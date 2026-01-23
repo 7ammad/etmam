@@ -1,0 +1,122 @@
+# Etmaam Project Context Bridge (.cursorrules)
+# Generated from Stack-Agnostic AI Development Workflow - Phase 0
+
+## Project Identity
+- **Name:** Etmaam (MVP)
+- **Goal:** Automated Tender Qualification & CRM Connector for Saudi Market
+- **Core Philosophy:** "Arabic First, Business Ready" (Native RTL)
+- **Architecture:** A2UI (Agent-Generated UI) Protocol
+- **Competition:** Infratech (20,000 SAR prize)
+
+## Tech Stack (Frozen - Phase 0 Resolution)
+- **Frontend:** Next.js 16.1.4 (App Router, Server Actions)
+- **Styling:** Tailwind CSS v4 (Native RTL support via `rtl:` variant)
+- **UI Library:** Shadcn/UI (Radix primitives, accessible)
+- **Backend/DB:** Supabase (SSR package, Row Level Security)
+- **AI:** Vercel AI SDK v4 (Streaming JSON responses)
+- **Language:** TypeScript v5.7+ (Strict Mode)
+- **i18n:** next-intl (App Router optimized)
+- **Icons:** Lucide React (Latest)
+- **Font:** IBM Plex Sans Arabic (Google Fonts)
+
+## Coding Standards (The "Stack-Agnostic" Rules)
+
+### 1. Schema First Principle
+- **NEVER** write logic without defining the Interface/Type first
+- Use Zod schemas for runtime validation
+- Generate TypeScript types from Supabase schema
+
+### 2. RTL Native (Critical)
+- Every UI component MUST support `dir="rtl"` by default
+- Use logical CSS properties (e.g., `ms-2` instead of `ml-2`)
+- Use Tailwind v4 logical utilities (`start-`, `end-`, `ms-`, `me-`)
+- All icons (arrows, chevrons) must flip automatically in RTL
+- Test both `/ar` and `/en` routes
+
+### 3. A2UI Protocol
+- UI components should be capable of rendering from JSON streams
+- Create `DynamicRenderer` component that maps JSON -> Shadcn Components
+- Server Actions return UI-structure JSON, not just raw text
+
+### 4. Error Handling Pattern
+- Use "Result Pattern" for Server Actions:
+  ```typescript
+  return { success: boolean, data?: T, error?: string }
+  ```
+- Never throw errors directly; wrap in Result type
+
+### 5. Server Components by Default
+- Use Server Components unless interactivity is required
+- Use Server Actions for data mutations
+- Avoid `useEffect` for data fetching; use `await` in Server Components
+
+### 6. Security (Supabase RLS)
+- Enable Row Level Security (RLS) on ALL tables
+- Use Supabase generated types for TypeScript safety
+- Never expose sensitive data in client components
+
+## Directory Structure
+```
+/app/[locale]/          # Internationalized routes (ar/en)
+  /dashboard/           # Main dashboard
+  /login/               # Auth pages
+/components/
+  /ui/                  # Shadcn/UI components
+  /a2ui/                # Dynamic renderers for AI content
+  /layout/              # Header, Footer, Sidebar
+/lib/
+  /supabase/            # Typed Supabase clients
+  /ai/                  # AI SDK utilities
+  /utils/               # Pure utility functions
+/types/                 # Shared TypeScript interfaces (Zod schemas preferred)
+/actions/                # Server Actions
+```
+
+## Naming Conventions
+- **Files:** kebab-case (`tender-upload.tsx`)
+- **Components:** PascalCase (`TenderUpload`)
+- **Functions:** camelCase (`analyzeTender`)
+- **Constants:** UPPER_SNAKE_CASE (`MAX_FILE_SIZE`)
+- **Types/Interfaces:** PascalCase (`TenderData`)
+
+## Testing Rules
+- Write tests BEFORE implementation (TDD)
+- Use Jest + React Testing Library for components
+- Use Playwright for E2E tests
+- Mock Supabase client in tests
+
+## Performance Guidelines
+- Use `next/image` for all images
+- Implement loading skeletons (RTL-aware shimmer)
+- Use React Suspense boundaries
+- Index database columns: `status`, `created_at`, `user_id`
+
+## Theme System
+- **Light Mode:** "Ministry Clean" - White backgrounds, slate text, emerald green accents
+- **Dark Mode:** "Midnight Operator" - Deep charcoal (#0f172a), silver text, neon emerald accents
+- Use `next-themes` for theme management
+- Support system preference detection
+
+## Internationalization
+- Default locale: `ar` (Arabic)
+- Secondary locale: `en` (English)
+- Route structure: `/ar/dashboard`, `/en/dashboard`
+- Middleware auto-detects but defaults to Arabic
+- All user-facing text MUST use `next-intl` (never hardcode Arabic/English)
+
+## AI Integration
+- Use Vercel AI SDK for streaming responses
+- AI responses MUST be in Arabic for Arabic locale
+- Return structured JSON from AI (not free-form text)
+- Implement retry logic for AI API calls
+
+## File Upload Handling
+- Support CSV and Excel files
+- Handle Arabic encoding properly (UTF-8 with BOM)
+- Parse with `papaparse` or `xlsx`
+- Sanitize all inputs before database insertion
+
+## References
+- Blueprint: `etmam-docs/Etmam-blueprint.md`
+- Workflow: `etmam-docs/The _Stack-Agnostic_ AI Development Workflow (Veri.md`
+- Skills: `.cursor/rules/*.md`
