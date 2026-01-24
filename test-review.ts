@@ -13,8 +13,8 @@ function calculateTotal(items: any[]) {
 const unusedVar = "test";
 
 // Missing type safety
-function processData(data) {
-  return data.map(x => x.value);
+function processData(data: any) {
+  return data.map((x: any) => x.value);
 }
 
 // Potential security issue - no input validation

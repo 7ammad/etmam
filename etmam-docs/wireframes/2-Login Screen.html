@@ -1,0 +1,160 @@
+
+                <html>
+                <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <script>
+                        window.FontAwesomeConfig = {
+                            autoReplaceSvg: 'nest', // Options: 'nest', 'remove', 'replace'
+                        };
+                    </script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+                    <style>
+                    </style>
+                    <script>
+                    tailwind.config = {
+                    theme: {
+                        extend: {
+                        colors: {
+                            primary: {"50":"#fafafa","100":"#f5f5f5","200":"#e5e5e5","300":"#d4d4d4","400":"#a3a3a3","500":"#737373","600":"#525252","700":"#404040","800":"#262626","900":"#171717","950":"#0a0a0a"}
+                        }
+                        }
+                    }
+                    }
+                </script>
+                </head>
+
+                <body>
+                        <div id="login-screen" class="min-h-[1024px] w-[1440px] bg-white flex items-center justify-center" dir="rtl">
+  
+  <div class="w-full max-w-[440px] px-8">
+    
+    <div class="text-center mb-12">
+      <div class="w-16 h-16 bg-neutral-800 mx-auto mb-4 flex items-center justify-center">
+        <i class="fa-solid fa-gavel text-white text-2xl"></i>
+      </div>
+      <h1 class="text-2xl text-neutral-900 mb-2">منصة تقييم المناقصات</h1>
+      <p class="text-sm text-neutral-600">تسجيل الدخول لحسابك</p>
+    </div>
+
+    <div class="bg-white border-2 border-neutral-200 p-8 mb-6">
+      
+      <div id="error-banner" class="hidden mb-6 p-4 bg-neutral-100 border border-neutral-300">
+        <div class="flex items-start gap-3">
+          <i class="fa-solid fa-circle-exclamation text-neutral-700 mt-0.5"></i>
+          <div class="flex-1">
+            <p class="text-sm text-neutral-900" id="error-message">بيانات الدخول غير صحيحة</p>
+          </div>
+        </div>
+      </div>
+
+      <form id="login-form">
+        <div class="mb-6">
+          <label for="email" class="block text-sm text-neutral-900 mb-2">
+            البريد الإلكتروني
+          </label>
+          <input 
+            type="email" 
+            id="email" 
+            name="email"
+            required
+            class="w-full px-4 py-3 border-2 border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:border-neutral-900 transition-colors"
+            placeholder="example@company.com"
+          />
+          <p class="text-xs text-neutral-500 mt-1 hidden" id="email-error">الرجاء إدخال بريد إلكتروني صحيح</p>
+        </div>
+
+        <div class="mb-6">
+          <label for="password" class="block text-sm text-neutral-900 mb-2">
+            كلمة المرور
+          </label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password"
+            required
+            minlength="8"
+            class="w-full px-4 py-3 border-2 border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:border-neutral-900 transition-colors"
+            placeholder="••••••••"
+          />
+          <p class="text-xs text-neutral-500 mt-1 hidden" id="password-error">كلمة المرور يجب أن تكون 8 أحرف على الأقل</p>
+        </div>
+
+        <button 
+          type="submit" 
+          id="login-button"
+          disabled
+          class="w-full py-3 px-6 bg-neutral-300 text-neutral-500 text-sm transition-colors cursor-not-allowed mb-4"
+        >
+          <span id="login-text">تسجيل الدخول</span>
+          <i class="fa-solid fa-spinner fa-spin hidden" id="login-spinner"></i>
+        </button>
+
+        <div class="text-center">
+          <a href="#forgot-password" class="text-sm text-neutral-700 hover:text-neutral-900 underline">
+            نسيت كلمة المرور؟
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <div class="flex items-center justify-center gap-6 text-sm">
+      <button id="language-toggle" class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 transition-colors">
+        <i class="fa-solid fa-language"></i>
+        <span>English</span>
+      </button>
+      
+      <div class="w-px h-4 bg-neutral-300"></div>
+      
+      <button id="theme-toggle" class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 transition-colors">
+        <i class="fa-solid fa-moon"></i>
+        <span>الوضع الداكن</span>
+      </button>
+    </div>
+
+    <div class="mt-8 text-center text-xs text-neutral-500">
+      <p>© 2025 منصة تقييم المناقصات. جميع الحقوق محفوظة.</p>
+    </div>
+
+  </div>
+
+  <div id="loading-state" class="hidden fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
+    <div class="text-center">
+      <i class="fa-solid fa-spinner fa-spin text-4xl text-neutral-900 mb-4"></i>
+      <p class="text-neutral-700">جاري تسجيل الدخول...</p>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  input:focus {
+    outline: none;
+  }
+  
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  
+  #login-button:not(:disabled) {
+    background-color: #171717;
+    color: white;
+    cursor: pointer;
+  }
+  
+  #login-button:not(:disabled):hover {
+    background-color: #262626;
+  }
+  
+  input:valid {
+    border-color: #d4d4d4;
+  }
+  
+  input:invalid:not(:placeholder-shown) {
+    border-color: #525252;
+  }
+</style>
+
+                        </body>
+                        </html>
+                        

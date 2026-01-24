@@ -1,6 +1,3 @@
-// Database types - will be generated from Supabase schema
-// For now, define base structure manually
-
 export type Json =
   | string
   | number
@@ -9,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       tenders: {
@@ -68,10 +65,10 @@ export type Database = {
           score: number
           recommendation: 'qualified' | 'conditional' | 'excluded'
           summary: string
-          strengths: string[]
-          risks: string[]
-          missing_requirements: string[]
-          action_items: string[]
+          strengths: string[] | null
+          risks: string[] | null
+          missing_requirements: string[] | null
+          action_items: string[] | null
           breakdown: Json
           model_used: string
         }
@@ -83,10 +80,10 @@ export type Database = {
           score: number
           recommendation: 'qualified' | 'conditional' | 'excluded'
           summary: string
-          strengths?: string[]
-          risks?: string[]
-          missing_requirements?: string[]
-          action_items?: string[]
+          strengths?: string[] | null
+          risks?: string[] | null
+          missing_requirements?: string[] | null
+          action_items?: string[] | null
           breakdown?: Json
           model_used?: string
         }
@@ -98,10 +95,10 @@ export type Database = {
           score?: number
           recommendation?: 'qualified' | 'conditional' | 'excluded'
           summary?: string
-          strengths?: string[]
-          risks?: string[]
-          missing_requirements?: string[]
-          action_items?: string[]
+          strengths?: string[] | null
+          risks?: string[] | null
+          missing_requirements?: string[] | null
+          action_items?: string[] | null
           breakdown?: Json
           model_used?: string
         }
@@ -189,12 +186,8 @@ export type Database = {
   }
 }
 
-// Helper types
-export type Tables<T extends keyof Database['public']['Tables']> =
-  Database['public']['Tables'][T]['Row']
-export type TablesInsert<T extends keyof Database['public']['Tables']> =
-  Database['public']['Tables'][T]['Insert']
-export type TablesUpdate<T extends keyof Database['public']['Tables']> =
-  Database['public']['Tables'][T]['Update']
-export type Enums<T extends keyof Database['public']['Enums']> =
-  Database['public']['Enums'][T]
+// Helper types for easier usage
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
+export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
+export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
+export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T]

@@ -3,7 +3,7 @@
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { IconButton } from '@radix-ui/themes'
 
 type Props = {
   className?: string
@@ -20,32 +20,25 @@ export function ThemeToggle({ className }: Props) {
 
   if (!mounted) {
     return (
-      <button
-        className={cn(
-          'rounded-md p-2 text-muted-foreground hover:bg-muted transition-colors',
-          className
-        )}
-        aria-label="Toggle theme"
-      >
-        <Sun className="h-5 w-5" />
-      </button>
+      <IconButton variant="ghost" color="gray" className={className} disabled>
+        <Sun size={20} />
+      </IconButton>
     )
   }
 
   return (
-    <button
+    <IconButton 
+      variant="ghost" 
+      color="gray" 
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className={cn(
-        'rounded-md p-2 text-muted-foreground hover:bg-muted transition-colors',
-        className
-      )}
+      className={className}
       aria-label="Toggle theme"
     >
       {theme === 'dark' ? (
-        <Sun className="h-5 w-5" />
+        <Sun size={20} />
       ) : (
-        <Moon className="h-5 w-5" />
+        <Moon size={20} />
       )}
-    </button>
+    </IconButton>
   )
 }

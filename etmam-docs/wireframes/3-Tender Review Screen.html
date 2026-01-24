@@ -1,0 +1,335 @@
+
+                <html>
+                <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <script>
+                        window.FontAwesomeConfig = {
+                            autoReplaceSvg: 'nest', // Options: 'nest', 'remove', 'replace'
+                        };
+                    </script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+                    <style>
+                    </style>
+                    <script>
+                    tailwind.config = {
+                    theme: {
+                        extend: {
+                        colors: {
+                            primary: {"50":"#fafafa","100":"#f5f5f5","200":"#e5e5e5","300":"#d4d4d4","400":"#a3a3a3","500":"#737373","600":"#525252","700":"#404040","800":"#262626","900":"#171717","950":"#0a0a0a"}
+                        }
+                        }
+                    }
+                    }
+                </script>
+                </head>
+
+                <body>
+                        <div id="tender-review-screen" class="min-h-[1024px] w-[1440px] bg-white flex" dir="rtl">
+
+  <!-- Left Sidebar -->
+  <div id="sidebar" class="w-64 bg-neutral-50 border-l border-neutral-200 flex flex-col">
+    
+    <!-- App Logo -->
+    <div class="p-6 border-b border-neutral-200">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-neutral-800 flex items-center justify-center">
+          <i class="fa-solid fa-gavel text-white text-sm"></i>
+        </div>
+        <span class="text-lg text-neutral-900">تقييم المناقصات</span>
+      </div>
+    </div>
+
+    <!-- Navigation Menu -->
+    <nav class="flex-1 p-4">
+      <ul class="space-y-2">
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>لوحة التحكم</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm">
+            <i class="fa-solid fa-file-contract"></i>
+            <span>المناقصات</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-users"></i>
+            <span>CRM</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-cog"></i>
+            <span>الإعدادات</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Logout Button -->
+    <div class="p-4 border-t border-neutral-200">
+      <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+        <i class="fa-solid fa-sign-out-alt"></i>
+        <span>تسجيل الخروج</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col">
+    
+    <!-- Top Bar -->
+    <header id="header" class="bg-white border-b border-neutral-200 px-6 py-4">
+      <div class="flex items-center justify-between">
+        
+        <h1 class="text-xl text-neutral-900">تفاصيل المناقصة</h1>
+        
+        <div class="flex items-center gap-4">
+          
+          <!-- User Menu -->
+          <div class="flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?scale=200&seed=1234" alt="صورة المستخدم" class="w-8 h-8 bg-neutral-200">
+            <span class="text-sm text-neutral-700">أحمد المدير</span>
+            <i class="fa-solid fa-chevron-down text-neutral-500 text-xs"></i>
+          </div>
+          
+          <!-- Language Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-language"></i>
+            <span>EN</span>
+          </button>
+          
+          <!-- Theme Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-moon"></i>
+            <span>داكن</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="flex-1 p-6">
+      
+      <!-- Breadcrumb -->
+      <nav class="mb-6">
+        <div class="flex items-center gap-2 text-sm">
+          <button class="text-neutral-700 hover:text-neutral-900 transition-colors">المناقصات</button>
+          <i class="fa-solid fa-chevron-left text-neutral-400 text-xs"></i>
+          <span class="text-neutral-900">تفاصيل المناقصة</span>
+        </div>
+      </nav>
+
+      <!-- Header Block -->
+      <div class="bg-white border-2 border-neutral-200 p-6 mb-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="text-xl text-neutral-900 mb-2">تطوير منصة التعليم الإلكتروني</h2>
+            <p class="text-lg text-neutral-600 mb-3">وزارة التعليم</p>
+            <div class="flex items-center gap-6 text-sm text-neutral-600">
+              <span>رقم المرجع: TEN-2025-001</span>
+              <span>الموعد النهائي: 2025-02-28</span>
+              <span>القيمة: 1,200,000 ريال</span>
+            </div>
+          </div>
+          <div>
+            <span class="inline-flex items-center gap-2 px-3 py-1 bg-neutral-800 text-white text-sm">
+              <i class="fa-solid fa-check"></i>
+              مقيمة
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Evaluation Summary Card -->
+      <div class="bg-white border-2 border-neutral-200 p-6 mb-6">
+        <h3 class="text-lg text-neutral-900 mb-4">ملخص التقييم</h3>
+        <div class="grid grid-cols-3 gap-6">
+          <div>
+            <div class="text-3xl text-neutral-900 mb-1">85</div>
+            <div class="text-sm text-neutral-600">الدرجة الإجمالية</div>
+          </div>
+          <div>
+            <span class="inline-flex items-center gap-2 px-3 py-1 bg-neutral-800 text-white text-sm mb-1">
+              <i class="fa-solid fa-thumbs-up"></i>
+              مؤهل
+            </span>
+            <div class="text-sm text-neutral-600">التوصية</div>
+          </div>
+          <div>
+            <p class="text-sm text-neutral-700">مشروع واعد مع توافق قوي مع قدراتنا التقنية والميزانية المتاحة. يتطلب تخطيط دقيق للجدول الزمني لضمان التسليم في الموعد المحدد.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breakdown Bars -->
+      <div class="bg-white border-2 border-neutral-200 p-6 mb-6">
+        <h3 class="text-lg text-neutral-900 mb-4">تفصيل التقييم</h3>
+        <div class="space-y-4">
+          
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-neutral-700">توافق الميزانية</span>
+              <span class="text-sm text-neutral-900">90</span>
+            </div>
+            <div class="w-full bg-neutral-200 h-2">
+              <div class="bg-neutral-800 h-2" style="width: 90%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-neutral-700">التوافق التقني</span>
+              <span class="text-sm text-neutral-900">85</span>
+            </div>
+            <div class="w-full bg-neutral-200 h-2">
+              <div class="bg-neutral-800 h-2" style="width: 85%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-neutral-700">توافق الجدول الزمني</span>
+              <span class="text-sm text-neutral-900">75</span>
+            </div>
+            <div class="w-full bg-neutral-200 h-2">
+              <div class="bg-neutral-800 h-2" style="width: 75%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-neutral-700">التوافق الاستراتيجي</span>
+              <span class="text-sm text-neutral-900">88</span>
+            </div>
+            <div class="w-full bg-neutral-200 h-2">
+              <div class="bg-neutral-800 h-2" style="width: 88%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-neutral-700">تقييم المخاطر</span>
+              <span class="text-sm text-neutral-900">80</span>
+            </div>
+            <div class="w-full bg-neutral-200 h-2">
+              <div class="bg-neutral-800 h-2" style="width: 80%"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Lists Grid -->
+      <div class="grid grid-cols-2 gap-6 mb-6">
+        
+        <!-- Strengths -->
+        <div class="bg-white border-2 border-neutral-200">
+          <div class="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
+            <h4 class="text-lg text-neutral-900">نقاط القوة</h4>
+            <i class="fa-solid fa-chevron-up text-neutral-500"></i>
+          </div>
+          <div class="p-6">
+            <ul class="space-y-2">
+              <li class="flex items-start gap-3">
+                <i class="fa-solid fa-check text-neutral-600 text-sm mt-1"></i>
+                <span class="text-sm text-neutral-700">خبرة واسعة في تطوير منصات التعليم الإلكتروني</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <i class="fa-solid fa-check text-neutral-600 text-sm mt-1"></i>
+                <span class="text-sm text-neutral-700">فريق تقني متخصص في التقنيات المطلوبة</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <i class="fa-solid fa-check text-neutral-600 text-sm mt-1"></i>
+                <span class="text-sm text-neutral-700">ميزانية المشروع تتماشى مع قدراتنا المالية</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Risks -->
+        <div class="bg-white border-2 border-neutral-200">
+          <div class="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
+            <h4 class="text-lg text-neutral-900">المخاطر</h4>
+            <i class="fa-solid fa-chevron-up text-neutral-500"></i>
+          </div>
+          <div class="p-6">
+            <ul class="space-y-2">
+              <li class="flex items-start gap-3">
+                <i class="fa-solid fa-exclamation-triangle text-neutral-600 text-sm mt-1"></i>
+                <span class="text-sm text-neutral-700">الجدول الزمني المحدد قد يكون ضيقًا</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <i class="fa-solid fa-exclamation-triangle text-neutral-600 text-sm mt-1"></i>
+                <span class="text-sm text-neutral-700">متطلبات الأمان قد تحتاج موارد إضافية</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Missing Requirements -->
+        <div class="bg-white border-2 border-neutral-200">
+          <div class="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
+            <h4 class="text-lg text-neutral-900">المتطلبات الناقصة</h4>
+            <i class="fa-solid fa-chevron-down text-neutral-500"></i>
+          </div>
+        </div>
+
+        <!-- Action Items -->
+        <div class="bg-white border-2 border-neutral-200">
+          <div class="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
+            <h4 class="text-lg text-neutral-900">العناصر المطلوبة</h4>
+            <i class="fa-solid fa-chevron-up text-neutral-500"></i>
+          </div>
+          <div class="p-6">
+            <ul class="space-y-2">
+              <li class="flex items-start gap-3">
+                <i class="fa-solid fa-tasks text-neutral-600 text-sm mt-1"></i>
+                <span class="text-sm text-neutral-700">مراجعة متطلبات الأمان مع فريق الأمن السيبراني</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <i class="fa-solid fa-tasks text-neutral-600 text-sm mt-1"></i>
+                <span class="text-sm text-neutral-700">تحديد الموارد الإضافية المطلوبة للمشروع</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Decision Bar (Sticky) -->
+    <div id="decision-bar" class="bg-white border-t border-neutral-200 px-6 py-4">
+      <div class="flex items-center justify-between">
+        
+        <div class="flex items-center gap-3">
+          <button class="px-6 py-2 bg-neutral-900 text-white text-sm hover:bg-neutral-800 transition-colors">
+            اعتماد
+          </button>
+          <button class="px-6 py-2 border-2 border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-50 transition-colors">
+            رفض
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button class="px-6 py-2 bg-neutral-800 text-white text-sm hover:bg-neutral-700 transition-colors">
+            إرسال إلى CRM
+          </button>
+          <button class="px-6 py-2 border-2 border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-50 transition-colors">
+            فتح في CRM
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+                        </body>
+                        </html>
+                        
