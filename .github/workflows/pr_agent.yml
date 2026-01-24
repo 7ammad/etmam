@@ -1,0 +1,29 @@
+name: PR Agent
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Run PR Agent
+    steps:
+      - name: PR Agent action
+        uses: qodo-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # DeepSeek Configuration (OpenAI-compatible)
+          OPENAI__KEY: ${{ secrets.DEEPSEEK_KEY }}
+          OPENAI__API_BASE: "https://api.deepseek.com"
+          CONFIG__MODEL: "deepseek/deepseek-chat"
+          CONFIG__FALLBACK_MODELS: '["deepseek/deepseek-chat"]'
+          
+          # Cost Control & Output Settings
+          PR_CODE_SUGGESTIONS__NUM_CODE_SUGGESTIONS: 2
+          PR_REVIEW__REVIEW_SUMMARY_MAX_WORDS: 300
