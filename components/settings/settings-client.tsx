@@ -1,11 +1,12 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { 
-  Settings2, 
-  Palette, 
-  Globe, 
-  Bell, 
+import { useTranslations } from '@/components/providers/i18n-provider'
+import { Link } from '@/i18n/routing'
+import {
+  Settings2,
+  Palette,
+  Globe,
+  Bell,
   Database,
   User,
   Sparkles,
@@ -18,7 +19,7 @@ interface SettingsClientProps {
 }
 
 export function SettingsClient({ locale }: SettingsClientProps) {
-  const t = useTranslations()
+  const t = useTranslations('settings')
 
   const settingsCards = [
     {

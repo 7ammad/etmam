@@ -1,25 +1,8 @@
 import type { ReactNode } from 'react'
-import { Noto_Kufi_Arabic, Cairo } from 'next/font/google'
 import { Theme } from '@radix-ui/themes'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import '@radix-ui/themes/styles.css'
 import './globals.css'
-
-// Noto Kufi Arabic - For Arabic text
-const notoKufi = Noto_Kufi_Arabic({
-  subsets: ['arabic'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-  variable: '--font-noto-kufi',
-  display: 'swap',
-})
-
-// Cairo - For English/Headings (Geometric style)
-const cairo = Cairo({
-  subsets: ['latin', 'arabic'],
-  weight: ['200', '300', '400', '500', '600', '700', '800', '900'],
-  variable: '--font-cairo',
-  display: 'swap',
-})
 
 type Props = {
   children: ReactNode
@@ -27,16 +10,26 @@ type Props = {
 
 // Root layout must contain <html> and <body> tags
 // Locale-specific attributes (lang, dir) are set by LocaleHtmlAttributes script
+// Using system fonts for better compatibility - Google Fonts can be added via CSS link if needed
 export default function RootLayout({ children }: Props) {
   return (
-    <html className={`${notoKufi.variable} ${cairo.variable}`} suppressHydrationWarning>
-      <body className="min-h-screen antialiased">
+    <html suppressHydrationWarning>
+      <head>
+        {/* Load Google Fonts via CSS link for better build compatibility */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Cairo:wght@200..900&family=Noto+Kufi+Arabic:wght@100..900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="min-h-screen antialiased font-sans">
         <ThemeProvider>
-          <Theme 
-            accentColor="iris" 
-            grayColor="slate" 
-            panelBackground="translucent" 
-            scaling="100%" 
+          <Theme
+            accentColor="iris"
+            grayColor="slate"
+            panelBackground="translucent"
+            scaling="100%"
             radius="large"
             appearance="inherit"
           >

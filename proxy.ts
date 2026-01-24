@@ -1,39 +1,11 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import createMiddleware from 'next-intl/middleware'
+import { routing } from './i18n/routing'
 
-const locales = ['ar', 'en']
-const defaultLocale = 'ar'
+// Use next-intl middleware for locale handling
+const intlMiddleware = createMiddleware(routing)
 
-function getLocale(request: NextRequest): string {
-  // Check for locale in pathname
-  const pathname = request.nextUrl.pathname
-  const pathnameLocale = locales.find(
-    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
-  )
-  if (pathnameLocale) return pathnameLocale
-
-  // Check Accept-Language header
-  const acceptLanguage = request.headers.get('Accept-Language')
-  if (acceptLanguage) {
-    const browserLocale = acceptLanguage.split(',')[0].split('-')[0]
-    if (locales.includes(browserLocale)) return browserLocale
-  }
-
-  return defaultLocale
-}
-
-export function proxy(request: NextRequest) {
-  const pathname = request.nextUrl.pathname
-
-  // Check if pathname already has a locale
-  const pathnameHasLocale = locales.some(
-    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
-  )
-
-  if (pathnameHasLocale) return NextResponse.next()
-
-  // Redirect to locale-prefixed path
-  const locale = getLocale(request)
-  return NextResponse.redirect(new URL(`/${locale}${pathname}`, request.url))
+export function proxy(request: Request) {
+  return intlMiddleware(request as any)
 }
 
 export const config = {

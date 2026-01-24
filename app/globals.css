@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-family-arabic: var(--font-noto-kufi), system-ui, sans-serif;
-  --font-family-sans: var(--font-cairo), system-ui, sans-serif;
+  --font-family-arabic: 'Noto Kufi Arabic', 'Cairo', system-ui, sans-serif;
+  --font-family-sans: 'Cairo', 'Noto Kufi Arabic', system-ui, sans-serif;
 }
 
 /* ========================================
