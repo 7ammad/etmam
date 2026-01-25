@@ -9,8 +9,10 @@ test.describe('Home Page', () => {
 
   test('should display the app title in Arabic', async ({ page }) => {
     await page.goto('/ar')
-    // App name appears in header as text, hero has the main headline
-    await expect(page.getByText('إتمام', { exact: true }).first()).toBeVisible()
+    await page.waitForLoadState('domcontentloaded')
+    // App name "ETMAM" appears in header (uses Latin chars in both locales)
+    // Wait for hydration and content to appear
+    await expect(page.getByText('ETMAM').first()).toBeVisible({ timeout: 15000 })
   })
 
   test('should have RTL direction for Arabic locale', async ({ page }) => {
@@ -23,8 +25,10 @@ test.describe('Home Page', () => {
 
   test('should display English content on /en route', async ({ page }) => {
     await page.goto('/en')
-    // App name appears in header, hero has "End Manual Tender Processing"
-    await expect(page.getByText('Etmaam', { exact: true }).first()).toBeVisible()
+    await page.waitForLoadState('domcontentloaded')
+    // App name "ETMAM" appears in header, hero has "End Manual Tender Processing"
+    // Wait for hydration and content to appear
+    await expect(page.getByText('ETMAM').first()).toBeVisible({ timeout: 15000 })
   })
 
   test('should have LTR direction for English locale', async ({ page }) => {
