@@ -284,7 +284,7 @@
   /* ═══════════════════════════════════════
      LAYOUT
      ═══════════════════════════════════════ */
-  --sidebar-width: 220px;  /* CRM style: reduced from 256px */
+  --sidebar-width: 240px;  /* Wider for better RTL text support */
   --sidebar-collapsed-width: 64px;
   --header-height: 64px;
   --container-max-width: 1280px;

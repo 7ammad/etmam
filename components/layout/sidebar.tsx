@@ -223,59 +223,38 @@ export function Sidebar({ className, style, onClose, isMobileDrawer = false }: S
           })}
         </Flex>
 
-        {/* CTA Card - Upgrade to PRO (Figma style purple gradient) */}
+        {/* CTA Card - Upgrade to PRO (Compact) */}
         <Box
           style={{
-            marginTop: 'var(--space-8)',
-            padding: 'var(--space-4)',
-            borderRadius: 'var(--radius-card)',
+            marginTop: 'var(--space-6)',
+            padding: 'var(--space-3)',
+            borderRadius: 'var(--radius-md)',
             background: 'var(--gradient-cta-card)',
-            boxShadow: 'var(--shadow-card)',
             color: 'var(--text-inverted)',
           }}
         >
-          <Flex direction="column" gap="2" align="center">
+          <Flex align="center" gap="3">
             <Flex
               align="center"
               justify="center"
               style={{
-                width: '48px',
-                height: '48px',
+                width: '32px',
+                height: '32px',
                 borderRadius: 'var(--radius-full)',
                 backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                flexShrink: 0,
               }}
             >
-              <Sparkles size={24} />
+              <Sparkles size={16} />
             </Flex>
-            <Text size="3" weight="bold" style={{ textAlign: 'center' }}>
-              {isRTL ? 'ترقية إلى PRO' : 'Upgrade to PRO'}
-            </Text>
-            <Text size="1" style={{ textAlign: 'center', opacity: 0.9 }}>
-              {isRTL ? 'احصل على جميع الميزات!' : 'Get access all Features!'}
-            </Text>
-            <button
-              style={{
-                marginTop: 'var(--space-2)',
-                padding: 'var(--space-2) var(--space-4)',
-                borderRadius: 'var(--radius-full)',
-                border: 'none',
-                backgroundColor: 'rgba(255, 255, 255, 1)',
-                color: '#5D50C6',
-                fontSize: 'var(--text-sm)',
-                fontWeight: 'var(--font-bold)',
-                cursor: 'pointer',
-                transition: 'var(--transition-all)',
-                width: '100%',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)'
-              }}
-            >
-              {isRTL ? 'احصل على Pro الآن!' : 'Get Pro Now!'}
-            </button>
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              <Text size="2" weight="bold" style={{ display: 'block' }}>
+                {isRTL ? 'ترقية PRO' : 'Upgrade PRO'}
+              </Text>
+              <Text size="1" style={{ opacity: 0.85 }}>
+                {isRTL ? 'جميع الميزات' : 'All Features'}
+              </Text>
+            </Box>
           </Flex>
         </Box>
       </nav>
