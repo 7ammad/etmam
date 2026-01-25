@@ -1,0 +1,474 @@
+
+                <html>
+                <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <script>
+                        window.FontAwesomeConfig = {
+                            autoReplaceSvg: 'nest', // Options: 'nest', 'remove', 'replace'
+                        };
+                    </script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+                    <style>
+                    </style>
+                    <script>
+                    tailwind.config = {
+                    theme: {
+                        extend: {
+                        colors: {
+                            primary: {"50":"#fafafa","100":"#f5f5f5","200":"#e5e5e5","300":"#d4d4d4","400":"#a3a3a3","500":"#737373","600":"#525252","700":"#404040","800":"#262626","900":"#171717","950":"#0a0a0a"}
+                        }
+                        }
+                    }
+                    }
+                </script>
+                </head>
+
+                <body>
+                        <div id="push-success-screen" class="min-h-[1024px] w-[1440px] bg-white flex" dir="rtl">
+
+  <!-- Left Sidebar -->
+  <div id="sidebar" class="w-64 bg-neutral-50 border-l border-neutral-200 flex flex-col">
+    
+    <!-- App Logo -->
+    <div class="p-6 border-b border-neutral-200">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-neutral-800 flex items-center justify-center">
+          <i class="fa-solid fa-gavel text-white text-sm"></i>
+        </div>
+        <span class="text-lg text-neutral-900">تقييم المناقصات</span>
+      </div>
+    </div>
+
+    <!-- Navigation Menu -->
+    <nav class="flex-1 p-4">
+      <ul class="space-y-2">
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>لوحة التحكم</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-file-contract"></i>
+            <span>المناقصات</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-users"></i>
+            <span>CRM</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-cog"></i>
+            <span>الإعدادات</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Logout Button -->
+    <div class="p-4 border-t border-neutral-200">
+      <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+        <i class="fa-solid fa-sign-out-alt"></i>
+        <span>تسجيل الخروج</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col">
+    
+    <!-- Top Bar -->
+    <header id="header" class="bg-white border-b border-neutral-200 px-6 py-4">
+      <div class="flex items-center justify-between">
+        
+        <h1 class="text-xl text-neutral-900">نجح الإرسال إلى CRM</h1>
+        
+        <div class="flex items-center gap-4">
+          
+          <!-- User Menu -->
+          <div class="flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?scale=200&seed=1234" alt="صورة المستخدم" class="w-8 h-8 bg-neutral-200">
+            <span class="text-sm text-neutral-700">أحمد المدير</span>
+            <i class="fa-solid fa-chevron-down text-neutral-500 text-xs"></i>
+          </div>
+          
+          <!-- Language Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-language"></i>
+            <span>EN</span>
+          </button>
+          
+          <!-- Theme Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-moon"></i>
+            <span>داكن</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="flex-1 flex items-center justify-center p-8">
+      
+      <!-- Success Card -->
+      <div id="success-card" class="bg-white border-2 border-neutral-200 w-full max-w-2xl">
+        
+        <!-- Success Header -->
+        <div class="px-8 py-6 border-b border-neutral-200 text-center">
+          <div class="w-16 h-16 bg-neutral-800 mx-auto mb-4 flex items-center justify-center">
+            <i class="fa-solid fa-check text-white text-2xl"></i>
+          </div>
+          <h2 class="text-2xl text-neutral-900 mb-2">تم إنشاء فرصة في CRM</h2>
+          <p class="text-sm text-neutral-600">تم إرسال الفرصة بنجاح إلى نظام إدارة العملاء</p>
+        </div>
+
+        <!-- Details Card -->
+        <div class="p-8">
+          
+          <!-- CRM Details -->
+          <div class="bg-neutral-50 border border-neutral-200 p-6 mb-6">
+            <h3 class="text-lg text-neutral-900 mb-4">تفاصيل الفرصة</h3>
+            
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">معرف CRM:</span>
+                <span class="text-sm text-neutral-900">OPP-2025-001234</span>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">وقت الإرسال:</span>
+                <span class="text-sm text-neutral-900">2025-01-24 15:30:45</span>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">الحالة:</span>
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-neutral-800 text-white text-xs">
+                  <i class="fa-solid fa-link"></i>
+                  مرتبط
+                </span>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">النظام:</span>
+                <span class="text-sm text-neutral-900">HubSpot</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tender Summary -->
+          <div class="bg-neutral-50 border border-neutral-200 p-6 mb-8">
+            <h3 class="text-lg text-neutral-900 mb-4">ملخص المناقصة</h3>
+            
+            <div class="space-y-3">
+              <div class="flex items-start gap-3">
+                <span class="text-sm text-neutral-600 w-24">الجهة:</span>
+                <span class="text-sm text-neutral-900">وزارة التعليم</span>
+              </div>
+              <div class="flex items-start gap-3">
+                <span class="text-sm text-neutral-600 w-24">العنوان:</span>
+                <span class="text-sm text-neutral-900">تطوير منصة التعليم الإلكتروني</span>
+              </div>
+              <div class="flex items-start gap-3">
+                <span class="text-sm text-neutral-600 w-24">القيمة:</span>
+                <span class="text-sm text-neutral-900">1,200,000 ريال</span>
+              </div>
+              <div class="flex items-start gap-3">
+                <span class="text-sm text-neutral-600 w-24">الدرجة:</span>
+                <span class="text-sm text-neutral-900">85/100</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div id="action-buttons" class="flex items-center gap-4">
+            <button class="px-8 py-3 bg-neutral-900 text-white text-sm hover:bg-neutral-800 transition-colors flex items-center gap-2">
+              <i class="fa-solid fa-external-link-alt"></i>
+              فتح في CRM
+            </button>
+            
+            <button class="px-6 py-3 border-2 border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-50 transition-colors">
+              العودة للوحة
+            </button>
+            
+            <button class="px-6 py-3 border-2 border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-50 transition-colors">
+              عرض المناقصات
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+</div>
+
+<!-- Alternative State: No CRM URL -->
+<div id="push-success-screen-no-url" class="min-h-[1024px] w-[1440px] bg-white flex hidden" dir="rtl">
+
+  <!-- Left Sidebar -->
+  <div id="sidebar-no-url" class="w-64 bg-neutral-50 border-l border-neutral-200 flex flex-col">
+    
+    <!-- App Logo -->
+    <div class="p-6 border-b border-neutral-200">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-neutral-800 flex items-center justify-center">
+          <i class="fa-solid fa-gavel text-white text-sm"></i>
+        </div>
+        <span class="text-lg text-neutral-900">تقييم المناقصات</span>
+      </div>
+    </div>
+
+    <!-- Navigation Menu -->
+    <nav class="flex-1 p-4">
+      <ul class="space-y-2">
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>لوحة التحكم</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-file-contract"></i>
+            <span>المناقصات</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-users"></i>
+            <span>CRM</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-cog"></i>
+            <span>الإعدادات</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Logout Button -->
+    <div class="p-4 border-t border-neutral-200">
+      <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+        <i class="fa-solid fa-sign-out-alt"></i>
+        <span>تسجيل الخروج</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col">
+    
+    <!-- Top Bar -->
+    <header id="header-no-url" class="bg-white border-b border-neutral-200 px-6 py-4">
+      <div class="flex items-center justify-between">
+        
+        <h1 class="text-xl text-neutral-900">نجح الإرسال إلى CRM</h1>
+        
+        <div class="flex items-center gap-4">
+          
+          <!-- User Menu -->
+          <div class="flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?scale=200&seed=1234" alt="صورة المستخدم" class="w-8 h-8 bg-neutral-200">
+            <span class="text-sm text-neutral-700">أحمد المدير</span>
+            <i class="fa-solid fa-chevron-down text-neutral-500 text-xs"></i>
+          </div>
+          
+          <!-- Language Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-language"></i>
+            <span>EN</span>
+          </button>
+          
+          <!-- Theme Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-moon"></i>
+            <span>داكن</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="flex-1 flex items-center justify-center p-8">
+      
+      <!-- Success Card -->
+      <div id="success-card-no-url" class="bg-white border-2 border-neutral-200 w-full max-w-2xl">
+        
+        <!-- Success Header -->
+        <div class="px-8 py-6 border-b border-neutral-200 text-center">
+          <div class="w-16 h-16 bg-neutral-800 mx-auto mb-4 flex items-center justify-center">
+            <i class="fa-solid fa-check text-white text-2xl"></i>
+          </div>
+          <h2 class="text-2xl text-neutral-900 mb-2">تم إنشاء فرصة في CRM</h2>
+          <p class="text-sm text-neutral-600">تم إرسال الفرصة بنجاح إلى نظام إدارة العملاء</p>
+        </div>
+
+        <!-- Details Card -->
+        <div class="p-8">
+          
+          <!-- CRM Details -->
+          <div class="bg-neutral-50 border border-neutral-200 p-6 mb-6">
+            <h3 class="text-lg text-neutral-900 mb-4">تفاصيل الفرصة</h3>
+            
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">معرف CRM:</span>
+                <span class="text-sm text-neutral-900">OPP-2025-001234</span>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">وقت الإرسال:</span>
+                <span class="text-sm text-neutral-900">2025-01-24 15:30:45</span>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">الحالة:</span>
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-neutral-600 text-white text-xs">
+                  <i class="fa-solid fa-info-circle"></i>
+                  تم النسخ
+                </span>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-neutral-600">النظام:</span>
+                <span class="text-sm text-neutral-900">HubSpot</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Copy Confirmation -->
+          <div class="bg-neutral-100 border border-neutral-300 p-4 mb-6 flex items-center gap-3">
+            <i class="fa-solid fa-clipboard-check text-neutral-700"></i>
+            <span class="text-sm text-neutral-700">تم نسخ معرف CRM إلى الحافظة</span>
+          </div>
+
+          <!-- Action Buttons -->
+          <div id="action-buttons-no-url" class="flex items-center gap-4">
+            <button class="px-8 py-3 bg-neutral-900 text-white text-sm hover:bg-neutral-800 transition-colors flex items-center gap-2">
+              <i class="fa-solid fa-copy"></i>
+              نسخ المعرف
+            </button>
+            
+            <button class="px-6 py-3 border-2 border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-50 transition-colors">
+              العودة للوحة
+            </button>
+            
+            <button class="px-6 py-3 border-2 border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-50 transition-colors">
+              عرض المناقصات
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+</div>
+
+<!-- Loading State -->
+<div id="push-success-screen-loading" class="min-h-[1024px] w-[1440px] bg-white flex hidden" dir="rtl">
+
+  <!-- Left Sidebar -->
+  <div id="sidebar-loading" class="w-64 bg-neutral-50 border-l border-neutral-200 flex flex-col">
+    
+    <!-- App Logo -->
+    <div class="p-6 border-b border-neutral-200">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-neutral-800 flex items-center justify-center">
+          <i class="fa-solid fa-gavel text-white text-sm"></i>
+        </div>
+        <span class="text-lg text-neutral-900">تقييم المناقصات</span>
+      </div>
+    </div>
+
+    <!-- Navigation Menu -->
+    <nav class="flex-1 p-4">
+      <ul class="space-y-2">
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>لوحة التحكم</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-file-contract"></i>
+            <span>المناقصات</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-users"></i>
+            <span>CRM</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-cog"></i>
+            <span>الإعدادات</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Logout Button -->
+    <div class="p-4 border-t border-neutral-200">
+      <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+        <i class="fa-solid fa-sign-out-alt"></i>
+        <span>تسجيل الخروج</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col">
+    
+    <!-- Top Bar -->
+    <header id="header-loading" class="bg-white border-b border-neutral-200 px-6 py-4">
+      <div class="flex items-center justify-between">
+        
+        <h1 class="text-xl text-neutral-900">جاري التأكيد النهائي</h1>
+        
+        <div class="flex items-center gap-4">
+          
+          <!-- User Menu -->
+          <div class="flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?scale=200&seed=1234" alt="صورة المستخدم" class="w-8 h-8 bg-neutral-200">
+            <span class="text-sm text-neutral-700">أحمد المدير</span>
+            <i class="fa-solid fa-chevron-down text-neutral-500 text-xs"></i>
+          </div>
+          
+          <!-- Language Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-language"></i>
+            <span>EN</span>
+          </button>
+          
+          <!-- Theme Toggle -->
+          <button class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-moon"></i>
+            <span>داكن</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="flex-1 flex items-center justify-center p-8">
+      
+      <!-- Loading Card -->
+      <div id="loading-card" class="bg-white border-2 border-neutral-200 w-full max-w-2xl text-center p-
+                        </body>
+                        </html>
+                        

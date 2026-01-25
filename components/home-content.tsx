@@ -1,35 +1,30 @@
 'use client'
 
-import { useTranslations } from '@/components/providers/i18n-provider'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { useTranslations, useI18n } from '@/components/providers/i18n-provider'
+import { LandingHeader } from './landing/landing-header'
+import { HeroSection } from './landing/hero-section'
+import { HowItWorksSection } from './landing/how-it-works-section'
+import { FeaturesSection } from './landing/features-section'
+import { FAQSection } from './landing/faq-section'
+import { CTASection } from './landing/cta-section'
+import { Footer } from './landing/footer'
 
 type Props = {
   locale: string
 }
 
 export function HomeContent({ locale }: Props) {
-  const t = useTranslations('common')
-  const tAuth = useTranslations('auth')
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 relative">
-      {/* Theme toggle in top corner */}
-      <div className="absolute top-6 end-6">
-        <ThemeToggle />
-      </div>
-      
-      <h1 className="text-4xl font-bold text-primary-600">{t('appName')}</h1>
-      <p className="mt-4 text-lg text-muted-foreground">
-        {tAuth('welcome')}
-      </p>
-      <div className="mt-8 flex gap-4">
-        <a
-          href={`/${locale}/dashboard`}
-          className="rounded-lg bg-primary-500 px-6 py-3 text-white hover:bg-primary-600 transition-colors"
-        >
-          {t('dashboard')}
-        </a>
-      </div>
-    </main>
+    <div className="flex min-h-screen flex-col">
+      <LandingHeader />
+      <main className="flex-1">
+        <HeroSection />
+        <HowItWorksSection />
+        <FeaturesSection />
+        <FAQSection />
+        <CTASection />
+      </main>
+      <Footer />
+    </div>
   )
 }

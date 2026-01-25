@@ -28,10 +28,10 @@ todos:
     status: completed
   - id: task-9-dashboard
     content: "Task 9: Build dashboard UI with stats cards and tender table"
-    status: pending
+    status: completed
   - id: task-10-tender-actions
     content: "Task 10: Implement tender CRUD server actions"
-    status: pending
+    status: completed
   - id: task-11-ai-client
     content: "Task 11: Create multi-model AI client with DeepSeek primary"
     status: pending

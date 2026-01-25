@@ -1,0 +1,169 @@
+{
+  "design_system": {
+    "meta": {
+      "name": "Bequant-Inspired System",
+      "version": "1.0.0",
+      "description": "High-performance, dark-themed design system with motion graphics and bento-grid layouts."
+    },
+    "theme": {
+      "colors": {
+        "background": {
+          "primary": "#050505",
+          "secondary": "#0A0A0A",
+          "card": "#111111",
+          "card_hover": "#161616",
+          "glass": "rgba(20, 20, 20, 0.6)"
+        },
+        "text": {
+          "primary": "#FFFFFF",
+          "secondary": "#A1A1AA",
+          "muted": "#52525B",
+          "accent": "#FFFFFF"
+        },
+        "accents": {
+          "brand_red": "#FF331F",
+          "brand_orange": "#FF5722",
+          "brand_green": "#22C55E",
+          "brand_blue": "#3B82F6",
+          "brand_yellow": "#EAB308"
+        },
+        "borders": {
+          "subtle": "rgba(255, 255, 255, 0.1)",
+          "highlight": "rgba(255, 255, 255, 0.2)"
+        }
+      },
+      "typography": {
+        "font_family": {
+          "primary": "Inter, system-ui, sans-serif",
+          "display": "Inter, system-ui, sans-serif"
+        },
+        "weights": {
+          "regular": 400,
+          "medium": 500,
+          "semibold": 600,
+          "bold": 700
+        },
+        "sizes": {
+          "hero_title": "clamp(3rem, 6vw, 5rem)",
+          "section_title": "clamp(2rem, 4vw, 3rem)",
+          "subtitle": "1.125rem",
+          "body": "1rem",
+          "small": "0.875rem",
+          "tiny": "0.75rem"
+        },
+        "line_heights": {
+          "tight": 1.1,
+          "normal": 1.5,
+          "relaxed": 1.75
+        }
+      },
+      "spacing": {
+        "container_padding": "2rem",
+        "grid_gap": "1.5rem",
+        "section_gap": "4rem"
+      },
+      "borders": {
+        "radius": {
+          "sm": "4px",
+          "md": "8px",
+          "lg": "16px",
+          "pill": "9999px"
+        }
+      }
+    },
+    "sections": {
+      "hero": {
+        "layout": {
+          "type": "flex_column_center",
+          "height": "100vh",
+          "alignment": "center"
+        },
+        "background": {
+          "type": "webgl_animation",
+          "style": "warp_speed_tunnel",
+          "colors": ["#FF331F", "#000000"],
+          "overlay": "radial-gradient(circle at center, transparent 0%, #050505 90%)"
+        },
+        "elements": {
+          "header": {
+            "position": "fixed_top",
+            "style": "floating_pill",
+            "background": "rgba(20, 20, 20, 0.8)",
+            "blur": "12px",
+            "border": "1px solid rgba(255,255,255,0.1)"
+          },
+          "badge": {
+            "position": "top_center",
+            "style": "outlined_pill",
+            "icon": "check_circle_red"
+          },
+          "news_cards": {
+            "position": "bottom_center",
+            "layout": "grid_2_col",
+            "style": "glassmorphism"
+          }
+        }
+      },
+      "bento_grid": {
+        "layout": {
+          "type": "css_grid",
+          "columns": "repeat(3, 1fr)",
+          "rows": "auto",
+          "template_areas": [
+            "card1 card1 card2",
+            "card1 card1 card3",
+            "card4 card5 card5"
+          ],
+          "mobile_template": "1fr"
+        },
+        "cards": [
+          {
+            "id": "card1",
+            "size": "large_square",
+            "content_type": "feature_highlight",
+            "visual": "abstract_grid_animation",
+            "stat_highlight": "negative_value_green_arrow"
+          },
+          {
+            "id": "card2",
+            "size": "medium_rect",
+            "content_type": "platform_info",
+            "visual": "red_light_streak_image"
+          },
+          {
+            "id": "card3",
+            "size": "small_rect",
+            "content_type": "feature_mini",
+            "visual": "icon_only"
+          },
+          {
+            "id": "card4",
+            "size": "medium_rect",
+            "content_type": "analytics_preview",
+            "visual": "data_visualization_graph"
+          },
+          {
+            "id": "card5",
+            "size": "large_rect",
+            "content_type": "capacity_highlight",
+            "visual": "yellow_light_streak_image",
+            "stat_highlight": "positive_value_green_arrow"
+          }
+        ]
+      }
+    },
+    "animations": {
+      "hover": {
+        "card_lift": "transform: translateY(-4px)",
+        "border_glow": "box-shadow: 0 0 20px rgba(255, 255, 255, 0.05)"
+      },
+      "scroll": {
+        "fade_in_up": "opacity: 0; transform: translateY(20px); transition: all 0.6s ease-out;"
+      },
+      "background": {
+        "speed": "dynamic_velocity",
+        "interaction": "mouse_move_parallax"
+      }
+    }
+  }
+}

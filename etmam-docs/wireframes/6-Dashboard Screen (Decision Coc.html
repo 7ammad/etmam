@@ -1,0 +1,396 @@
+
+                <html>
+                <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <script>
+                        window.FontAwesomeConfig = {
+                            autoReplaceSvg: 'nest', // Options: 'nest', 'remove', 'replace'
+                        };
+                    </script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+                    <style>
+                    </style>
+                    <script>
+                    tailwind.config = {
+                    theme: {
+                        extend: {
+                        colors: {
+                            primary: {"50":"#fafafa","100":"#f5f5f5","200":"#e5e5e5","300":"#d4d4d4","400":"#a3a3a3","500":"#737373","600":"#525252","700":"#404040","800":"#262626","900":"#171717","950":"#0a0a0a"}
+                        }
+                        }
+                    }
+                    }
+                </script>
+                </head>
+
+                <body>
+                        <div id="dashboard-screen" class="min-h-[1024px] w-[1440px] bg-white flex" dir="rtl">
+
+  <!-- Left Sidebar -->
+  <div id="sidebar" class="w-64 bg-neutral-50 border-l border-neutral-200 flex flex-col">
+    
+    <!-- App Logo -->
+    <div class="p-6 border-b border-neutral-200">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-neutral-800 flex items-center justify-center">
+          <i class="fa-solid fa-gavel text-white text-sm"></i>
+        </div>
+        <span class="text-lg text-neutral-900">تقييم المناقصات</span>
+      </div>
+    </div>
+
+    <!-- Navigation Menu -->
+    <nav class="flex-1 p-4">
+      <ul class="space-y-2">
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>لوحة التحكم</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-file-contract"></i>
+            <span>المناقصات</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-users"></i>
+            <span>CRM</span>
+          </button>
+        </li>
+        <li>
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+            <i class="fa-solid fa-cog"></i>
+            <span>الإعدادات</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Logout Button -->
+    <div class="p-4 border-t border-neutral-200">
+      <button id="logout-button" class="w-full flex items-center gap-3 px-4 py-3 text-neutral-700 hover:bg-neutral-100 text-sm transition-colors">
+        <i class="fa-solid fa-sign-out-alt"></i>
+        <span>تسجيل الخروج</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col">
+    
+    <!-- Top Bar -->
+    <header id="header" class="bg-white border-b border-neutral-200 px-6 py-4">
+      <div class="flex items-center justify-between">
+        
+        <h1 class="text-xl text-neutral-900">لوحة التحكم</h1>
+        
+        <div class="flex items-center gap-4">
+          
+          <!-- User Menu -->
+          <div class="flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?scale=200&seed=1234" alt="صورة المستخدم" class="w-8 h-8 bg-neutral-200">
+            <span class="text-sm text-neutral-700">أحمد المدير</span>
+            <i class="fa-solid fa-chevron-down text-neutral-500 text-xs"></i>
+          </div>
+          
+          <!-- Language Toggle -->
+          <button id="language-toggle" class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-language"></i>
+            <span>EN</span>
+          </button>
+          
+          <!-- Theme Toggle -->
+          <button id="theme-toggle" class="flex items-center gap-2 text-neutral-700 hover:text-neutral-900 text-sm transition-colors">
+            <i class="fa-solid fa-moon"></i>
+            <span>داكن</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <main class="flex-1 p-6">
+      
+      <!-- KPI Cards Row -->
+      <div class="grid grid-cols-4 gap-6 mb-8">
+        
+        <div class="bg-white border-2 border-neutral-200 p-6">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="fa-solid fa-file-contract text-neutral-700"></i>
+            <span class="text-sm text-neutral-600">إجمالي المناقصات</span>
+          </div>
+          <div class="text-2xl text-neutral-900">24</div>
+        </div>
+
+        <div class="bg-white border-2 border-neutral-200 p-6">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="fa-solid fa-check-circle text-neutral-700"></i>
+            <span class="text-sm text-neutral-600">مؤهل</span>
+          </div>
+          <div class="text-2xl text-neutral-900">8</div>
+        </div>
+
+        <div class="bg-white border-2 border-neutral-200 p-6">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="fa-solid fa-times-circle text-neutral-700"></i>
+            <span class="text-sm text-neutral-600">مستبعد</span>
+          </div>
+          <div class="text-2xl text-neutral-900">12</div>
+        </div>
+
+        <div class="bg-white border-2 border-neutral-200 p-6">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="fa-solid fa-dollar-sign text-neutral-700"></i>
+            <span class="text-sm text-neutral-600">إجمالي القيمة</span>
+          </div>
+          <div class="text-2xl text-neutral-900">2.4M SAR</div>
+        </div>
+      </div>
+
+      <!-- Next Action Panel -->
+      <div id="next-action-panel" class="bg-white border-2 border-neutral-200 p-6 mb-8">
+        
+        <!-- State: Tenders Exist -->
+        <div id="evaluate-all-state">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg text-neutral-900 mb-1">الإجراء التالي</h3>
+              <p class="text-sm text-neutral-600">4 مناقصات في انتظار التقييم</p>
+            </div>
+            <button id="evaluate-all-button" class="px-6 py-3 bg-neutral-900 text-white text-sm hover:bg-neutral-800 transition-colors">
+              <i class="fa-solid fa-play ml-2"></i>
+              تقييم الكل (قيد الانتظار)
+            </button>
+          </div>
+        </div>
+
+        <!-- State: No Tenders (Hidden by default) -->
+        <div id="upload-state" class="hidden">
+          <div class="text-center py-8">
+            <div class="w-16 h-16 bg-neutral-100 mx-auto mb-4 flex items-center justify-center">
+              <i class="fa-solid fa-upload text-neutral-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg text-neutral-900 mb-2">ارفع أول ملف مناقصات</h3>
+            <p class="text-sm text-neutral-600 mb-6">ابدأ بتحميل ملف CSV أو Excel يحتوي على المناقصات</p>
+            <button id="upload-file-button" class="px-6 py-3 bg-neutral-900 text-white text-sm hover:bg-neutral-800 transition-colors">
+              <i class="fa-solid fa-upload ml-2"></i>
+              رفع ملف
+            </button>
+          </div>
+        </div>
+
+        <!-- State: Evaluation in Progress (Hidden by default) -->
+        <div id="evaluation-progress-state" class="hidden">
+          <div class="flex items-center gap-4">
+            <i class="fa-solid fa-spinner fa-spin text-neutral-700"></i>
+            <div class="flex-1">
+              <h3 class="text-sm text-neutral-900">جاري تقييم المناقصات...</h3>
+              <p class="text-xs text-neutral-600">معالجة 2 من 4 مناقصات</p>
+            </div>
+            <div class="w-48 bg-neutral-200 h-2">
+              <div class="bg-neutral-900 h-2 w-1/2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tenders Table -->
+      <div class="bg-white border-2 border-neutral-200">
+        
+        <div class="px-6 py-4 border-b border-neutral-200">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg text-neutral-900">المناقصات الأخيرة</h3>
+            <button class="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">
+              <i class="fa-solid fa-external-link ml-1"></i>
+              عرض الكل
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-neutral-200 bg-neutral-50">
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">الجهة</th>
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">العنوان</th>
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">الموعد النهائي</th>
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">القيمة</th>
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">الحالة</th>
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">النتيجة</th>
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">التوصية</th>
+                <th class="px-6 py-3 text-right text-xs text-neutral-600">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              
+              <!-- Sample Row 1 -->
+              <tr class="border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer">
+                <td class="px-6 py-4 text-sm text-neutral-900">وزارة الصحة</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">تطوير نظام إدارة المرضى</td>
+                <td class="px-6 py-4 text-sm text-neutral-600">2025-02-15</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">850,000 SAR</td>
+                <td class="px-6 py-4">
+                  <span class="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs">قيد التقييم</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-neutral-600">-</td>
+                <td class="px-6 py-4 text-sm text-neutral-600">-</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
+                    <button class="text-xs text-neutral-600 hover:text-neutral-900 transition-colors">
+                      <i class="fa-solid fa-spinner fa-spin"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Sample Row 2 -->
+              <tr class="border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer">
+                <td class="px-6 py-4 text-sm text-neutral-900">وزارة التعليم</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">منصة التعلم الإلكتروني</td>
+                <td class="px-6 py-4 text-sm text-neutral-600">2025-03-01</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">1,200,000 SAR</td>
+                <td class="px-6 py-4">
+                  <span class="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs">تم التقييم</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-neutral-900">85</td>
+                <td class="px-6 py-4 text-sm text-neutral-700">مؤهل</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
+                    <button class="text-xs text-neutral-600 hover:text-neutral-900 transition-colors" title="إرسال إلى CRM">
+                      <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                    <button class="text-xs text-neutral-600 hover:text-neutral-900 transition-colors" title="عرض التفاصيل">
+                      <i class="fa-solid fa-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Sample Row 3 -->
+              <tr class="border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer">
+                <td class="px-6 py-4 text-sm text-neutral-900">أرامكو</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">تطوير تطبيق الموارد البشرية</td>
+                <td class="px-6 py-4 text-sm text-neutral-600">2025-02-28</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">650,000 SAR</td>
+                <td class="px-6 py-4">
+                  <span class="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs">تم الإرسال</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-neutral-900">78</td>
+                <td class="px-6 py-4 text-sm text-neutral-700">مؤهل</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
+                    <button class="text-xs text-neutral-600 hover:text-neutral-900 transition-colors" title="فتح في CRM">
+                      <i class="fa-solid fa-external-link-alt"></i>
+                    </button>
+                    <button class="text-xs text-neutral-600 hover:text-neutral-900 transition-colors" title="عرض التفاصيل">
+                      <i class="fa-solid fa-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Sample Row 4 -->
+              <tr class="border-b border-neutral-200 hover:bg-neutral-50 cursor-pointer">
+                <td class="px-6 py-4 text-sm text-neutral-900">البنك الأهلي</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">نظام إدارة القروض</td>
+                <td class="px-6 py-4 text-sm text-neutral-600">2025-01-30</td>
+                <td class="px-6 py-4 text-sm text-neutral-900">450,000 SAR</td>
+                <td class="px-6 py-4">
+                  <span class="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs">قيد الانتظار</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-neutral-600">-</td>
+                <td class="px-6 py-4 text-sm text-neutral-600">-</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
+                    <button class="text-xs text-neutral-600 hover:text-neutral-900 transition-colors" title="تقييم">
+                      <i class="fa-solid fa-play"></i>
+                    </button>
+                    <button class="text-xs text-neutral-600 hover:text-neutral-900 transition-colors" title="عرض التفاصيل">
+                      <i class="fa-solid fa-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty State (Hidden by default) -->
+        <div id="empty-table-state" class="hidden text-center py-12">
+          <div class="w-16 h-16 bg-neutral-100 mx-auto mb-4 flex items-center justify-center">
+            <i class="fa-solid fa-inbox text-neutral-400 text-2xl"></i>
+          </div>
+          <h3 class="text-lg text-neutral-900 mb-2">لا توجد مناقصات</h3>
+          <p class="text-sm text-neutral-600">ابدأ برفع أول ملف مناقصات</p>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Toast Notification Area -->
+  <div id="toast-area" class="fixed top-4 left-4 z-50 space-y-2">
+    
+    <!-- Success Toast (Hidden by default) -->
+    <div id="success-toast" class="hidden bg-white border-2 border-neutral-200 p-4 shadow-lg max-w-sm">
+      <div class="flex items-start gap-3">
+        <i class="fa-solid fa-check-circle text-neutral-600 mt-0.5"></i>
+        <div class="flex-1">
+          <p class="text-sm text-neutral-900">تم بنجاح</p>
+          <p class="text-xs text-neutral-600">تم استيراد 5 مناقصات جديدة</p>
+        </div>
+        <button class="text-neutral-400 hover:text-neutral-600">
+          <i class="fa-solid fa-times text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Error Toast (Hidden by default) -->
+    <div id="error-toast" class="hidden bg-white border-2 border-neutral-200 p-4 shadow-lg max-w-sm">
+      <div class="flex items-start gap-3">
+        <i class="fa-solid fa-exclamation-circle text-neutral-600 mt-0.5"></i>
+        <div class="flex-1">
+          <p class="text-sm text-neutral-900">خطأ في الاستيراد</p>
+          <p class="text-xs text-neutral-600">تحقق من صيغة الملف وحاول مرة أخرى</p>
+        </div>
+        <button class="text-neutral-400 hover:text-neutral-600">
+          <i class="fa-solid fa-times text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Logout Confirmation Modal -->
+  <div id="logout-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white border-2 border-neutral-200 w-full max-w-[400px] mx-4" dir="rtl">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <i class="fa-solid fa-sign-out-alt text-neutral-700"></i>
+          <h3 class="text-lg text-neutral-900">تأكيد تسجيل الخروج</h3>
+        </div>
+        
+        <p class="text-sm text-neutral-600 mb-6">هل أنت متأكد من رغبتك في تسجيل الخروج؟</p>
+        
+        <div class="flex gap-3">
+          <button id="confirm-logout" class="flex-1 py-2 px-4 bg-neutral-900 text-white text-sm hover:bg-neutral-800 transition-colors">
+            تسجيل الخروج
+          </button>
+          <button id="cancel-logout" class="py-2 px-4 border-2 border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-50 transition-colors">
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+                        </body>
+                        </html>
+                        

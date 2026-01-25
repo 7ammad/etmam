@@ -1,18 +1,8 @@
 import type { Metadata, Viewport } from 'next'
-import { IBM_Plex_Sans_Arabic } from 'next/font/google'
 import { notFound } from 'next/navigation'
 import { getMessages, isValidLocale, type Locale } from '@/lib/i18n'
 import { I18nProvider } from '@/components/providers/i18n-provider'
-import { ThemeProvider } from '@/components/providers/theme-provider'
-import '../globals.css'
-
-// IBM Plex Sans Arabic - Primary font for Arabic-first UI
-const ibmPlexArabic = IBM_Plex_Sans_Arabic({
-  subsets: ['arabic', 'latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-ibm-plex-arabic',
-  display: 'swap',
-})
+import { LocaleHtmlAttributes } from '@/components/locale-html-attributes'
 
 export const metadata: Metadata = {
   title: {
@@ -51,22 +41,13 @@ export default async function LocaleLayout({ children, params }: Props) {
   }
 
   const messages = getMessages(locale)
-  const dir = locale === 'ar' ? 'rtl' : 'ltr'
 
   return (
-    <html
-      lang={locale}
-      dir={dir}
-      className={ibmPlexArabic.variable}
-      suppressHydrationWarning
-    >
-      <body className="min-h-screen bg-background font-arabic antialiased">
-        <ThemeProvider>
-          <I18nProvider locale={locale} messages={messages}>
-            {children}
-          </I18nProvider>
-        </ThemeProvider>
-      </body>
-    </html>
+    <>
+      <LocaleHtmlAttributes locale={locale} />
+      <I18nProvider locale={locale} messages={messages}>
+        {children}
+      </I18nProvider>
+    </>
   )
 }
