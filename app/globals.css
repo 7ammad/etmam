@@ -1,36 +1,68 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ETMAAM GLOBAL STYLES
+   Unified design system entry point
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Google Fonts - Must be first @import */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@400;500;600;700;900&display=swap');
+
+/* Import Tailwind */
 @import 'tailwindcss';
 
+/* Import Design System */
+@import '../styles/tokens.css';
+@import '../styles/animations.css';
+
+/* ═══════════════════════════════════════
+   TAILWIND THEME EXTENSIONS
+   ═══════════════════════════════════════ */
+
 @theme {
-  --font-family-arabic: 'Noto Kufi Arabic', 'Cairo', system-ui, sans-serif;
-  --font-family-sans: 'Cairo', 'Noto Kufi Arabic', system-ui, sans-serif;
+  --font-family-arabic: var(--font-arabic);
+  --font-family-sans: var(--font-latin);
 }
 
-/* ========================================
+/* ═══════════════════════════════════════
    BASE STYLES
-   ======================================== */
+   ═══════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 body {
-  font-family: var(--font-family-arabic);
-  background-color: var(--gray-1);
+  font-family: var(--font-arabic);
+  background-color: var(--surface-ground);
+  color: var(--text-primary);
+  line-height: var(--leading-normal);
+  min-height: 100vh;
 }
 
 [lang="en"] body {
-  font-family: var(--font-family-sans);
+  font-family: var(--font-latin);
 }
 
-/* ========================================
+/* ═══════════════════════════════════════
    RADIX THEME OVERRIDES
-   ======================================== */
+   ═══════════════════════════════════════ */
 
 .radix-themes {
-  --default-font-family: var(--font-family-arabic);
+  --default-font-family: var(--font-arabic);
 }
 
 [lang="en"] .radix-themes {
-  --default-font-family: var(--font-family-sans);
+  --default-font-family: var(--font-latin);
 }
 
-/* Remove section borders */
+/* Remove section borders from Radix */
 .rt-Section {
   border: none !important;
 }
@@ -39,57 +71,243 @@ section {
   border: none !important;
 }
 
-/* ========================================
+/* ═══════════════════════════════════════
    GLASS CARD EFFECT
-   ======================================== */
+   ═══════════════════════════════════════ */
 
 .glass-card {
-  background: var(--color-panel-translucent);
+  background: var(--surface-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--gray-a3);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  border: 1px solid var(--surface-glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glass);
+  transition: var(--transition-all);
 }
 
 .glass-card:hover {
-  border-color: var(--gray-a5);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-lg);
 }
 
-/* ========================================
-   ANIMATIONS
-   ======================================== */
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* Non-interactive glass card */
+.glass-card-static {
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--surface-glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glass);
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ═══════════════════════════════════════
+   TYPOGRAPHY UTILITIES
+   ═══════════════════════════════════════ */
+
+.text-primary {
+  color: var(--text-primary);
 }
 
-@keyframes slide-up {
-  from { 
-    opacity: 0;
-    transform: translateY(20px);
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.text-link {
+  color: var(--text-link);
+  transition: var(--transition-colors);
+}
+
+.text-link:hover {
+  color: var(--text-link-hover);
+}
+
+/* ═══════════════════════════════════════
+   SURFACE UTILITIES
+   ═══════════════════════════════════════ */
+
+.bg-surface {
+  background-color: var(--surface-ground);
+}
+
+.bg-surface-raised {
+  background-color: var(--surface-raised);
+}
+
+.bg-surface-muted {
+  background-color: var(--surface-muted);
+}
+
+/* ═══════════════════════════════════════
+   STATUS BADGE UTILITIES
+   ═══════════════════════════════════════ */
+
+.badge-qualified {
+  background-color: var(--color-qualified-bg);
+  color: var(--color-qualified-text);
+}
+
+.badge-conditional {
+  background-color: var(--color-conditional-bg);
+  color: var(--color-conditional-text);
+}
+
+.badge-excluded {
+  background-color: var(--color-excluded-bg);
+  color: var(--color-excluded-text);
+}
+
+.badge-pending {
+  background-color: var(--color-pending-bg);
+  color: var(--color-pending-text);
+}
+
+.badge-evaluating {
+  background-color: var(--color-evaluating-bg);
+  color: var(--color-evaluating-text);
+}
+
+/* ═══════════════════════════════════════
+   FOCUS STYLES
+   ═══════════════════════════════════════ */
+
+:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ═══════════════════════════════════════
+   FORM ELEMENT STYLING
+   ═══════════════════════════════════════ */
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ═══════════════════════════════════════
+   SCROLLBAR STYLING
+   ═══════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-muted);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-400);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--surface-muted);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-500);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-600);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-500);
+}
+
+/* ═══════════════════════════════════════
+   SELECTION STYLING
+   ═══════════════════════════════════════ */
+
+::selection {
+  background-color: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+.dark ::selection {
+  background-color: var(--color-primary-800);
+  color: var(--color-primary-100);
+}
+
+/* ═══════════════════════════════════════
+   SKIP LINK (Accessibility)
+   ═══════════════════════════════════════ */
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-primary-600);
+  color: var(--text-inverted);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-semibold);
+  z-index: var(--z-tooltip);
+  transition: top var(--duration-fast) var(--ease-out);
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE UTILITIES
+   ═══════════════════════════════════════ */
+
+.mobile-only {
+  display: block;
+}
+
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none;
   }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
+  
+  .desktop-only {
+    display: block;
   }
 }
 
-/* ========================================
-   UTILITY CLASSES
-   ======================================== */
+/* ═══════════════════════════════════════
+   RTL-SPECIFIC STYLES
+   ═══════════════════════════════════════ */
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out;
+[dir="rtl"] .flip-rtl {
+  transform: scaleX(-1);
 }
 
-.animate-slide-up {
-  animation: slide-up 0.5s ease-out;
+/* ═══════════════════════════════════════
+   SCREEN READER ONLY
+   ═══════════════════════════════════════ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

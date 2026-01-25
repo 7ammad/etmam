@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import NextLink from 'next/link'
 import { useI18n, useTranslations } from '@/components/providers/i18n-provider'
 import { 
@@ -7,24 +8,24 @@ import {
   Flex, 
   Heading, 
   Text, 
-  Card, 
   Button, 
   Table,
   TextField,
   Select,
-  Badge,
   Grid,
 } from '@radix-ui/themes'
 import {
   Search,
   Send,
-  Clock,
-  CheckCircle2,
-  Plane,
-  AlertTriangle,
-  XCircle,
-  Loader2,
+  Eye,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  X,
 } from 'lucide-react'
+import { Badge, ScoreBadge, RecommendationBadge } from '@/components/ui/data-display'
+import { SearchEmptyState } from '@/components/ui/data-display'
 
 export default function TendersListPage() {
   const { locale } = useI18n()
@@ -32,6 +33,11 @@ export default function TendersListPage() {
   const tEvaluation = useTranslations('evaluation')
   const tCommon = useTranslations('common')
   const tList = useTranslations('tendersList')
+  const isRTL = locale === 'ar'
+  
+  const [showFilters, setShowFilters] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [recommendationFilter, setRecommendationFilter] = useState('all')
 
   const formatValue = (value: number) =>
     new Intl.NumberFormat(locale === 'ar' ? 'ar-SA' : 'en-SA', {
@@ -40,8 +46,14 @@ export default function TendersListPage() {
       maximumFractionDigits: 0,
     }).format(value)
 
+  const formatDate = (dateStr: string) =>
+    new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
+      dateStyle: 'medium',
+    }).format(new Date(dateStr))
+
   const tenders = [
     {
+      id: '1',
       entityKey: 'sampleEntity1',
       titleKey: 'sampleTitle1',
       referenceNo: 'TEN-2025-001',
@@ -52,6 +64,7 @@ export default function TendersListPage() {
       recommendation: null,
     },
     {
+      id: '2',
       entityKey: 'sampleEntity2',
       titleKey: 'sampleTitle2',
       referenceNo: 'TEN-2025-002',
@@ -62,6 +75,7 @@ export default function TendersListPage() {
       recommendation: 'qualified',
     },
     {
+      id: '3',
       entityKey: 'sampleEntity3',
       titleKey: 'sampleTitle3',
       referenceNo: 'TEN-2025-003',
@@ -72,16 +86,18 @@ export default function TendersListPage() {
       recommendation: 'conditional',
     },
     {
+      id: '4',
       entityKey: 'sampleEntity4',
       titleKey: 'sampleTitle4',
       referenceNo: 'TEN-2025-004',
       deadline: '2025-04-10',
       value: 1800000,
       status: 'evaluated',
-      score: 68,
+      score: 45,
       recommendation: 'excluded',
     },
     {
+      id: '5',
       entityKey: 'sampleEntity5',
       titleKey: 'sampleTitle5',
       referenceNo: 'TEN-2025-005',
@@ -93,259 +109,540 @@ export default function TendersListPage() {
     },
   ]
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { color: 'gray' as const, icon: Clock, label: tTender('statuses.pending') },
-      evaluating: { color: 'blue' as const, icon: Loader2, label: tTender('statuses.evaluating') },
-      evaluated: { color: 'green' as const, icon: CheckCircle2, label: tTender('statuses.evaluated') },
-      pushed: { color: 'purple' as const, icon: Plane, label: tTender('statuses.pushed') },
-    }
-
-    const config = statusConfig[status as keyof typeof statusConfig]
-    if (!config) return null
-    
-    const Icon = config.icon
-    
-    return (
-      <Badge color={config.color} variant="soft">
-        <Flex align="center" gap="1">
-          <Icon size={12} />
-          {config.label}
-        </Flex>
-      </Badge>
-    )
-  }
-
-  const getRecommendationBadge = (recommendation: string | null) => {
-    if (!recommendation) return '-'
-    
-    const recConfig = {
-      qualified: { color: 'green' as const, icon: CheckCircle2, label: tEvaluation('qualified') },
-      conditional: { color: 'yellow' as const, icon: AlertTriangle, label: tEvaluation('conditional') },
-      excluded: { color: 'red' as const, icon: XCircle, label: tEvaluation('excluded') },
-    }
-
-    const config = recConfig[recommendation as keyof typeof recConfig]
-    if (!config) return '-'
-    
-    const Icon = config.icon
-    
-    return (
-      <Badge color={config.color} variant="soft">
-        <Flex align="center" gap="1">
-          <Icon size={12} />
-          {config.label}
-        </Flex>
-      </Badge>
-    )
+  const statusToBadgeColor: Record<string, 'pending' | 'evaluating' | 'qualified' | 'success' | 'info'> = {
+    pending: 'pending',
+    evaluating: 'evaluating',
+    evaluated: 'info',
+    approved: 'success',
+    pushed: 'qualified',
   }
 
   return (
-    <Box style={{ flex: 1 }}>
-          {/* Breadcrumb */}
-          <Flex align="center" gap="2" mb="6">
-            <NextLink href={`/${locale}/dashboard`} style={{ textDecoration: 'none' }}>
-              <Text size="2" color="gray" highContrast style={{ cursor: 'pointer' }}>
-                {tCommon('dashboard')}
+    <Flex direction="column" gap="6">
+      {/* Breadcrumb */}
+      <nav aria-label={isRTL ? 'مسار التنقل' : 'Breadcrumb'}>
+        <Flex align="center" gap="2">
+          <NextLink 
+            href={`/${locale}/dashboard`} 
+            className="focus-ring"
+            style={{ 
+              textDecoration: 'none',
+              color: 'var(--text-link)',
+              fontSize: 'var(--text-sm)',
+              borderRadius: 'var(--radius-sm)',
+            }}
+          >
+            {tCommon('dashboard')}
+          </NextLink>
+          <Text size="2" style={{ color: 'var(--text-tertiary)' }}>/</Text>
+          <Text size="2" style={{ color: 'var(--text-primary)' }} aria-current="page">
+            {tList('title')}
+          </Text>
+        </Flex>
+      </nav>
+
+      {/* Page Header */}
+      <Flex justify="between" align="center" wrap="wrap" gap="4">
+        <Box>
+          <Heading 
+            size="6" 
+            style={{ 
+              color: 'var(--text-primary)',
+              marginBottom: 'var(--space-1)',
+            }}
+          >
+            {tList('title')}
+          </Heading>
+          <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+            {isRTL ? `${tenders.length} مناقصة` : `${tenders.length} tenders`}
+          </Text>
+        </Box>
+        <Button
+          variant="ghost"
+          onClick={() => setShowFilters(!showFilters)}
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          {showFilters ? <X size={18} /> : <Filter size={18} />}
+          <span className="desktop-only">
+            {showFilters 
+              ? (isRTL ? 'إخفاء الفلاتر' : 'Hide Filters')
+              : (isRTL ? 'إظهار الفلاتر' : 'Show Filters')
+            }
+          </span>
+        </Button>
+      </Flex>
+
+      {/* Filter Bar */}
+      {showFilters && (
+        <div 
+          className="glass-card animate-fade-in-down" 
+          style={{ padding: 'var(--space-5)' }}
+        >
+          <Grid columns={{ initial: '1', sm: '2', md: '4' }} gap="4">
+            {/* Status Filter */}
+            <Box>
+              <Text 
+                as="label" 
+                size="2" 
+                weight="medium" 
+                style={{ 
+                  display: 'block',
+                  color: 'var(--text-secondary)',
+                  marginBottom: 'var(--space-2)',
+                }}
+              >
+                {tList('status')}
               </Text>
-            </NextLink>
-            <Text size="2" color="gray">/</Text>
-            <Text size="2">{tList('title')}</Text>
+              <Select.Root value={statusFilter} onValueChange={setStatusFilter}>
+                <Select.Trigger style={{ width: '100%' }} />
+                <Select.Content>
+                  <Select.Item value="all">{tList('allStatuses')}</Select.Item>
+                  <Select.Item value="pending">{tTender('statuses.pending')}</Select.Item>
+                  <Select.Item value="evaluating">{tTender('statuses.evaluating')}</Select.Item>
+                  <Select.Item value="evaluated">{tTender('statuses.evaluated')}</Select.Item>
+                  <Select.Item value="pushed">{tTender('statuses.pushed')}</Select.Item>
+                </Select.Content>
+              </Select.Root>
+            </Box>
+
+            {/* Recommendation Filter */}
+            <Box>
+              <Text 
+                as="label" 
+                size="2" 
+                weight="medium" 
+                style={{ 
+                  display: 'block',
+                  color: 'var(--text-secondary)',
+                  marginBottom: 'var(--space-2)',
+                }}
+              >
+                {tEvaluation('recommendation')}
+              </Text>
+              <Select.Root value={recommendationFilter} onValueChange={setRecommendationFilter}>
+                <Select.Trigger style={{ width: '100%' }} />
+                <Select.Content>
+                  <Select.Item value="all">{tList('allRecommendations')}</Select.Item>
+                  <Select.Item value="qualified">{tEvaluation('qualified')}</Select.Item>
+                  <Select.Item value="conditional">{tEvaluation('conditional')}</Select.Item>
+                  <Select.Item value="excluded">{tEvaluation('excluded')}</Select.Item>
+                </Select.Content>
+              </Select.Root>
+            </Box>
+
+            {/* Search - spans 2 columns on desktop */}
+            <Box style={{ gridColumn: 'span 2' }} className="desktop-only">
+              <Text 
+                as="label" 
+                size="2" 
+                weight="medium" 
+                style={{ 
+                  display: 'block',
+                  color: 'var(--text-secondary)',
+                  marginBottom: 'var(--space-2)',
+                }}
+              >
+                {tCommon('search')}
+              </Text>
+              <TextField.Root 
+                placeholder={tList('searchPlaceholder')}
+                style={{ width: '100%' }}
+              >
+                <TextField.Slot>
+                  <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
+                </TextField.Slot>
+              </TextField.Root>
+            </Box>
+          </Grid>
+
+          {/* Mobile Search */}
+          <Box className="mobile-only" style={{ marginTop: 'var(--space-4)' }}>
+            <TextField.Root 
+              placeholder={tList('searchPlaceholder')}
+              style={{ width: '100%' }}
+            >
+              <TextField.Slot>
+                <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
+              </TextField.Slot>
+            </TextField.Root>
+          </Box>
+
+          {/* Filter Actions */}
+          <Flex gap="3" style={{ marginTop: 'var(--space-4)' }}>
+            <Button 
+              size="2" 
+              style={{ 
+                backgroundColor: 'var(--color-primary-500)',
+                color: 'var(--text-inverted)',
+              }}
+            >
+              {tList('applyFilters')}
+            </Button>
+            <Button 
+              size="2" 
+              variant="outline"
+              style={{ 
+                borderColor: 'var(--border-default)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              {tList('clearFilters')}
+            </Button>
           </Flex>
+        </div>
+      )}
 
-          {/* Filter Bar */}
-          <Card className="glass-card" mb="6">
-            <Flex direction="column" gap="4" p="5">
-              <Grid columns={{ initial: '1', sm: '2', md: '4' }} gap="4">
-                {/* Status Filter */}
-                <Box>
-                  <Text as="label" size="2" weight="medium" mb="2" style={{ display: 'block' }}>
-                    {tList('status')}
-                  </Text>
-                  <Select.Root defaultValue="all">
-                    <Select.Trigger style={{ width: '100%' }} />
-                    <Select.Content>
-                      <Select.Item value="all">
-                        {tList('allStatuses')}
-                      </Select.Item>
-                      <Select.Item value="pending">
-                        {tTender('statuses.pending')}
-                      </Select.Item>
-                      <Select.Item value="evaluating">
-                        {tTender('statuses.evaluating')}
-                      </Select.Item>
-                      <Select.Item value="evaluated">
-                        {tTender('statuses.evaluated')}
-                      </Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                </Box>
-
-                {/* Recommendation Filter */}
-                <Box>
-                  <Text as="label" size="2" weight="medium" mb="2" style={{ display: 'block' }}>
-                    {tEvaluation('recommendation')}
-                  </Text>
-                  <Select.Root defaultValue="all">
-                    <Select.Trigger style={{ width: '100%' }} />
-                    <Select.Content>
-                      <Select.Item value="all">
-                        {tList('allRecommendations')}
-                      </Select.Item>
-                      <Select.Item value="qualified">
-                        {tEvaluation('qualified')}
-                      </Select.Item>
-                      <Select.Item value="conditional">
-                        {tEvaluation('conditional')}
-                      </Select.Item>
-                      <Select.Item value="excluded">
-                        {tEvaluation('excluded')}
-                      </Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                </Box>
-
-                {/* Score Min */}
-                <Box>
-                  <Text as="label" size="2" weight="medium" mb="2" style={{ display: 'block' }}>
-                    {tList('minScore')}
-                  </Text>
-                  <TextField.Root 
-                    type="number" 
-                    min="0" 
-                    max="100" 
-                    placeholder="0"
-                    style={{ width: '100%' }}
-                  />
-                </Box>
-
-                {/* Score Max */}
-                <Box>
-                  <Text as="label" size="2" weight="medium" mb="2" style={{ display: 'block' }}>
-                    {tList('maxScore')}
-                  </Text>
-                  <TextField.Root 
-                    type="number" 
-                    min="0" 
-                    max="100" 
-                    placeholder="100"
-                    style={{ width: '100%' }}
-                  />
-                </Box>
-              </Grid>
-
-              {/* Search */}
-              <Box>
-                <Text as="label" size="2" weight="medium" mb="2" style={{ display: 'block' }}>
-                  {tCommon('search')}
-                </Text>
-                <TextField.Root 
-                  placeholder={tList('searchPlaceholder')}
-                  style={{ width: '100%' }}
+      {/* Tenders Table/Cards */}
+      <div className="glass-card" style={{ overflow: 'hidden' }}>
+        {/* Desktop Table */}
+        <div className="desktop-only">
+          <Table.Root>
+            <Table.Header>
+              <Table.Row style={{ backgroundColor: 'var(--surface-muted)' }}>
+                <Table.ColumnHeaderCell style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-semibold)' }}>
+                  {tTender('entity')}
+                </Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-semibold)' }}>
+                  {tTender('title')}
+                </Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-semibold)' }}>
+                  {tTender('deadline')}
+                </Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-semibold)' }}>
+                  {tTender('estimatedValue')}
+                </Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-semibold)' }}>
+                  {tTender('status')}
+                </Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-semibold)' }}>
+                  {tEvaluation('recommendation')}
+                </Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell align="center" style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-semibold)' }}>
+                  {tTender('actions')}
+                </Table.ColumnHeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {tenders.map((tender) => (
+                <Table.Row 
+                  key={tender.id}
+                  style={{ borderBottom: '1px solid var(--border-default)' }}
                 >
-                  <TextField.Slot>
-                    <Search size={16} />
-                  </TextField.Slot>
-                </TextField.Root>
-              </Box>
+                  <Table.Cell style={{ color: 'var(--text-primary)' }}>
+                    <Text weight="medium">{tList(tender.entityKey)}</Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Box style={{ maxWidth: '250px' }}>
+                      <Text style={{ color: 'var(--text-primary)' }} truncate>
+                        {tList(tender.titleKey)}
+                      </Text>
+                      <Text 
+                        size="1" 
+                        style={{ 
+                          color: 'var(--text-tertiary)',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        {tender.referenceNo}
+                      </Text>
+                    </Box>
+                  </Table.Cell>
+                  <Table.Cell style={{ color: 'var(--text-secondary)' }}>
+                    {formatDate(tender.deadline)}
+                  </Table.Cell>
+                  <Table.Cell style={{ color: 'var(--text-primary)' }}>
+                    {formatValue(tender.value)}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Badge color={statusToBadgeColor[tender.status] || 'pending'} size="sm">
+                      {tTender(`statuses.${tender.status}`)}
+                    </Badge>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {tender.recommendation ? (
+                      <Flex gap="2" align="center">
+                        <RecommendationBadge recommendation={tender.recommendation} />
+                        {tender.score && <ScoreBadge score={tender.score} size="sm" />}
+                      </Flex>
+                    ) : (
+                      <Text style={{ color: 'var(--text-tertiary)' }}>-</Text>
+                    )}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Flex justify="center" gap="1">
+                      <ActionButton
+                        icon={<Eye size={16} />}
+                        title={tTender('viewDetails')}
+                      />
+                      {tender.status === 'pending' && (
+                        <ActionButton
+                          icon={<Sparkles size={16} />}
+                          title={tTender('evaluate')}
+                          color="warning"
+                        />
+                      )}
+                      {tender.status === 'evaluated' && (
+                        <ActionButton
+                          icon={<Send size={16} />}
+                          title={tTender('pushToCRM')}
+                          color="primary"
+                        />
+                      )}
+                    </Flex>
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </div>
 
-              {/* Filter Actions */}
-              <Flex gap="3">
-                <Button size="2" variant="solid" color="iris">
-                  {tList('applyFilters')}
-                </Button>
-                <Button size="2" variant="outline" color="gray">
-                  {tList('clearFilters')}
-                </Button>
-              </Flex>
-            </Flex>
-          </Card>
+        {/* Mobile Card View */}
+        <div className="mobile-only" style={{ padding: 'var(--space-4)' }}>
+          <Flex direction="column" gap="3">
+            {tenders.map((tender) => (
+              <TenderCard
+                key={tender.id}
+                tender={tender}
+                formatDate={formatDate}
+                formatValue={formatValue}
+                tList={tList}
+                tTender={tTender}
+                statusToBadgeColor={statusToBadgeColor}
+              />
+            ))}
+          </Flex>
+        </div>
 
-          {/* Tenders Table */}
-          <Card className="glass-card">
-            <Flex direction="column">
-              <Flex p="5" style={{ borderBottom: '1px solid var(--gray-a3)' }}>
-                <Heading size="4">{tList('tableTitle')}</Heading>
-              </Flex>
-              
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell>{tTender('entity')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tTender('title')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tTender('referenceNo')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tTender('deadline')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tTender('estimatedValue')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tTender('status')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tEvaluation('score')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tEvaluation('recommendation')}</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>{tTender('actions')}</Table.ColumnHeaderCell>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {tenders.map((tender, index) => (
-                    <Table.Row key={index}>
-                      <Table.Cell>{tList(tender.entityKey)}</Table.Cell>
-                      <Table.Cell>{tList(tender.titleKey)}</Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray">{tender.referenceNo}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray">{tender.deadline}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray">{formatValue(tender.value)}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {getStatusBadge(tender.status)}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {tender.score || '-'}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {getRecommendationBadge(tender.recommendation)}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Flex gap="2">
-                          {tender.status === 'pending' ? (
-                            <Button size="1" variant="ghost">
-                              {tTender('evaluate')}
-                            </Button>
-                          ) : tender.status === 'evaluated' ? (
-                            <Button size="1" variant="ghost">
-                              <Send size={14} />
-                            </Button>
-                          ) : tender.status === 'pushed' ? (
-                            <Button size="1" variant="ghost">
-                              {tList('openInCrm')}
-                            </Button>
-                          ) : null}
-                        </Flex>
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
+        {/* Pagination */}
+        <Flex 
+          justify="between" 
+          align="center" 
+          wrap="wrap"
+          gap="4"
+          style={{ 
+            padding: 'var(--space-4) var(--space-5)',
+            borderTop: '1px solid var(--border-default)',
+          }}
+        >
+          <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+            {tList('paginationSummary')}
+          </Text>
+          <Flex gap="2">
+            <PaginationButton disabled>
+              <ChevronLeft size={16} className={isRTL ? 'flip-rtl' : ''} />
+              <span className="desktop-only">{tList('prev')}</span>
+            </PaginationButton>
+            <PaginationButton active>1</PaginationButton>
+            <PaginationButton>2</PaginationButton>
+            <PaginationButton>3</PaginationButton>
+            <PaginationButton>
+              <span className="desktop-only">{tList('next')}</span>
+              <ChevronRight size={16} className={isRTL ? 'flip-rtl' : ''} />
+            </PaginationButton>
+          </Flex>
+        </Flex>
+      </div>
+    </Flex>
+  )
+}
 
-              {/* Pagination */}
-              <Flex justify="between" align="center" p="5" style={{ borderTop: '1px solid var(--gray-a3)' }}>
-                <Text size="2" color="gray">
-                  {tList('paginationSummary')}
-                </Text>
-                <Flex gap="2">
-                  <Button size="1" variant="outline" disabled>
-                    {tList('prev')}
-                  </Button>
-                  <Button size="1" variant="solid" color="iris">1</Button>
-                  <Button size="1" variant="outline">2</Button>
-                  <Button size="1" variant="outline">3</Button>
-                  <Button size="1" variant="outline">
-                    {tList('next')}
-                  </Button>
-                </Flex>
+// Action Button
+function ActionButton({
+  icon,
+  title,
+  color = 'neutral',
+}: {
+  icon: React.ReactNode
+  title: string
+  color?: 'neutral' | 'primary' | 'warning'
+}) {
+  const colorMap = {
+    neutral: {
+      default: 'var(--text-tertiary)',
+      hover: 'var(--text-primary)',
+      bg: 'var(--surface-muted)',
+    },
+    primary: {
+      default: 'var(--color-primary-500)',
+      hover: 'var(--color-primary-600)',
+      bg: 'var(--color-primary-50)',
+    },
+    warning: {
+      default: 'var(--color-warning)',
+      hover: 'var(--color-warning-600)',
+      bg: 'var(--color-warning-50)',
+    },
+  }
+  const colors = colorMap[color]
+
+  return (
+    <button
+      title={title}
+      aria-label={title}
+      className="focus-ring"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '32px',
+        height: '32px',
+        borderRadius: 'var(--radius-md)',
+        border: 'none',
+        background: 'transparent',
+        color: colors.default,
+        cursor: 'pointer',
+        transition: 'var(--transition-all)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = colors.bg
+        e.currentTarget.style.color = colors.hover
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'transparent'
+        e.currentTarget.style.color = colors.default
+      }}
+    >
+      {icon}
+    </button>
+  )
+}
+
+// Pagination Button
+function PaginationButton({
+  children,
+  active,
+  disabled,
+}: {
+  children: React.ReactNode
+  active?: boolean
+  disabled?: boolean
+}) {
+  return (
+    <button
+      disabled={disabled}
+      className="focus-ring"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 'var(--space-1)',
+        minWidth: '36px',
+        height: '36px',
+        padding: '0 var(--space-3)',
+        borderRadius: 'var(--radius-md)',
+        border: active ? 'none' : '1px solid var(--border-default)',
+        background: active ? 'var(--color-primary-500)' : 'var(--surface-raised)',
+        color: active ? 'var(--text-inverted)' : disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
+        fontSize: 'var(--text-sm)',
+        fontWeight: 'var(--font-medium)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'var(--transition-all)',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+// Mobile Tender Card
+function TenderCard({
+  tender,
+  formatDate,
+  formatValue,
+  tList,
+  tTender,
+  statusToBadgeColor,
+}: {
+  tender: {
+    id: string
+    entityKey: string
+    titleKey: string
+    referenceNo: string
+    deadline: string
+    value: number
+    status: string
+    score: number | null
+    recommendation: string | null
+  }
+  formatDate: (date: string) => string
+  formatValue: (value: number) => string
+  tList: (key: string) => string
+  tTender: (key: string) => string
+  statusToBadgeColor: Record<string, 'pending' | 'evaluating' | 'qualified' | 'success' | 'info'>
+}) {
+  return (
+    <div
+      className="glass-card"
+      style={{ padding: 'var(--space-4)' }}
+    >
+      <Flex direction="column" gap="3">
+        {/* Header */}
+        <Flex justify="between" align="start">
+          <Box style={{ flex: 1 }}>
+            <Text 
+              size="1" 
+              style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)' }}
+            >
+              {tList(tender.entityKey)}
+            </Text>
+            <Text 
+              size="3" 
+              weight="bold"
+              style={{ 
+                color: 'var(--text-primary)',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {tList(tender.titleKey)}
+            </Text>
+          </Box>
+          <Badge color={statusToBadgeColor[tender.status] || 'pending'} size="sm">
+            {tTender(`statuses.${tender.status}`)}
+          </Badge>
+        </Flex>
+
+        {/* Details */}
+        <Flex gap="4" wrap="wrap">
+          <Box>
+            <Text size="1" style={{ color: 'var(--text-tertiary)' }}>{tTender('deadline')}</Text>
+            <Text size="2" style={{ color: 'var(--text-primary)' }}>{formatDate(tender.deadline)}</Text>
+          </Box>
+          <Box>
+            <Text size="1" style={{ color: 'var(--text-tertiary)' }}>{tTender('estimatedValue')}</Text>
+            <Text size="2" style={{ color: 'var(--text-primary)' }}>{formatValue(tender.value)}</Text>
+          </Box>
+          {tender.recommendation && (
+            <Box>
+              <Text size="1" style={{ color: 'var(--text-tertiary)' }}>Score</Text>
+              <Flex gap="2" align="center">
+                {tender.score && <ScoreBadge score={tender.score} size="sm" />}
               </Flex>
-            </Flex>
-          </Card>
-    </Box>
+            </Box>
+          )}
+        </Flex>
+
+        {/* Actions */}
+        <Flex 
+          gap="2" 
+          justify="end" 
+          style={{ 
+            borderTop: '1px solid var(--border-default)', 
+            paddingTop: 'var(--space-3)',
+          }}
+        >
+          <ActionButton icon={<Eye size={16} />} title={tTender('viewDetails')} />
+          {tender.status === 'pending' && (
+            <ActionButton icon={<Sparkles size={16} />} title={tTender('evaluate')} color="warning" />
+          )}
+          {tender.status === 'evaluated' && (
+            <ActionButton icon={<Send size={16} />} title={tTender('pushToCRM')} color="primary" />
+          )}
+        </Flex>
+      </Flex>
+    </div>
   )
 }

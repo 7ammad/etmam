@@ -6,14 +6,16 @@ import NextLink from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations, useI18n } from '@/components/providers/i18n-provider'
 import { Box, Flex, Text } from '@radix-ui/themes'
-import { Crown, LayoutDashboard, FileText, Users, Settings as SettingsIcon, LogOut } from 'lucide-react'
+import { Crown, LayoutDashboard, FileText, Users, Settings as SettingsIcon, LogOut, X, ChevronRight, Sparkles } from 'lucide-react'
 
 type SidebarProps = {
   className?: string
   style?: CSSProperties
+  onClose?: () => void
+  isMobileDrawer?: boolean
 }
 
-export function Sidebar({ className, style }: SidebarProps) {
+export function Sidebar({ className, style, onClose, isMobileDrawer = false }: SidebarProps) {
   const tNav = useTranslations('navigation')
   const tCommon = useTranslations('common')
   const { locale } = useI18n()
@@ -59,95 +61,311 @@ export function Sidebar({ className, style }: SidebarProps) {
     },
   ]
 
+  const handleNavClick = () => {
+    if (isMobileDrawer && onClose) {
+      onClose()
+    }
+  }
+
   return (
     <Box
       className={className}
       style={{
-        width: '256px',
+        width: 'var(--sidebar-width)',
         height: '100vh',
-        backgroundColor: 'var(--gray-2)',
-        borderRight: isRTL ? 'none' : '1px solid var(--gray-a3)',
-        borderLeft: isRTL ? '1px solid var(--gray-a3)' : 'none',
+        backgroundColor: 'var(--surface-sidebar)',
+        boxShadow: 'var(--shadow-sidebar)',
         display: 'flex',
         flexDirection: 'column',
         ...style,
       }}
     >
-      {/* Logo */}
+      {/* Logo Header */}
       <Flex 
         align="center" 
+        justify="between"
         gap="3" 
-        p="6"
-        style={{ borderBottom: '1px solid var(--gray-a3)' }}
+        style={{ 
+          padding: 'var(--space-6)',
+          borderBottom: '1px solid var(--border-default)',
+        }}
       >
-        <Flex 
-          align="center" 
-          justify="center" 
-          width="32px" 
-          height="32px" 
-          style={{ 
-            borderRadius: 'var(--radius-2)',
-            background: 'linear-gradient(135deg, var(--iris-9), var(--iris-11))',
-          }}
-        >
-          <Crown size={16} color="white" />
+        <Flex align="center" gap="3">
+          <Flex 
+            align="center" 
+            justify="center" 
+            style={{ 
+              width: '36px',
+              height: '36px',
+              borderRadius: 'var(--radius-md)',
+              background: 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700))',
+              boxShadow: 'var(--shadow-primary)',
+            }}
+          >
+            <Crown size={18} color="white" />
+          </Flex>
+          <Text 
+            size="5" 
+            weight="bold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {tCommon('appName')}
+          </Text>
         </Flex>
-        <Text size="4" weight="bold">{tCommon('appName')}</Text>
+        
+        {/* Close button for mobile drawer */}
+        {isMobileDrawer && onClose && (
+          <button
+            onClick={onClose}
+            aria-label={isRTL ? 'إغلاق القائمة' : 'Close menu'}
+            className="focus-ring"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'var(--transition-colors)',
+            }}
+          >
+            <X size={20} />
+          </button>
+        )}
       </Flex>
 
       {/* Navigation */}
-      <Flex direction="column" p="4" style={{ flex: 1 }}>
-        {navItems.map((item) => {
-          const isActive = activeId === item.id
-          const Icon = item.icon
-          
-          return (
-            <NextLink 
-              key={item.id} 
-              href={item.href}
-              style={{ textDecoration: 'none' }}
-            >
-              <Flex
-                align="center"
-                gap="3"
-                px="4"
-                py="3"
-                style={{
-                  borderRadius: 'var(--radius-2)',
-                  backgroundColor: isActive ? 'var(--iris-9)' : 'transparent',
-                  color: isActive ? 'white' : 'var(--gray-11)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
+      <nav 
+        aria-label={isRTL ? 'القائمة الرئيسية' : 'Main navigation'}
+        style={{ 
+          flex: 1, 
+          padding: 'var(--space-4)',
+          overflowY: 'auto',
+        }}
+      >
+        <Flex direction="column" gap="1">
+          {navItems.map((item) => {
+            const isActive = activeId === item.id
+            const Icon = item.icon
+            
+            return (
+              <NextLink 
+                key={item.id} 
+                href={item.href}
+                onClick={handleNavClick}
                 aria-current={isActive ? 'page' : undefined}
+                className="focus-ring"
+                style={{ 
+                  textDecoration: 'none',
+                  borderRadius: 'var(--radius-md)',
+                }}
               >
-                <Icon size={18} />
-                <Text size="2" weight="medium">{item.label}</Text>
-              </Flex>
-            </NextLink>
-          )
-        })}
-      </Flex>
+                <Flex
+                  align="center"
+                  justify="between"
+                  gap="3"
+                  style={{
+                    padding: 'var(--space-3) var(--space-4)',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: isActive ? 'var(--color-primary-500)' : 'transparent',
+                    color: isActive ? 'var(--text-inverted)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'var(--transition-all)',
+                    position: 'relative',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'var(--surface-muted)'
+                      e.currentTarget.style.color = 'var(--text-primary)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = 'var(--text-secondary)'
+                    }
+                  }}
+                >
+                  <Flex align="center" gap="3">
+                    <Icon 
+                      size={20} 
+                      style={{ 
+                        flexShrink: 0,
+                        opacity: isActive ? 1 : 0.8,
+                      }} 
+                    />
+                    <Text 
+                      size="2" 
+                      weight={isActive ? 'bold' : 'medium'}
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {item.label}
+                    </Text>
+                  </Flex>
+                  {isActive && (
+                    <ChevronRight 
+                      size={16} 
+                      className="flip-rtl"
+                      style={{ flexShrink: 0 }} 
+                    />
+                  )}
+                </Flex>
+              </NextLink>
+            )
+          })}
+        </Flex>
 
-      {/* Logout */}
-      <Box p="4" style={{ borderTop: '1px solid var(--gray-a3)' }}>
-        <Flex
-          align="center"
-          gap="3"
-          px="4"
-          py="3"
+        {/* CTA Card - Upgrade to PRO (Figma style purple gradient) */}
+        <Box
           style={{
-            borderRadius: 'var(--radius-2)',
-            color: 'var(--gray-11)',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
+            marginTop: 'var(--space-8)',
+            padding: 'var(--space-4)',
+            borderRadius: 'var(--radius-card)',
+            background: 'var(--gradient-cta-card)',
+            boxShadow: 'var(--shadow-card)',
+            color: 'var(--text-inverted)',
           }}
         >
-          <LogOut size={18} />
-          <Text size="2" weight="medium">
-            {tCommon('logout')}
-          </Text>
+          <Flex direction="column" gap="2" align="center">
+            <Flex
+              align="center"
+              justify="center"
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              }}
+            >
+              <Sparkles size={24} />
+            </Flex>
+            <Text size="3" weight="bold" style={{ textAlign: 'center' }}>
+              {isRTL ? 'ترقية إلى PRO' : 'Upgrade to PRO'}
+            </Text>
+            <Text size="1" style={{ textAlign: 'center', opacity: 0.9 }}>
+              {isRTL ? 'احصل على جميع الميزات!' : 'Get access all Features!'}
+            </Text>
+            <button
+              style={{
+                marginTop: 'var(--space-2)',
+                padding: 'var(--space-2) var(--space-4)',
+                borderRadius: 'var(--radius-full)',
+                border: 'none',
+                backgroundColor: 'rgba(255, 255, 255, 1)',
+                color: '#5D50C6',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-bold)',
+                cursor: 'pointer',
+                transition: 'var(--transition-all)',
+                width: '100%',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)'
+              }}
+            >
+              {isRTL ? 'احصل على Pro الآن!' : 'Get Pro Now!'}
+            </button>
+          </Flex>
+        </Box>
+      </nav>
+
+      {/* User Profile Section */}
+      <Box 
+        style={{ 
+          padding: 'var(--space-4)',
+          borderTop: '1px solid var(--border-default)',
+        }}
+      >
+        <Flex align="center" gap="3" style={{ marginBottom: 'var(--space-3)' }}>
+          <Flex
+            align="center"
+            justify="center"
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'var(--color-primary-100)',
+              color: 'var(--color-primary-700)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-bold)',
+              flexShrink: 0,
+            }}
+          >
+            {isRTL ? 'م' : 'E'}
+          </Flex>
+          <Box style={{ flex: 1, minWidth: 0 }}>
+            <Text 
+              size="2" 
+              weight="bold"
+              style={{ 
+                display: 'block',
+                color: 'var(--text-primary)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {isRTL ? 'مستخدم إتمام' : 'Etmaam User'}
+            </Text>
+            <Text 
+              size="1" 
+              style={{ 
+                display: 'block',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              {isRTL ? 'مدير المشروع' : 'Project Manager'}
+            </Text>
+          </Box>
         </Flex>
+
+        {/* Logout Button */}
+        <button
+          onClick={() => {
+            // TODO: Implement logout logic
+            console.log('Logout clicked')
+          }}
+          className="focus-ring"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            width: '100%',
+            padding: 'var(--space-3) var(--space-4)',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'var(--transition-all)',
+            fontFamily: 'inherit',
+            fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--font-medium)',
+            textAlign: isRTL ? 'right' : 'left',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-error-50)'
+            e.currentTarget.style.color = 'var(--color-error-600)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+            e.currentTarget.style.color = 'var(--text-secondary)'
+          }}
+        >
+          <LogOut size={20} style={{ flexShrink: 0 }} />
+          <span>{tCommon('logout')}</span>
+        </button>
       </Box>
     </Box>
   )

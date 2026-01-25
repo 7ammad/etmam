@@ -1,0 +1,392 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ETMAAM DESIGN SYSTEM TOKENS
+   "Ministry Clean" - Premium, trustworthy, government-grade professionalism
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ═══════════════════════════════════════
+     PRIMARY - Emerald (Saudi-inspired)
+     ═══════════════════════════════════════ */
+  --color-primary-50:  #ecfdf5;
+  --color-primary-100: #d1fae5;
+  --color-primary-200: #a7f3d0;
+  --color-primary-300: #6ee7b7;
+  --color-primary-400: #34d399;
+  --color-primary-500: #10b981;  /* Main brand */
+  --color-primary-600: #059669;
+  --color-primary-700: #047857;
+  --color-primary-800: #065f46;
+  --color-primary-900: #064e3b;
+  --color-primary-950: #022c22;
+
+  /* ═══════════════════════════════════════
+     NEUTRAL - Slate
+     ═══════════════════════════════════════ */
+  --color-neutral-50:  #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+  --color-neutral-950: #020617;
+
+  /* ═══════════════════════════════════════
+     SEMANTIC COLORS
+     ═══════════════════════════════════════ */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error:   #ef4444;
+  --color-info:    #3b82f6;
+
+  /* Success shades */
+  --color-success-50:  #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-900: #064e3b;
+
+  /* Warning shades */
+  --color-warning-50:  #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-900: #78350f;
+
+  /* Error shades */
+  --color-error-50:  #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-900: #7f1d1d;
+
+  /* Info shades */
+  --color-info-50:  #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-900: #1e3a8a;
+
+  /* ═══════════════════════════════════════
+     STATUS COLORS (Tender-specific) - Figma matched
+     ═══════════════════════════════════════ */
+  --color-qualified:   #00AC4F;  /* Bright green - Figma "Active" */
+  --color-conditional: #f59e0b;  /* Amber - caution */
+  --color-excluded:    #DF0404;  /* Red - Figma "Inactive" */
+  --color-pending:     #64748b;  /* Gray - waiting */
+  --color-evaluating:  #3b82f6;  /* Blue - processing */
+
+  /* Status background colors (light mode) */
+  --color-qualified-bg:   #ecfdf5;
+  --color-conditional-bg: #fffbeb;
+  --color-excluded-bg:    #fef2f2;
+  --color-pending-bg:     #f8fafc;
+  --color-evaluating-bg:  #eff6ff;
+
+  /* Status text colors */
+  --color-qualified-text:   #065f46;
+  --color-conditional-text: #92400e;
+  --color-excluded-text:    #991b1b;
+  --color-pending-text:     #475569;
+  --color-evaluating-text:  #1e40af;
+
+  /* ═══════════════════════════════════════
+     SURFACES (Light Mode)
+     ═══════════════════════════════════════ */
+  --surface-ground:       #ffffff;
+  --surface-raised:       #ffffff;
+  --surface-overlay:      rgba(255, 255, 255, 0.8);
+  --surface-glass:        rgba(255, 255, 255, 0.7);
+  --surface-glass-border: rgba(0, 0, 0, 0.08);
+  --surface-muted:        #f8fafc;
+  
+  /* CRM Dashboard Style Surfaces */
+  --surface-sidebar:      #ffffff;
+  --surface-card:         #ffffff;
+  --surface-page:         #fafbff;
+  
+  /* Stat Card Icon Backgrounds */
+  --stat-icon-primary-bg: rgba(16, 185, 129, 0.12);
+  --stat-icon-purple-bg:  rgba(139, 92, 246, 0.12);
+  --stat-icon-orange-bg:  rgba(249, 115, 22, 0.12);
+  --stat-icon-blue-bg:    rgba(59, 130, 246, 0.12);
+
+  /* ═══════════════════════════════════════
+     TEXT COLORS (Light Mode)
+     ═══════════════════════════════════════ */
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary:  #94a3b8;
+  --text-inverted:  #ffffff;
+  --text-link:      #059669;
+  --text-link-hover: #047857;
+
+  /* ═══════════════════════════════════════
+     BORDER COLORS (Light Mode)
+     ═══════════════════════════════════════ */
+  --border-default: #e2e8f0;
+  --border-muted:   #f1f5f9;
+  --border-strong:  #cbd5e1;
+  --border-focus:   #10b981;
+
+  /* ═══════════════════════════════════════
+     FONT FAMILIES
+     ═══════════════════════════════════════ */
+  --font-arabic: 'Noto Kufi Arabic', 'Cairo', system-ui, sans-serif;
+  --font-latin:  'Inter', 'Cairo', system-ui, sans-serif;
+  --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ═══════════════════════════════════════
+     TYPE SCALE (1.25 ratio)
+     ═══════════════════════════════════════ */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.875rem;  /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg:   1.125rem;  /* 18px */
+  --text-xl:   1.25rem;   /* 20px */
+  --text-2xl:  1.5rem;    /* 24px */
+  --text-3xl:  1.875rem;  /* 30px */
+  --text-4xl:  2.25rem;   /* 36px */
+  --text-5xl:  3rem;      /* 48px */
+  --text-6xl:  3.75rem;   /* 60px */
+
+  /* ═══════════════════════════════════════
+     LINE HEIGHTS
+     ═══════════════════════════════════════ */
+  --leading-none:    1;
+  --leading-tight:   1.25;
+  --leading-snug:    1.375;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose:   2;
+
+  /* ═══════════════════════════════════════
+     FONT WEIGHTS
+     ═══════════════════════════════════════ */
+  --font-normal:   400;
+  --font-medium:   500;
+  --font-semibold: 600;
+  --font-bold:     700;
+  --font-black:    900;
+
+  /* ═══════════════════════════════════════
+     SPACING (4px base unit)
+     ═══════════════════════════════════════ */
+  --space-0:  0;
+  --space-1:  0.25rem;  /* 4px */
+  --space-2:  0.5rem;   /* 8px */
+  --space-3:  0.75rem;  /* 12px */
+  --space-4:  1rem;     /* 16px */
+  --space-5:  1.25rem;  /* 20px */
+  --space-6:  1.5rem;   /* 24px */
+  --space-8:  2rem;     /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  --space-20: 5rem;     /* 80px */
+  --space-24: 6rem;     /* 96px */
+
+  /* ═══════════════════════════════════════
+     SEMANTIC SPACING
+     ═══════════════════════════════════════ */
+  --space-page-x:      var(--space-6);   /* Page horizontal padding */
+  --space-page-y:      var(--space-8);   /* Page vertical padding */
+  --space-section:     var(--space-12);  /* Between sections */
+  --space-card:        var(--space-6);   /* Card internal padding */
+  --space-card-gap:    var(--space-4);   /* Between card elements */
+  --space-input:       var(--space-3);   /* Input internal padding */
+  --space-button-x:    var(--space-4);   /* Button horizontal padding */
+  --space-button-y:    var(--space-2);   /* Button vertical padding */
+
+  /* ═══════════════════════════════════════
+     BORDER RADIUS
+     ═══════════════════════════════════════ */
+  --radius-none: 0;
+  --radius-sm:   0.375rem;  /* 6px - buttons, inputs */
+  --radius-md:   0.5rem;    /* 8px - cards */
+  --radius-lg:   0.75rem;   /* 12px - modals */
+  --radius-xl:   1rem;      /* 16px - large cards */
+  --radius-2xl:  1.5rem;    /* 24px - hero sections */
+  --radius-full: 9999px;    /* Pills, avatars */
+  
+  /* CRM Dashboard Radius */
+  --radius-card:      0.875rem;  /* 14px - main cards */
+  --radius-stat-icon: 50%;       /* Circular - Figma style */
+
+  /* CRM CTA Card Gradient (purple/pink like Figma) */
+  --gradient-cta-card: linear-gradient(135deg, #5D50C6 0%, #8B5CF6 50%, #F85E9F 100%);
+
+  /* ═══════════════════════════════════════
+     SHADOWS
+     ═══════════════════════════════════════ */
+  --shadow-xs:   0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md:   0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg:   0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl:   0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl:  0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Glass shadow */
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.1), 
+                  inset 0 0 0 1px var(--surface-glass-border);
+  
+  /* CRM Dashboard Shadows */
+  --shadow-card:    0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-sidebar: 2px 0 8px rgba(0, 0, 0, 0.03);
+
+  /* Colored shadows for buttons */
+  --shadow-primary: 0 4px 14px rgba(16, 185, 129, 0.4);
+  --shadow-error:   0 4px 14px rgba(239, 68, 68, 0.4);
+  --shadow-info:    0 4px 14px rgba(59, 130, 246, 0.4);
+
+  /* ═══════════════════════════════════════
+     DURATIONS
+     ═══════════════════════════════════════ */
+  --duration-instant: 50ms;
+  --duration-fast:    150ms;
+  --duration-normal:  200ms;
+  --duration-slow:    300ms;
+  --duration-slower:  500ms;
+
+  /* ═══════════════════════════════════════
+     EASINGS
+     ═══════════════════════════════════════ */
+  --ease-linear:    linear;
+  --ease-in:        cubic-bezier(0.4, 0, 1, 1);
+  --ease-out:       cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out:    cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce:    cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-elastic:   cubic-bezier(0.68, -0.6, 0.32, 1.6);
+
+  /* ═══════════════════════════════════════
+     TRANSITIONS (composed)
+     ═══════════════════════════════════════ */
+  --transition-colors:   color var(--duration-fast) var(--ease-in-out),
+                         background-color var(--duration-fast) var(--ease-in-out),
+                         border-color var(--duration-fast) var(--ease-in-out);
+  --transition-opacity:  opacity var(--duration-normal) var(--ease-in-out);
+  --transition-transform: transform var(--duration-normal) var(--ease-out);
+  --transition-shadow:   box-shadow var(--duration-normal) var(--ease-out);
+  --transition-all:      all var(--duration-normal) var(--ease-in-out);
+
+  /* ═══════════════════════════════════════
+     BREAKPOINTS (for reference in JS)
+     ═══════════════════════════════════════ */
+  --breakpoint-sm:  640px;
+  --breakpoint-md:  768px;
+  --breakpoint-lg:  1024px;
+  --breakpoint-xl:  1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* ═══════════════════════════════════════
+     LAYOUT
+     ═══════════════════════════════════════ */
+  --sidebar-width: 220px;  /* CRM style: reduced from 256px */
+  --sidebar-collapsed-width: 64px;
+  --header-height: 64px;
+  --container-max-width: 1280px;
+
+  /* ═══════════════════════════════════════
+     Z-INDEX SCALE
+     ═══════════════════════════════════════ */
+  --z-base:     0;
+  --z-dropdown: 10;
+  --z-sticky:   20;
+  --z-fixed:    30;
+  --z-overlay:  40;
+  --z-modal:    50;
+  --z-popover:  60;
+  --z-toast:    70;
+  --z-tooltip:  80;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dark,
+[data-theme="dark"] {
+  /* Surfaces */
+  --surface-ground:       #0f172a;
+  --surface-raised:       #1e293b;
+  --surface-overlay:      rgba(15, 23, 42, 0.8);
+  --surface-glass:        rgba(30, 41, 59, 0.7);
+  --surface-glass-border: rgba(255, 255, 255, 0.1);
+  --surface-muted:        #1e293b;
+
+  /* CRM Dashboard Surfaces (Dark Mode) */
+  --surface-sidebar:      #1e293b;
+  --surface-card:         #1e293b;
+  --surface-page:         #0f172a;
+
+  /* Stat Card Icon Backgrounds (Dark Mode - higher opacity) */
+  --stat-icon-primary-bg: rgba(16, 185, 129, 0.2);
+  --stat-icon-purple-bg:  rgba(139, 92, 246, 0.2);
+  --stat-icon-orange-bg:  rgba(249, 115, 22, 0.2);
+  --stat-icon-blue-bg:    rgba(59, 130, 246, 0.2);
+
+  /* Text colors */
+  --text-primary:   #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary:  #64748b;
+  --text-inverted:  #0f172a;
+  --text-link:      #34d399;
+  --text-link-hover: #6ee7b7;
+
+  /* Border colors */
+  --border-default: #334155;
+  --border-muted:   #1e293b;
+  --border-strong:  #475569;
+  --border-focus:   #34d399;
+
+  /* Status background colors (dark mode) */
+  --color-qualified-bg:   rgba(16, 185, 129, 0.15);
+  --color-conditional-bg: rgba(245, 158, 11, 0.15);
+  --color-excluded-bg:    rgba(239, 68, 68, 0.15);
+  --color-pending-bg:     rgba(100, 116, 139, 0.15);
+  --color-evaluating-bg:  rgba(59, 130, 246, 0.15);
+
+  /* Status text colors (dark mode) */
+  --color-qualified-text:   #6ee7b7;
+  --color-conditional-text: #fcd34d;
+  --color-excluded-text:    #fca5a5;
+  --color-pending-text:     #cbd5e1;
+  --color-evaluating-text:  #93c5fd;
+
+  /* Adjusted shadows for dark mode */
+  --shadow-xs:   0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:   0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg:   0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl:   0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --shadow-2xl:  0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.3), 
+                  inset 0 0 0 1px var(--surface-glass-border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RTL TYPOGRAPHY ADJUSTMENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[dir="rtl"] {
+  /* Arabic needs slightly more line height */
+  --leading-normal: 1.7;
+  --leading-relaxed: 1.8;
+  
+  /* Arabic text often needs more letter spacing */
+  letter-spacing: 0.01em;
+}
+
+[dir="rtl"] h1, 
+[dir="rtl"] h2, 
+[dir="rtl"] h3,
+[dir="rtl"] h4,
+[dir="rtl"] h5,
+[dir="rtl"] h6 {
+  font-family: var(--font-arabic);
+  font-weight: var(--font-bold);
+}

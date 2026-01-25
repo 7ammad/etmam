@@ -3,17 +3,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  FileText,
-  CheckCircle2,
-  XCircle,
-  DollarSign,
   Play,
   Upload,
-  Eye,
-  Send,
   Loader2,
   Info,
-  Sparkles,
+  ArrowRight,
+  ChevronRight,
 } from 'lucide-react'
 import { useTranslations, useI18n } from '@/components/providers/i18n-provider'
 import {
@@ -21,15 +16,14 @@ import {
   Flex,
   Heading,
   Text,
-  Card,
   Box,
   Callout,
-  Grid,
-  Table,
-  Badge,
 } from '@radix-ui/themes'
+import { StatsCards } from './stats-cards'
+import { TenderTable } from './tender-table'
 import { FileUpload } from './file-upload'
 import { EvaluationProgressModal } from '@/components/modals/evaluation-progress-modal'
+import { UploadEmptyState } from '@/components/ui/data-display'
 import { importTendersAction, deleteTenderAction } from '@/actions/tender'
 import { runEvaluationAction } from '@/actions/evaluation'
 import type { TenderStatus } from '@/types/tender'
@@ -65,11 +59,11 @@ interface DashboardContentProps {
 export function DashboardContent({ locale, stats, tenders }: DashboardContentProps) {
   const tTender = useTranslations('tender')
   const tCommon = useTranslations('common')
-  const tStats = useTranslations('stats')
   const tDashboard = useTranslations('dashboard')
-  const tEvaluation = useTranslations('evaluation')
   const { locale: currentLocale } = useI18n()
   const router = useRouter()
+  const isRTL = currentLocale === 'ar'
+  
   const [showUpload, setShowUpload] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -95,7 +89,7 @@ export function DashboardContent({ locale, stats, tenders }: DashboardContentPro
       } else {
         setMessage({ type: 'error', text: result.error })
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: tTender('importError') })
     } finally {
       setIsUploading(false)
@@ -134,66 +128,24 @@ export function DashboardContent({ locale, stats, tenders }: DashboardContentPro
     })
   }
 
-  const formatValue = (value: number | null) => {
-    if (value === null) return '-'
-    return new Intl.NumberFormat(currentLocale === 'ar' ? 'ar-SA' : 'en-SA', {
-      style: 'currency',
-      currency: 'SAR',
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
-
-  const formatDate = (dateStr: string) => {
-    return new Intl.DateTimeFormat(currentLocale === 'ar' ? 'ar-SA' : 'en-US', {
-      dateStyle: 'medium',
-    }).format(new Date(dateStr))
-  }
-
-  const statsCards = [
-    {
-      id: 'total',
-      icon: FileText,
-      label: tStats('totalTenders'),
-      value: stats.totalTenders.toString(),
-    },
-    {
-      id: 'qualified',
-      icon: CheckCircle2,
-      label: tStats('qualified'),
-      value: stats.qualified.toString(),
-    },
-    {
-      id: 'excluded',
-      icon: XCircle,
-      label: tStats('excluded'),
-      value: stats.excluded.toString(),
-    },
-    {
-      id: 'value',
-      icon: DollarSign,
-      label: tStats('totalValue'),
-      value: formatValue(stats.totalValue),
-    },
-  ]
-
-  const statusColors: Record<TenderStatus, 'gray' | 'blue' | 'green' | 'purple' | 'red' | 'amber'> = {
-    pending: 'gray',
-    evaluating: 'blue',
-    evaluated: 'green',
-    approved: 'green',
-    pushed: 'purple',
-    rejected: 'red',
-  }
-
   return (
     <Flex direction="column" gap="6">
+      {/* Evaluation Modal */}
       {showEvaluationModal && (
         <EvaluationProgressModal onClose={() => setShowEvaluationModal(false)} />
       )}
 
-      {/* Message */}
+      {/* Message Alert */}
       {message && (
-        <Callout.Root color={message.type === 'success' ? 'green' : 'red'}>
+        <Callout.Root 
+          color={message.type === 'success' ? 'green' : 'red'}
+          style={{
+            backgroundColor: message.type === 'success' 
+              ? 'var(--color-success-50)' 
+              : 'var(--color-error-50)',
+            borderRadius: 'var(--radius-lg)',
+          }}
+        >
           <Callout.Icon>
             <Info size={16} />
           </Callout.Icon>
@@ -201,172 +153,159 @@ export function DashboardContent({ locale, stats, tenders }: DashboardContentPro
         </Callout.Root>
       )}
 
-      {/* KPI Cards */}
-      <Grid columns={{ initial: '1', sm: '2', md: '4' }} gap="5">
-        {statsCards.map((card) => (
-          <Card key={card.id} className="glass-card">
-            <Flex direction="column" gap="3" p="4">
-              <Flex align="center" gap="2">
-                <card.icon size={18} style={{ color: 'var(--gray-11)' }} />
-                <Text size="2" color="gray">{card.label}</Text>
-              </Flex>
-              <Text size="7" weight="bold">{card.value}</Text>
-            </Flex>
-          </Card>
-        ))}
-      </Grid>
+      {/* Stats Cards */}
+      <section aria-labelledby="stats-heading">
+        <h2 id="stats-heading" className="sr-only">
+          {isRTL ? 'إحصائيات المناقصات' : 'Tender Statistics'}
+        </h2>
+        <StatsCards stats={stats} />
+      </section>
 
-      {/* Next Action Panel */}
-      <Card className="glass-card">
-        <Flex direction="column" gap="4" p="5">
+      {/* Quick Action Panel */}
+      <section aria-labelledby="action-heading">
+        <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
           {stats.totalTenders > 0 ? (
-            <Flex align="center" justify="between" gap="4">
+            <Flex 
+              align="center" 
+              justify="between" 
+              gap="4"
+              wrap="wrap"
+            >
               <Box>
-                <Heading size="4" mb="1">{tDashboard('nextAction')}</Heading>
-                <Text size="2" color="gray">
+                <Heading 
+                  size="4" 
+                  style={{ 
+                    color: 'var(--text-primary)',
+                    marginBottom: 'var(--space-1)',
+                  }}
+                >
+                  {tDashboard('nextAction')}
+                </Heading>
+                <Text size="2" style={{ color: 'var(--text-secondary)' }}>
                   {tDashboard('pendingEvaluation', { count: (stats.pendingEvaluation ?? 0).toString() })}
                 </Text>
               </Box>
-              <Button
-                size="3"
-                variant="solid"
-                color="iris"
-                onClick={() => setShowEvaluationModal(true)}
-              >
-                <Play size={16} />
-                {tDashboard('evaluateAll')}
-              </Button>
+              <Flex gap="3" wrap="wrap">
+                <Button
+                  size="3"
+                  variant="outline"
+                  onClick={() => setShowUpload(true)}
+                  style={{
+                    borderColor: 'var(--border-default)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <Upload size={16} />
+                  {tTender('uploadFile')}
+                </Button>
+                <Button
+                  size="3"
+                  variant="solid"
+                  onClick={() => setShowEvaluationModal(true)}
+                  style={{
+                    backgroundColor: 'var(--color-primary-500)',
+                    color: 'var(--text-inverted)',
+                  }}
+                >
+                  <Play size={16} />
+                  {tDashboard('evaluateAll')}
+                </Button>
+              </Flex>
             </Flex>
           ) : (
-            <Flex direction="column" align="center" gap="3" py="6">
-              <Flex
-                align="center"
-                justify="center"
-                width="64px"
-                height="64px"
+            <UploadEmptyState
+              onUpload={() => setShowUpload(true)}
+              title={tDashboard('uploadFirstTitle')}
+              description={tDashboard('uploadFirstDescription')}
+              acceptedFormats="CSV, Excel"
+            />
+          )}
+        </div>
+      </section>
+
+      {/* File Upload Panel */}
+      {showUpload && (
+        <section aria-labelledby="upload-heading">
+          <div 
+            className="glass-card animate-fade-in-up" 
+            style={{ padding: 'var(--space-6)' }}
+          >
+            <Flex justify="between" align="center" style={{ marginBottom: 'var(--space-4)' }}>
+              <Heading size="4" style={{ color: 'var(--text-primary)' }}>
+                {tTender('uploadFile')}
+              </Heading>
+              <button
+                onClick={() => setShowUpload(false)}
+                className="focus-ring"
                 style={{
-                  borderRadius: 'var(--radius-3)',
-                  background: 'var(--gray-a3)',
-                  color: 'var(--gray-11)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  padding: 'var(--space-2)',
+                  borderRadius: 'var(--radius-md)',
                 }}
               >
-                <Upload size={24} />
-              </Flex>
-              <Box style={{ textAlign: 'center' }}>
-                <Heading size="4" mb="1">{tDashboard('uploadFirstTitle')}</Heading>
-                <Text size="2" color="gray">{tDashboard('uploadFirstDescription')}</Text>
-              </Box>
-              <Button size="3" variant="solid" color="iris" onClick={() => setShowUpload(true)}>
-                <Upload size={16} />
-                {tTender('uploadFile')}
-              </Button>
+                {isRTL ? 'إغلاق' : 'Close'}
+              </button>
             </Flex>
-          )}
-        </Flex>
-      </Card>
-
-      {/* File Upload */}
-      {showUpload && (
-        <Card className="glass-card">
-          <Heading size="4" mb="4">{tTender('uploadFile')}</Heading>
-          <FileUpload onFileSelect={handleFileSelect} isUploading={isUploading} />
-        </Card>
+            <FileUpload onFileSelect={handleFileSelect} isUploading={isUploading} />
+          </div>
+        </section>
       )}
 
-      {/* Loading */}
+      {/* Loading State */}
       {isPending && (
-        <Flex align="center" gap="2" style={{ color: 'var(--gray-11)' }}>
+        <Flex 
+          align="center" 
+          gap="2" 
+          style={{ color: 'var(--text-secondary)' }}
+        >
           <Loader2 size={16} className="animate-spin" />
           <Text size="2">{tCommon('loading')}</Text>
         </Flex>
       )}
 
-      {/* Recent Tenders Table */}
-      <Card className="glass-card">
-        <Flex direction="column">
-          <Flex justify="between" align="center" p="5" style={{ borderBottom: '1px solid var(--gray-a3)' }}>
-            <Heading size="4">{tDashboard('recentTenders')}</Heading>
-            <Button variant="ghost" size="2" onClick={() => router.push(`/${locale}/tenders-list`)}>
+      {/* Recent Tenders Section */}
+      <section aria-labelledby="tenders-heading">
+        <div className="glass-card" style={{ overflow: 'hidden' }}>
+          <Flex 
+            justify="between" 
+            align="center" 
+            style={{ 
+              padding: 'var(--space-5) var(--space-6)',
+              borderBottom: '1px solid var(--border-default)',
+            }}
+          >
+            <Heading 
+              size="4" 
+              id="tenders-heading"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {tDashboard('recentTenders')}
+            </Heading>
+            <Button 
+              variant="ghost" 
+              size="2" 
+              onClick={() => router.push(`/${locale}/tenders-list`)}
+              style={{ color: 'var(--text-link)' }}
+            >
               {tDashboard('viewAll')}
+              <ChevronRight size={16} className={isRTL ? 'flip-rtl' : ''} />
             </Button>
           </Flex>
-          <Table.Root>
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeaderCell>{tTender('entity')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>{tTender('title')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>{tTender('deadline')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>{tTender('estimatedValue')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>{tTender('status')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>{tEvaluation('score')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>{tEvaluation('recommendation')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>{tTender('actions')}</Table.ColumnHeaderCell>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {tenders.length === 0 ? (
-                <Table.Row>
-                  <Table.Cell colSpan={8}>
-                    <Flex align="center" justify="center" py="6">
-                      <Text size="2" color="gray">{tTender('noTenders')}</Text>
-                    </Flex>
-                  </Table.Cell>
-                </Table.Row>
-              ) : (
-                tenders.slice(0, 6).map((tender) => (
-                  <Table.Row key={tender.id}>
-                    <Table.Cell>{tender.entity}</Table.Cell>
-                    <Table.Cell>{tender.title}</Table.Cell>
-                    <Table.Cell>{formatDate(tender.deadline)}</Table.Cell>
-                    <Table.Cell>{formatValue(tender.estimated_value)}</Table.Cell>
-                    <Table.Cell>
-                      <Badge color={statusColors[tender.status] || 'gray'} variant="soft">
-                        {tTender(`statuses.${tender.status}`)}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>{tender.evaluation?.score ?? '-'}</Table.Cell>
-                    <Table.Cell>
-                      {tender.evaluation ? (
-                        <Badge
-                          color={
-                            tender.evaluation.recommendation === 'qualified'
-                              ? 'green'
-                              : tender.evaluation.recommendation === 'conditional'
-                                ? 'yellow'
-                                : 'red'
-                          }
-                          variant="soft"
-                        >
-                          {tEvaluation(tender.evaluation.recommendation)}
-                        </Badge>
-                      ) : (
-                        '-'
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Flex gap="2">
-                        <Button variant="ghost" size="1" onClick={() => handleView(tender.id)}>
-                          <Eye size={14} />
-                        </Button>
-                        {tender.status === 'pending' && (
-                          <Button variant="ghost" size="1" onClick={() => handleEvaluate(tender.id)}>
-                            <Sparkles size={14} />
-                          </Button>
-                        )}
-                        {tender.status === 'evaluated' && (
-                          <Button variant="ghost" size="1" onClick={() => handlePushToCRM(tender.id)}>
-                            <Send size={14} />
-                          </Button>
-                        )}
-                      </Flex>
-                    </Table.Cell>
-                  </Table.Row>
-                ))
-              )}
-            </Table.Body>
-          </Table.Root>
-        </Flex>
-      </Card>
+          
+          <Box style={{ padding: '0' }}>
+            <TenderTable
+              tenders={tenders.slice(0, 6)}
+              onView={handleView}
+              onEvaluate={handleEvaluate}
+              onPushToCRM={handlePushToCRM}
+              onDelete={handleDelete}
+            />
+          </Box>
+        </div>
+      </section>
     </Flex>
   )
 }

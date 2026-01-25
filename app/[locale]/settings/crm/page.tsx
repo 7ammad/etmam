@@ -1,5 +1,4 @@
 import { CRMSettingsClient } from '@/components/settings/crm-settings-client'
-import '@/app/globals-settings.css'
 
 type Props = {
   params: Promise<{ locale: string }>

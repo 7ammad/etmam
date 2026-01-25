@@ -231,7 +231,7 @@ export function CRMSettingsClient({ locale }: { locale: string }) {
             </div>
             
             <p className="mt-3 text-sm text-white/50 flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full bg-purple-500" />
+              <span className="w-1 h-1 rounded-full bg-purple-500 inline-block" />
               Enter your {providers.find((p) => p.value === config.provider)?.label} webhook endpoint
             </p>
           </div>
@@ -260,7 +260,7 @@ export function CRMSettingsClient({ locale }: { locale: string }) {
             </div>
             
             <p className="mt-3 text-sm text-white/50 flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full bg-amber-500" />
+              <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" />
               Authentication token for secure API access
             </p>
           </div>
