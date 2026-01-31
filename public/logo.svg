@@ -1,0 +1,11 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Modern geometric icon -->
+  <rect x="2" y="8" width="24" height="24" rx="4" fill="#22c55e" opacity="0.9"/>
+  <rect x="6" y="12" width="16" height="16" rx="2" fill="white"/>
+  <path d="M12 18 L16 22 L20 18" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- ETMAM text -->
+  <text x="32" y="26" font-family="'Cairo', 'Noto Kufi Arabic', sans-serif" font-size="18" font-weight="700" fill="#22c55e">
+    ETMAM
+  </text>
+</svg>

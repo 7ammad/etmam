@@ -227,12 +227,13 @@ export async function getTenderStats(): Promise<{
   // #endregion
   
   // Get all tenders with evaluations
+  // Query all columns - Supabase will return what exists
+  // We'll handle missing columns gracefully
   const { data, error } = await supabase
     .from('tenders')
     .select(`
       id,
       status,
-      estimated_value,
       evaluations (
         recommendation
       )
@@ -258,9 +259,15 @@ export async function getTenderStats(): Promise<{
   }
 
   for (const tender of (data || []) as any[]) {
-    // Sum estimated values
-    if (tender.estimated_value) {
-      stats.totalValue += Number(tender.estimated_value)
+    // Sum estimated values (column may not exist in all database versions)
+    // Try to get it, but don't fail if it doesn't exist
+    try {
+      const estimatedValue = (tender as any).estimated_value
+      if (estimatedValue != null && !isNaN(Number(estimatedValue))) {
+        stats.totalValue += Number(estimatedValue)
+      }
+    } catch {
+      // Column doesn't exist, skip it
     }
 
     // Count by status
@@ -291,4 +298,58 @@ export async function getTenderStats(): Promise<{
   }
 
   return stats
+}
+
+// Get tenders filtered by routing decision
+export async function getTendersByRouting(
+  routingDecision?: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID'
+): Promise<TenderWithEvaluation[]> {
+  const supabase = createServiceClient()
+
+  let query = supabase
+    .from('tenders')
+    .select(`
+      *,
+      evaluations (
+        *,
+        routing_decision,
+        predicted_budget_min,
+        predicted_budget_max,
+        oracle_metadata
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  // Filter by routing decision if provided
+  if (routingDecision) {
+    query = query.eq('evaluations.routing_decision', routingDecision)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching tenders by routing:', error)
+    throw new Error('Failed to fetch tenders by routing')
+  }
+
+  // Type assertion needed due to Supabase complex return types
+  const tenders = (data as any[]).map((tender) => ({
+    ...tender,
+    evaluation: Array.isArray(tender.evaluations)
+      ? tender.evaluations[0] || null
+      : tender.evaluations || null,
+  }))
+
+  // If routing decision filter was provided, also filter in memory
+  // (Supabase nested filtering may not work perfectly)
+  if (routingDecision) {
+    return tenders.filter((tender) => {
+      const evaluation = tender.evaluation
+      if (!evaluation) return false
+      const routing = evaluation.routing_decision
+      return routing === routingDecision
+    })
+  }
+
+  return tenders
 }

@@ -15,6 +15,16 @@ export const scoreBreakdownSchema = z.object({
 
 export type ScoreBreakdown = z.infer<typeof scoreBreakdownSchema>
 
+// Routing decision enum (matches database enum)
+export const routingDecisionSchema = z.enum([
+  'INFRATECH',
+  'EXOTECH',
+  'JOINT',
+  'NO_BID',
+])
+
+export type RoutingDecision = z.infer<typeof routingDecisionSchema>
+
 // Full evaluation schema
 export const evaluationSchema = z.object({
   id: z.string().uuid().optional(),
@@ -28,6 +38,11 @@ export const evaluationSchema = z.object({
   action_items: z.array(z.string()).default([]),
   breakdown: scoreBreakdownSchema,
   model_used: z.string().default('deepseek-chat'),
+  // Oracle fields (from Phase 1)
+  oracle_metadata: z.record(z.unknown()).nullable().optional(),
+  predicted_budget_min: z.number().int().positive().nullable().optional(),
+  predicted_budget_max: z.number().int().positive().nullable().optional(),
+  routing_decision: routingDecisionSchema.nullable().optional(),
   created_at: z.coerce.date().optional(),
   updated_at: z.coerce.date().optional(),
 })
@@ -69,6 +84,11 @@ export interface EvaluationDisplay {
   actionItems: string[]
   breakdown: ScoreBreakdown
   modelUsed: string
+  // Oracle fields
+  oracleMetadata?: Record<string, unknown> | null
+  predictedBudgetMin?: number | null
+  predictedBudgetMax?: number | null
+  routingDecision?: RoutingDecision | null
   createdAt: Date
 }
 

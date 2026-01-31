@@ -24,6 +24,10 @@ export const tenderSchema = z.object({
   source: z.string().nullable().optional(),
   status: tenderStatusSchema.default('pending'),
   raw_data: z.record(z.unknown()).nullable().optional(),
+  // Scraper fields (from Phase 0 - Deep Scraper)
+  booklet_price_sar: z.number().int().positive().nullable().optional(),
+  initial_guarantee_sar: z.number().positive().nullable().optional(),
+  project_duration: z.string().nullable().optional(),
 })
 
 export type Tender = z.infer<typeof tenderSchema>

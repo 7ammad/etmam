@@ -43,6 +43,11 @@ export async function upsertEvaluation(evaluation: EvaluationInsert): Promise<Ev
       action_items: evaluation.action_items,
       breakdown: evaluation.breakdown,
       model_used: evaluation.model_used,
+      // Oracle fields (Phase 2)
+      oracle_metadata: evaluation.oracle_metadata,
+      predicted_budget_min: evaluation.predicted_budget_min,
+      predicted_budget_max: evaluation.predicted_budget_max,
+      routing_decision: evaluation.routing_decision,
     }
     const updateQuery = supabase
       .from('evaluations') as any

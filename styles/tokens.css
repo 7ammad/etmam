@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    ETMAAM DESIGN SYSTEM TOKENS
-   "Ministry Clean" - Premium, trustworthy, government-grade professionalism
+   "Precision Operator" - Distinctive, bold, production-grade aesthetic
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -135,8 +135,8 @@
   /* ═══════════════════════════════════════
      FONT FAMILIES
      ═══════════════════════════════════════ */
-  --font-arabic: 'Noto Kufi Arabic', 'Cairo', system-ui, sans-serif;
-  --font-latin:  'Inter', 'Cairo', system-ui, sans-serif;
+  --font-arabic: 'Noto Kufi Arabic', system-ui, sans-serif;
+  --font-latin:  'Cairo', system-ui, sans-serif;
   --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
 
   /* ═══════════════════════════════════════
@@ -218,6 +218,28 @@
 
   /* CRM CTA Card Gradient (purple/pink like Figma) */
   --gradient-cta-card: linear-gradient(135deg, #5D50C6 0%, #8B5CF6 50%, #F85E9F 100%);
+
+  /* ═══════════════════════════════════════
+     ROUTING COLORS (Oracle Pipeline)
+     ═══════════════════════════════════════ */
+  --color-infratech: #06b6d4;
+  --color-infratech-dark: #0891b2;
+  --color-infratech-bg: rgba(6, 182, 212, 0.1);
+  --color-infratech-text: #0891b2;
+  
+  --color-exotech: #8b5cf6;
+  --color-exotech-dark: #7c3aed;
+  --color-exotech-bg: rgba(139, 92, 246, 0.1);
+  --color-exotech-text: #7c3aed;
+  
+  --color-joint: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+  --color-joint-bg: rgba(139, 92, 246, 0.1);
+  --color-joint-text: #7c3aed;
+  
+  --color-no-bid: #6b7280;
+  --color-no-bid-dark: #4b5563;
+  --color-no-bid-bg: rgba(107, 114, 128, 0.1);
+  --color-no-bid-text: #4b5563;
 
   /* ═══════════════════════════════════════
      SHADOWS
@@ -316,6 +338,42 @@
   --surface-glass:        rgba(30, 41, 59, 0.7);
   --surface-glass-border: rgba(255, 255, 255, 0.1);
   --surface-muted:        #1e293b;
+
+  /* Routing Colors (Dark Mode) */
+  --color-infratech: #22d3ee;
+  --color-infratech-dark: #06b6d4;
+  --color-infratech-bg: rgba(34, 211, 238, 0.15);
+  --color-infratech-text: #67e8f9;
+  
+  --color-exotech: #a78bfa;
+  --color-exotech-dark: #8b5cf6;
+  --color-exotech-bg: rgba(167, 139, 250, 0.15);
+  --color-exotech-text: #c4b5fd;
+  
+  --color-joint: linear-gradient(135deg, #22d3ee 0%, #a78bfa 100%);
+  --color-joint-bg: rgba(34, 211, 238, 0.15);
+  --color-joint-text: #c4b5fd;
+  
+  --color-no-bid: #9ca3af;
+  --color-no-bid-dark: #6b7280;
+  --color-no-bid-bg: rgba(156, 163, 175, 0.15);
+  --color-no-bid-text: #d1d5db;
+
+  /* Routing Colors (Dark Mode) */
+  --color-infratech: #22d3ee;
+  --color-infratech-text: #22d3ee;
+  --color-infratech-bg: rgba(34, 211, 238, 0.15);
+  
+  --color-exotech: #a78bfa;
+  --color-exotech-text: #a78bfa;
+  --color-exotech-bg: rgba(167, 139, 250, 0.15);
+  
+  --color-joint-text: #a78bfa;
+  --color-joint-bg: rgba(167, 139, 250, 0.15);
+  
+  --color-no-bid: #9ca3af;
+  --color-no-bid-text: #9ca3af;
+  --color-no-bid-bg: rgba(156, 163, 175, 0.15);
 
   /* CRM Dashboard Surfaces (Dark Mode) */
   --surface-sidebar:      #1e293b;

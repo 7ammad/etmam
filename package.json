@@ -11,13 +11,20 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "scrape:recon": "tsx scripts/etimad-recon.ts",
+    "scrape:test": "tsx scripts/test-scraper.ts",
+    "scrape:run": "tsx scripts/run-scraper.ts",
+    "test:api": "tsx scripts/test-api-integration.ts",
+    "verify:phase-1": "tsx scripts/verify-phase-1.ts",
+    "verify:phase-2": "tsx scripts/verify-phase-2.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",
     "@radix-ui/themes": "^3.2.1",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.0",
+    "@tremor/react": "^3.18.7",
     "ai": "^4.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -42,7 +49,9 @@
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.0",
+    "supabase": "^2.72.8",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },
   "packageManager": "pnpm@9.15.0"

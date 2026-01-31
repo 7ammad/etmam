@@ -1,13 +1,8 @@
-import { isValidLocale, type Locale } from '@/lib/i18n'
-import { SettingsClient } from '@/components/settings/settings-client'
-
-type Props = {
-  params: Promise<{ locale: string }>
-}
-
-export default async function SettingsPage({ params }: Props) {
-  const { locale } = await params
-  const validLocale: Locale = isValidLocale(locale) ? locale : 'ar'
-
-  return <SettingsClient locale={validLocale} />
+export default function SettingsPage() {
+  return (
+    <div style={{ padding: '2rem', textAlign: 'center' }}>
+      <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Settings</h1>
+      <p style={{ color: '#666' }}>New design coming soon...</p>
+    </div>
+  )
 }

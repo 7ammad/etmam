@@ -1,7 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm type-check:*)"
+      "Bash(pnpm type-check:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx next build)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm build:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm scrape:recon:*)",
+      "Bash(HEADLESS=true pnpm scrape:recon:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm --dir \"c:/dev/builds/etmaam\" build)",
+      "Bash(pnpm exec tsx:*)",
+      "Bash(git show:*)",
+      "Bash(echo:*)",
+      "Bash(/c/Users/Hammad/AppData/Roaming/npm/pnpm build)",
+      "Bash(/c/Users/Hammad/AppData/Roaming/npm/pnpm add @tremor/react)",
+      "Bash(powershell.exe -Command \"cd ''c:/dev/builds/etmaam''; pnpm build 2>&1 | Select-Object -Last 40\")"
     ]
   }
 }

@@ -23,6 +23,7 @@ lerna-debug.log*
 
 # Misc
 .DS_Store
+nul
 *.pem
 
 # Debug
@@ -57,3 +58,10 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Scraper output (reconnaissance, test results)
+scratchpad/
+
+# Playwright
+playwright-report/
+test-results/

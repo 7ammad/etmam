@@ -50,7 +50,7 @@ CREATE TABLE tenders (
   title TEXT NOT NULL,                     -- عنوان المنافسة
   reference_no TEXT NOT NULL,              -- رقم المنافسة
   deadline TIMESTAMPTZ NOT NULL,           -- الموعد النهائي
-  estimated_value NUMERIC(15, 2),          -- القيمة التقديرية (SAR)
+  estimated_value NUMERIC(12, 2),          -- القيمة التقديرية (SAR) - 12 digits sufficient for SAR values up to 999 billion
   
   -- Additional fields
   description TEXT,
@@ -58,9 +58,7 @@ CREATE TABLE tenders (
   status tender_status DEFAULT 'pending' NOT NULL,
   
   -- Raw data from import
-  raw_data JSONB,
-  
-  UNIQUE(user_id, reference_no)
+  raw_data JSONB
 );
 
 -- Evaluations table (AI evaluation results)
@@ -146,6 +144,40 @@ CREATE INDEX idx_crm_configs_provider ON crm_configs(provider);
 -- CRM Pushes
 CREATE INDEX idx_crm_pushes_tender_id ON crm_pushes(tender_id);
 CREATE INDEX idx_crm_pushes_status ON crm_pushes(status);
+
+-- ============================================================
+-- JSONB GIN INDEXES (for efficient JSONB queries)
+-- ============================================================
+
+-- GIN index for tenders.raw_data (supports @>, ?, ?&, ?| operators)
+CREATE INDEX idx_tenders_raw_data_gin ON tenders USING gin (raw_data);
+
+-- GIN index for evaluations.breakdown (supports JSONB containment queries)
+CREATE INDEX idx_evaluations_breakdown_gin ON evaluations USING gin (breakdown);
+
+-- GIN index for crm_configs.config (supports JSONB queries on config)
+CREATE INDEX idx_crm_configs_config_gin ON crm_configs USING gin (config);
+
+-- GIN index for crm_pushes.response_data (supports JSONB queries on responses)
+CREATE INDEX idx_crm_pushes_response_data_gin ON crm_pushes USING gin (response_data);
+
+-- ============================================================
+-- UNIQUE CONSTRAINTS (idempotent)
+-- ============================================================
+
+-- Add unique constraint on (user_id, reference_no) for tenders
+-- This enables upsert operations and prevents duplicate tenders per user
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'tenders_user_reference_unique'
+  ) THEN
+    ALTER TABLE tenders
+      ADD CONSTRAINT tenders_user_reference_unique
+      UNIQUE (user_id, reference_no);
+  END IF;
+END $$;
 
 -- ============================================================
 -- UPDATED_AT TRIGGER

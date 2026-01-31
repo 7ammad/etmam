@@ -24,6 +24,9 @@ export interface Database {
           source: string | null
           status: 'pending' | 'evaluating' | 'evaluated' | 'approved' | 'pushed' | 'rejected'
           raw_data: Json | null
+          booklet_price_sar: number | null
+          initial_guarantee_sar: number | null
+          project_duration: string | null
         }
         Insert: {
           id?: string
@@ -39,6 +42,9 @@ export interface Database {
           source?: string | null
           status?: 'pending' | 'evaluating' | 'evaluated' | 'approved' | 'pushed' | 'rejected'
           raw_data?: Json | null
+          booklet_price_sar?: number | null
+          initial_guarantee_sar?: number | null
+          project_duration?: string | null
         }
         Update: {
           id?: string
@@ -54,7 +60,11 @@ export interface Database {
           source?: string | null
           status?: 'pending' | 'evaluating' | 'evaluated' | 'approved' | 'pushed' | 'rejected'
           raw_data?: Json | null
+          booklet_price_sar?: number | null
+          initial_guarantee_sar?: number | null
+          project_duration?: string | null
         }
+        Relationships: []
       }
       evaluations: {
         Row: {
@@ -71,6 +81,10 @@ export interface Database {
           action_items: string[] | null
           breakdown: Json
           model_used: string
+          oracle_metadata: Json | null
+          predicted_budget_min: number | null
+          predicted_budget_max: number | null
+          routing_decision: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID' | null
         }
         Insert: {
           id?: string
@@ -86,6 +100,10 @@ export interface Database {
           action_items?: string[] | null
           breakdown?: Json
           model_used?: string
+          oracle_metadata?: Json | null
+          predicted_budget_min?: number | null
+          predicted_budget_max?: number | null
+          routing_decision?: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID' | null
         }
         Update: {
           id?: string
@@ -101,7 +119,20 @@ export interface Database {
           action_items?: string[] | null
           breakdown?: Json
           model_used?: string
+          oracle_metadata?: Json | null
+          predicted_budget_min?: number | null
+          predicted_budget_max?: number | null
+          routing_decision?: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID' | null
         }
+        Relationships: [
+          {
+            foreignKeyName: 'evaluations_tender_id_fkey'
+            columns: ['tender_id']
+            isOneToOne: false
+            referencedRelation: 'tenders'
+            referencedColumns: ['id']
+          }
+        ]
       }
       crm_configs: {
         Row: {
@@ -137,6 +168,7 @@ export interface Database {
           is_active?: boolean
           last_tested_at?: string | null
         }
+        Relationships: []
       }
       crm_pushes: {
         Row: {
@@ -169,6 +201,22 @@ export interface Database {
           error_message?: string | null
           response_data?: Json | null
         }
+        Relationships: [
+          {
+            foreignKeyName: 'crm_pushes_tender_id_fkey'
+            columns: ['tender_id']
+            isOneToOne: false
+            referencedRelation: 'tenders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'crm_pushes_crm_config_id_fkey'
+            columns: ['crm_config_id']
+            isOneToOne: false
+            referencedRelation: 'crm_configs'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
     Views: {
@@ -182,6 +230,7 @@ export interface Database {
       recommendation_type: 'qualified' | 'conditional' | 'excluded'
       crm_provider: 'webhook' | 'hubspot' | 'salesforce' | 'zoho' | 'odoo'
       push_status: 'pending' | 'success' | 'failed'
+      routing_decision: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID'
     }
   }
 }

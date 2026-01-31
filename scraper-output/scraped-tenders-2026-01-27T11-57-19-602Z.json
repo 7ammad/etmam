@@ -1,0 +1,86 @@
+{
+  "metadata": {
+    "startedAt": "2026-01-27T11:56:52.396Z",
+    "completedAt": "2026-01-27T11:57:19.507Z",
+    "totalScraped": 5,
+    "totalErrors": 0,
+    "config": {
+      "batchSize": 5,
+      "delayMs": 3000
+    }
+  },
+  "tenders": [
+    {
+      "reference_no": "HA26610005",
+      "title": "تفاصيل المنافسة",
+      "entity": "ادارة الشؤون الفنية المركزية بمنطقة حائل",
+      "deadline": "2026-01-27T11:56:58.804Z",
+      "estimated_value": null,
+      "booklet_price": 20000,
+      "initial_guarantee": null,
+      "contract_duration": "3 يوم",
+      "description": "توريد احبار لبعض الطابعات بادارة الشؤون الفنية المركزية بمنطقة حائل ...عرض الأقل...",
+      "tender_url": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=Xo3XXP77FpbdSWzwTlhRlA==",
+      "source": "etimad",
+      "scraped_at": "2026-01-27T11:56:58.804Z"
+    },
+    {
+      "reference_no": "046847",
+      "title": "تفاصيل المنافسة",
+      "entity": "جامعة الملك عبدالعزيز",
+      "deadline": "2026-01-27T11:57:03.426Z",
+      "estimated_value": null,
+      "booklet_price": 70000,
+      "initial_guarantee": null,
+      "contract_duration": "3 سنة",
+      "description": "مشروع البوابة المعرفية لمدة 3 سنوات ...عرض الأقل...",
+      "tender_url": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=DUtbsBC39U DFQXLrGVS6Q==",
+      "source": "etimad",
+      "scraped_at": "2026-01-27T11:57:03.426Z"
+    },
+    {
+      "reference_no": "4700541618",
+      "title": "تفاصيل المنافسة",
+      "entity": "أمانة منطقة حائل",
+      "deadline": "2026-01-27T11:57:08.069Z",
+      "estimated_value": null,
+      "booklet_price": 100000,
+      "initial_guarantee": null,
+      "contract_duration": "24 شهر",
+      "description": "تشغيل وصـــــــــــــــــــــــــــــــــــــــــــيانة الأمن السيبراني ...عرض الأقل...",
+      "tender_url": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=Z3XpICVlffEWv4ZMZSrI7g==",
+      "source": "etimad",
+      "scraped_at": "2026-01-27T11:57:08.069Z"
+    },
+    {
+      "reference_no": "2026100004",
+      "title": "تفاصيل المنافسة",
+      "entity": "وزارة الصحة الديوان العام",
+      "deadline": "2026-01-27T11:57:14.188Z",
+      "estimated_value": null,
+      "booklet_price": 100000,
+      "initial_guarantee": null,
+      "contract_duration": "24 شهر",
+      "description": "مشروع تشغيل وصيانة وتطوير تطبيب السكتات الدماغية عن بعد ...عرض الأقل...",
+      "tender_url": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=wyWW4YXGDsVeX7bx6tne1Q==",
+      "source": "etimad",
+      "scraped_at": "2026-01-27T11:57:14.188Z"
+    },
+    {
+      "reference_no": "1551",
+      "title": "تفاصيل المنافسة",
+      "entity": "الهيئة السعودية للبيانات والذكاء الاصطناعي",
+      "deadline": "2026-01-27T11:57:19.501Z",
+      "estimated_value": null,
+      "booklet_price": 100000,
+      "initial_guarantee": null,
+      "contract_duration": "3 سنة",
+      "description": "المشروع يهدف لتجديد الرخص وتقديم الدعم للخدمات المقدمة لتشغيل مراكز البيانات ومركز التعافي من الكوارث مما يؤمن تواجدية وتوافرية التطبيقات الخدمية والحيوية المقدمة. بالإضافة لتأمين وحماية التطبيقات و البنية التحتية للأنظمة و المنصات الوطنية المقدمة من الهيئة السعودية للبيانات والذكاء الاصطناعي (سدايا). ...عرض الأقل...",
+      "tender_url": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=6haK*@@**3Hrww1taZHOfVCQLg==",
+      "source": "etimad",
+      "scraped_at": "2026-01-27T11:57:19.501Z"
+    }
+  ],
+  "errors": [],
+  "scrapedAt": "2026-01-27T11:57:19.602Z"
+}

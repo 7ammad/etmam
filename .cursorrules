@@ -1,6 +1,164 @@
 # Etmaam Project Context Bridge (.cursorrules)
 # Generated from Stack-Agnostic AI Development Workflow - Phase 0
 
+## 🎯 USER RULE: Skill Review Protocol (MANDATORY)
+**Type:** User Preference / Agent Behavior Rule  
+**Priority:** CRITICAL - Must be followed before ANY action
+
+### Rule: Always Review and Use Relevant Skills Before Starting Tasks
+
+**BEFORE** executing any user request or development task, you MUST:
+
+1. **Identify Relevant Skills:**
+   - **FIRST:** Check the agent_skills list (500+ skills already installed globally in Cursor settings)
+   - Determine which skills match the task domain (database, React, TypeScript, testing, code review, etc.)
+   - Review skill descriptions from the agent_skills list to understand capabilities
+   - Also check local: `.cursor/skills/` for project-specific skills
+
+2. **Read and Apply Skills:**
+   - **For globally installed skills:** Read the skill file using the fullPath from agent_skills list
+   - **For local skills:** Read `.cursor/skills/[skill-name]/SKILL.md` or `AGENTS.md`
+   - Understand the best practices, patterns, and guidelines in the skill
+   - Apply the skill's knowledge to enhance your approach BEFORE executing the task
+
+3. **Examples (Skills are already installed - use them directly):**
+   - **Database/Migration tasks** → Use `supabase-postgres-best-practices` (check agent_skills for fullPath)
+   - **Code review tasks** → Use `code-reviewer` skill (alirezarezvani-48/engineering-team/code-reviewer) for comprehensive code analysis
+   - **TypeScript/React tasks** → Use `vercel-react-best-practices` 
+   - **Debugging tasks** → Use `obra/superpowers/systematic-debugging`
+   - **Testing tasks** → Use `webapp-testing` or `wshobson/agents/e2e-testing-patterns`
+   - **UI/Design tasks** → Use `frontend-design` or `web-design-guidelines`
+   - **Database design** → Use `wshobson/agents/postgresql-table-design`
+
+4. **Skill Locations:**
+   - **Global (500+ installed):** Available via agent_skills list - USE THESE FIRST (already installed in Cursor settings)
+   - Local: `.cursor/skills/[skill-name]/SKILL.md` or `AGENTS.md`
+   - Project rules: `.cursor/rules/*.md`
+   
+   **IMPORTANT:** Skills are already installed globally in Cursor. Check the agent_skills list to find and use relevant skills directly - no installation needed!
+
+5. **Workflow:**
+   ```
+   User Request → Identify Task Type → Find Relevant Skills → Read Skills → Apply Knowledge → Execute Task
+   ```
+
+**This rule ensures:**
+- ✅ Best practices are always applied
+- ✅ No missed optimization opportunities
+- ✅ Consistent quality across all work
+- ✅ Skills enhance capabilities before action
+
+**Exception:** Only skip if no relevant skills exist for the task type.
+
+---
+
+## 📝 USER RULE: Communication Style - Concise Summaries (MANDATORY)
+**Type:** User Preference / Agent Behavior Rule  
+**Priority:** HIGH - Must be followed for all responses
+
+### Rule: Default to Concise Summaries, Not Detailed Reports
+
+**ALWAYS** provide concise summaries with key points unless explicitly asked for detailed reports.
+
+1. **Default Response Format:**
+   - ✅ **Summary:** 2-3 sentences with key findings
+   - ✅ **Key Points:** Bullet list of important items (3-5 items max)
+   - ✅ **Action Items:** What needs to be done next (if applicable)
+   - ❌ **NO:** Long-form reports, detailed analysis, extensive documentation
+
+2. **When to Provide Detailed Reports:**
+   - ✅ User explicitly asks: "generate a detailed report", "create a full analysis", "write comprehensive documentation"
+   - ✅ User asks: "document this", "create a report", "write up the findings"
+   - ❌ **NOT** when user asks: "check X", "review Y", "what's the status", "is this ready"
+
+3. **Summary Format Examples:**
+
+   **✅ Good (Concise):**
+   ```
+   Status: ✅ Ready
+   - All dependencies installed
+   - Migrations validated
+   - Ready to test
+   ```
+
+   **❌ Bad (Too Detailed):**
+   ```
+   # Comprehensive Dependency Audit Report
+   Date: 2026-01-27
+   Project: Etmaam CRM
+   Status: ✅ ALL DEPENDENCIES VERIFIED
+   
+   ## 📦 Installed Dependencies
+   [50+ lines of detailed analysis...]
+   ```
+
+4. **Exception Cases:**
+   - Code reviews: Provide focused findings, not exhaustive reports
+   - Debugging: Show the issue and fix, not full diagnostic reports
+   - Status checks: One-line status + key points
+   - Validation: Pass/Fail + issues found (if any)
+
+5. **If User Wants Details:**
+   - Offer: "Would you like a detailed report?" or "I can create a full analysis if needed"
+   - Wait for confirmation before generating extensive documentation
+
+**This rule ensures:**
+- ✅ Responses are quick and actionable
+- ✅ Key information is immediately visible
+- ✅ No information overload
+- ✅ User can request details when needed
+
+**Exception:** Only generate detailed reports when explicitly requested.
+
+---
+
+## 🔍 USER RULE: Dependency Check Protocol (MANDATORY)
+**Type:** User Preference / Agent Behavior Rule  
+**Priority:** HIGH - Must be followed before code execution or testing
+
+### Rule: Always Verify Dependencies Before Execution
+
+**BEFORE** running any script, test, or code execution, you MUST:
+
+1. **Check Package Dependencies:**
+   - Verify all required packages are listed in `package.json`
+   - Check if `node_modules` exists and dependencies are installed
+   - For TypeScript projects: Verify `tsconfig.json` paths are correct
+   - For scripts: Verify runtime dependencies (e.g., `tsx` for TypeScript execution)
+
+2. **Verify Import Dependencies:**
+   - Check all `import` statements in the target files
+   - Verify path aliases (`@/` mappings) are correctly configured
+   - Ensure external packages match `package.json` versions
+   - Check for missing type definitions (`@types/*` packages)
+
+3. **Scraper-Specific Checks:**
+   - **Playwright:** Verify `@playwright/test` is installed and browsers are installed (`npx playwright install chromium`)
+   - **TypeScript execution:** Verify `tsx` is installed for running `.ts` scripts
+   - **Environment variables:** Check `.env.local` has required variables (CRON_SECRET, SYSTEM_USER_ID, Supabase keys)
+   - **Database:** Verify migrations are applied before testing database operations
+
+4. **Dependency Audit Workflow:**
+   ```
+   Task Request → Check package.json → Verify node_modules → Check imports → Verify runtime deps → Execute
+   ```
+
+5. **Common Dependency Checks:**
+   - **Scraper scripts:** `@playwright/test`, `tsx`, `zod`, `@supabase/supabase-js`
+   - **API routes:** `next/server`, `@supabase/ssr`, type definitions
+   - **TypeScript:** `typescript`, `@types/node`, `@types/react`
+   - **Build tools:** `next`, `tailwindcss`, `eslint`
+
+**This rule ensures:**
+- ✅ No "module not found" errors
+- ✅ All dependencies are properly installed
+- ✅ TypeScript paths resolve correctly
+- ✅ Runtime environment is ready
+
+**Exception:** Skip if user explicitly states dependencies are already verified.
+
+---
+
 ## Project Identity
 - **Name:** Etmaam (MVP)
 - **Goal:** Automated Tender Qualification & CRM Connector for Saudi Market
