@@ -2,14 +2,18 @@
  * Etimad Scraper Test Script
  *
  * Runs the scraper in test mode with a small batch size.
- * Outputs results to console and optionally posts to the sync API.
+ * No API required: just scrapes and prints/saves to scraper-output.
+ * Optionally POST to sync API when POST_TO_API=true.
  *
  * Run with: pnpm scrape:test
+ * Historical (awarded) tenders: pnpm scrape:test -- --historical
+ * Quick smoke (6 tenders, no file save): pnpm scrape:smoke  or  pnpm scrape:test -- --smoke
  *
  * Environment variables:
- *   POST_TO_API - Set to 'true' to POST results to sync endpoint
- *   API_URL - URL of the sync endpoint (default: http://localhost:3000/api/cron/sync)
- *   CRON_SECRET - Auth token for sync endpoint
+ *   BATCH_SIZE - Number of tenders (default: 5, overridden to 6 when --smoke)
+ *   SAVE_TO_FILE - Set to 'true' to save JSON to scraper-output/ (filename: scraped-tenders-{active|historical}-{timestamp}.json)
+ *   POST_TO_API - Set to 'true' to also POST results to sync endpoint (then API_URL, CRON_SECRET needed)
+ *   API_URL, CRON_SECRET - Only if POST_TO_API=true
  *   ACTIVITY_ID - Main activity filter ID (default: '9' for Telecom/IT)
  */
 
@@ -33,19 +37,27 @@ async function main(): Promise<void> {
   const startTime = Date.now()
 
   try {
-    // Use Telecom/IT filter by default, or custom via env var
+    const hasHistoricalFlag = process.argv.includes('--historical')
+    const smokeMode = process.argv.includes('--smoke')
+    const mode = (process.env.SCRAPER_MODE || (hasHistoricalFlag ? 'historical' : 'active')) as 'active' | 'historical'
+
     const activityId =
       process.env.ACTIVITY_ID || ETMAM_ACTIVITY_FILTERS.telecomIT.mainActivityId
+    const batchSize = smokeMode ? 6 : parseInt(process.env.BATCH_SIZE || '5', 10)
 
-    console.log('[Test] Starting scraper with batch size: 5')
+    if (smokeMode) console.log('[Test] Smoke run: first 6 tenders only, no file save')
+    console.log(`[Test] Starting scraper with batch size: ${batchSize}`)
+    console.log(`[Test] Mode: ${mode} (${mode === 'historical' ? 'awarded tenders' : 'active/open for bids'})`)
     console.log(`[Test] Activity filter: ${activityId} (Telecom/IT)`)
     console.log('')
 
     const result = await scrapePublicTenders({
-      batchSize: 5, // Only scrape 5 tenders for testing
-      delayMs: 3000, // Longer delay for testing (3 seconds)
-      headless: true, // Run headless in test mode
+      batchSize,
+      delayMs: 3000,
+      headless: true,
       activityFilter: { mainActivityId: activityId },
+      mode,
+      listPageSize: 24,
     })
 
     // Print results summary
@@ -62,23 +74,31 @@ async function main(): Promise<void> {
     // Print errors
     displayErrors(result.errors)
 
-    // Save to JSON file (optional, controlled by SAVE_TO_FILE env var)
-    if (process.env.SAVE_TO_FILE === 'true' || process.env.SAVE_TO_FILE === '1') {
+    // Save to JSON file (optional: SAVE_TO_FILE=true or when BATCH_SIZE >= 10; smoke saves only if SAVE_TO_FILE set)
+    const saveToFile =
+      (smokeMode &&
+        (process.env.SAVE_TO_FILE === 'true' || process.env.SAVE_TO_FILE === '1')) ||
+      (!smokeMode &&
+        (process.env.SAVE_TO_FILE === 'true' ||
+          process.env.SAVE_TO_FILE === '1' ||
+          batchSize >= 10))
+    if (saveToFile) {
       const outputDir = path.join(process.cwd(), 'scraper-output')
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true })
       }
-      
+
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-      const filename = path.join(outputDir, `scraped-tenders-${timestamp}.json`)
-      
+      const filename = path.join(outputDir, `scraped-tenders-${mode}-${timestamp}.json`)
+
       const output = {
+        mode,
         metadata: result.metadata,
         tenders: result.tenders,
         errors: result.errors,
         scrapedAt: new Date().toISOString(),
       }
-      
+
       fs.writeFileSync(filename, JSON.stringify(output, null, 2), 'utf-8')
       console.log(`[Test] Results saved to: ${filename}`)
       console.log('')

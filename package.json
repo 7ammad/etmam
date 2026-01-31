@@ -14,10 +14,14 @@
     "test:ui": "playwright test --ui",
     "scrape:recon": "tsx scripts/etimad-recon.ts",
     "scrape:test": "tsx scripts/test-scraper.ts",
+    "scrape:smoke": "tsx scripts/test-scraper.ts -- --smoke",
     "scrape:run": "tsx scripts/run-scraper.ts",
     "test:api": "tsx scripts/test-api-integration.ts",
     "verify:phase-1": "tsx scripts/verify-phase-1.ts",
-    "verify:phase-2": "tsx scripts/verify-phase-2.ts"
+    "verify:phase-2": "tsx scripts/verify-phase-2.ts",
+    "verify:historical": "tsx scripts/verify-phase-historical.ts",
+    "verify:scraper-active": "tsx scripts/verify-scraper-active.ts",
+    "review:scraped": "tsx scripts/review-scraped-data.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",

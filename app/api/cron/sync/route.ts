@@ -18,7 +18,7 @@ import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
 import { scrapedTenderSchema } from '@/types/scraper'
 import type { SyncPayload, SyncResponse, ScrapedTender } from '@/types/scraper'
-import type { Database } from '@/types/database'
+import type { Database, Json } from '@/types/database'
 
 type TenderInsert = Database['public']['Tables']['tenders']['Insert']
 
@@ -64,7 +64,8 @@ function verifyCronSecret(request: NextRequest): boolean {
 }
 
 /**
- * Convert a ScrapedTender to the database format
+ * Convert a ScrapedTender to the database format.
+ * All scraped information (including every tab and award fields) is stored in raw_data under this tender.
  */
 function tenderToDbFormat(tender: ScrapedTender): TenderInsert {
   return {
@@ -77,14 +78,16 @@ function tenderToDbFormat(tender: ScrapedTender): TenderInsert {
     description: tender.description ?? null,
     source: 'etimad',
     status: 'pending',
+    booklet_price_sar: tender.booklet_price ?? null,
+    initial_guarantee_sar: tender.initial_guarantee ?? null,
+    project_duration: tender.contract_duration ?? null,
+    award_amount_sar: tender.award_amount_sar ?? null,
+    award_date: tender.award_date ?? null,
+    winning_bidder: tender.winning_bidder ?? null,
     raw_data: {
-      // Store all scraped fields in raw_data for future use
-      booklet_price: tender.booklet_price,
-      initial_guarantee: tender.initial_guarantee,
-      contract_duration: tender.contract_duration,
-      tender_url: tender.tender_url,
-      scraped_at: tender.scraped_at,
-    },
+      ...tender,
+      tab_sections: tender.tab_sections,
+    } as Json,
   }
 }
 

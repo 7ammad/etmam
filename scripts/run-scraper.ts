@@ -48,6 +48,8 @@ async function main(): Promise<void> {
   // Parse optional configuration
   const batchSize = parseInt(process.env.BATCH_SIZE || '50', 10)
   const delayMs = parseInt(process.env.DELAY_MS || '2000', 10)
+  const hasHistoricalFlag = process.argv.includes('--historical')
+  const scraperMode = (process.env.SCRAPER_MODE || (hasHistoricalFlag ? 'historical' : 'active')) as 'active' | 'historical'
 
   // Activity filter - defaults to Telecom/IT (ID: 9) for Etmam's target sector
   const activityId = process.env.ACTIVITY_ID || '9'
@@ -61,6 +63,7 @@ async function main(): Promise<void> {
   console.log(`  API URL: ${apiUrl}`)
   console.log(`  Batch Size: ${batchSize}`)
   console.log(`  Delay: ${delayMs}ms`)
+  console.log(`  Mode: ${scraperMode} (${scraperMode === 'historical' ? 'awarded tenders' : 'active/open for bids'})`)
   console.log(
     `  Activity Filter: ${activityId}${subActivityId ? '/' + subActivityId : ''} (Telecom/IT)`
   )
@@ -69,13 +72,15 @@ async function main(): Promise<void> {
   const startTime = Date.now()
 
   try {
-    // Run scraper
+    // Run scraper (historical: 24 items/page, scrape all pages; active: 6 items/page, batch limit)
     console.log('[Scraper] Starting...')
     const result = await scrapePublicTenders({
       batchSize,
       delayMs,
       headless: true,
       activityFilter,
+      mode: scraperMode,
+      listPageSize: 24,
     })
 
     const scrapeTime = Date.now() - startTime

@@ -12,15 +12,31 @@ import { z } from 'zod'
  * Validates data extracted from the Etimad portal.
  * Required fields come from the list page, optional from detail page.
  */
+/**
+ * Helper to validate ISO 8601 date strings
+ */
+const isoDateString = z.string().refine(
+  (val) => {
+    const date = new Date(val)
+    return !isNaN(date.getTime()) && val.includes('T')
+  },
+  { message: 'Must be a valid ISO 8601 date string (e.g., 2026-02-10T00:00:00.000Z)' }
+)
+
 export const scrapedTenderSchema = z.object({
   // Required fields (from list page)
   reference_no: z.string().min(1, 'Reference number is required'),
   title: z.string().min(1, 'Title is required'),
   entity: z.string().min(1, 'Entity is required'),
-  deadline: z.string(), // ISO date string or original format
+  deadline: isoDateString,
 
   // Optional fields (from list page or detail page)
   estimated_value: z.number().nullable().optional(),
+
+  // Award fields (from award_results tab; present for historical/awarded tenders)
+  award_amount_sar: z.number().nullable().optional(),
+  award_date: z.string().nullable().optional(),
+  winning_bidder: z.string().nullable().optional(),
 
   // Detail page fields (deep scrape)
   booklet_price: z.number().nullable().optional(),
@@ -29,9 +45,16 @@ export const scrapedTenderSchema = z.object({
   description: z.string().nullable().optional(),
   tender_url: z.string().url().optional(),
 
+  /** Data scraped from each detail-page tab (Basic Info, Addresses/Dates, Classification, Award, Local Content). Required; must contain at least one tab section. */
+  tab_sections: z
+    .record(z.string(), z.record(z.string(), z.string()))
+    .refine((obj) => Object.keys(obj).length > 0, {
+      message: 'tab_sections must contain at least one tab',
+    }),
+
   // Metadata
   source: z.literal('etimad'),
-  scraped_at: z.string(), // ISO timestamp
+  scraped_at: isoDateString,
 })
 
 export type ScrapedTender = z.infer<typeof scrapedTenderSchema>
@@ -66,6 +89,10 @@ export interface ScraperConfig {
   timeout: number
   /** Optional activity filter for targeting specific sectors */
   activityFilter?: ActivityFilter
+  /** Optional: 'active' = open for bids (2), 'historical' = awarded (6). Default: 'active'. */
+  mode?: 'active' | 'historical'
+  /** Optional: items per page on list (6, 12, 18, 24). Default: 24 for historical, 6 for active. */
+  listPageSize?: 6 | 12 | 18 | 24
 }
 
 /**
@@ -147,6 +174,18 @@ export interface EtimadSelectors {
     nextPage: string
     /** Tender status filter dropdown */
     filterActive: string
+    /** Filter panel toggle (top-left search button) */
+    filterToggle: string
+    /** Filter panel collapse target */
+    filterPanel: string
+    /** Basic info section inside filter panel */
+    filterBasicInfo: string
+    /** Main activity dropdown */
+    mainActivitySelect: string
+    /** Sub-activity dropdown */
+    subActivitySelect: string
+    /** Search submit button inside filter panel */
+    filterSearchButton: string
     /** Items per page selector */
     itemsPerPage: string
     /** Tender type badge */
@@ -172,6 +211,12 @@ export interface EtimadSelectors {
     purposeTruncated: string
     /** Purpose/description full (#purposeSpan) */
     purposeFull: string
+    /** Tab list selector */
+    tabList: string
+    /** Tab link selector */
+    tabLink: string
+    /** Tab pane selector */
+    tabPane: string
   }
   // Arabic labels to search for
   arabicLabels: {
@@ -182,6 +227,9 @@ export interface EtimadSelectors {
     entity: string[]
     deadline: string[]
     estimatedValue: string[]
+    winningBidder?: string[]
+    awardAmount?: string[]
+    awardDate?: string[]
   }
 }
 

@@ -14,7 +14,7 @@ import type { ScraperConfig, EtimadSelectors } from '@/types/scraper'
  */
 export const DEFAULT_CONFIG: ScraperConfig = {
   baseUrl: 'https://tenders.etimad.sa',
-  batchSize: 50,
+  batchSize: 120, // Default: collect up to 120 tenders (6 per page → ~20 pages)
   delayMs: 2000, // 2 second delay between requests (be polite)
   maxRetries: 3,
   userAgent:
@@ -89,12 +89,15 @@ export const ETMAM_ACTIVITY_FILTERS = {
 /**
  * Tender status filter options
  *
- * Use in #TenderCategory dropdown
+ * Use in #TenderCategory dropdown.
+ * VERIFIED from portal HTML: "المنافسات النشطة (تقديم العروض)" = value "2".
+ * Awarded: "تم اعلان الترسية" = value "6" (historical tenders).
  */
 export const TENDER_STATUS_FILTERS = {
-  all: '', // No filter
-  active: '1', // المنافسات النشطة (تقديم العروض)
-  ended: '2', // المنافسات المنتهية (الكل)
+  all: '', // No filter (الكل)
+  active: '2', // المنافسات النشطة (تقديم العروض) - open for bids
+  ended: '8', // المنافسات المنتهية (الكل)
+  awarded: '6', // تم اعلان الترسية - award announced (historical)
 } as const
 
 /**
@@ -139,8 +142,20 @@ export const ETIMAD_SELECTORS: EtimadSelectors = {
     pagination: '.pagination, nav[aria-label*="pagination"]',
     /** Next page button */
     nextPage: '.pagination .page-link[rel="next"], .pagination-next',
-    /** Tender status filter dropdown */
+    /** Tender status filter dropdown (in filter panel) */
     filterActive: '#TenderCategory',
+    /** Filter panel toggle - top-left "بحث" button; opens #Search collapse */
+    filterToggle: '#searchBtnColaps',
+    /** Filter panel collapse target */
+    filterPanel: '#Search',
+    /** Basic info section inside filter panel (TenderCategory, region, main/sub activity) */
+    filterBasicInfo: '#basicInfo',
+    /** Main activity dropdown (Telecom & IT = 9) */
+    mainActivitySelect: '#activitiesList',
+    /** Sub-activity dropdown (IT = 902; loads after main activity) */
+    subActivitySelect: '#subActivitiesList',
+    /** Search submit button inside filter panel */
+    filterSearchButton: '#searchBtn',
     /** Items per page selector */
     itemsPerPage: '#itemsPerPage',
     /** Tender type badge (منافسة عامة, شراء مباشر, etc.) */
@@ -164,6 +179,12 @@ export const ETIMAD_SELECTORS: EtimadSelectors = {
     /** Purpose/description (truncated and full versions) */
     purposeTruncated: '#subPurposSapn',
     purposeFull: '#purposeSpan',
+    /** Tab list (nav pills) */
+    tabList: 'ul.nav.nav-pills.nav-pills-icons[role="tablist"]',
+    /** Tab link (each tab) - use a[href^="#d-"] to get all panes */
+    tabLink: 'a[href^="#d-"][data-toggle="tab"]',
+    /** Tab pane container */
+    tabPane: '.tab-pane[id^="d-"]',
   },
   arabicLabels: {
     bookletPrice: ['قيمة وثائق المنافسة', 'قيمة الوثائق', 'رسوم الوثائق'],
@@ -173,6 +194,10 @@ export const ETIMAD_SELECTORS: EtimadSelectors = {
     entity: ['الجهة الحكومية', 'الجهة', 'جهة الطرح'],
     deadline: ['الموعد النهائي', 'موعد التقديم', 'آخر موعد'],
     estimatedValue: ['القيمة التقديرية', 'القيمة المقدرة', 'الميزانية التقديرية'],
+    /** Award results tab (historical tenders): winning bidder, award amount, award date */
+    winningBidder: ['إسم المورد', 'المورد الفائز', 'المنفذ الفائز'],
+    awardAmount: ['قيمة الترسية', 'قيمة العقد'],
+    awardDate: ['تاريخ الترسية', 'تاريخ الإعلان'],
   },
 }
 

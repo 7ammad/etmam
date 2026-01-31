@@ -107,13 +107,14 @@ export async function checkForBlock(page: Page): Promise<boolean> {
 export function parseSARAmount(text: string | null | undefined): number | null {
   if (!text) return null
 
-  // Remove currency symbols and text
-  const cleaned = text
+  let cleaned = text
     .replace(/[ريال|SAR|R\.S\.?|SR\.?]/gi, '')
-    .replace(/,/g, '') // Remove thousand separators
     .trim()
 
-  // Extract number
+  // European decimal comma (e.g. 60547,50) -> period so we don't strip it as thousand sep
+  cleaned = cleaned.replace(/,(\d{1,2})$/, '.$1')
+  cleaned = cleaned.replace(/,/g, '')
+
   const match = cleaned.match(/[\d.]+/)
   if (!match) return null
 
@@ -177,14 +178,66 @@ export function parseDate(text: string | null | undefined): string | null {
   const cleaned = text.trim()
   if (!cleaned) return null
 
-  // Try to parse as Date
-  const date = new Date(cleaned)
-  if (!isNaN(date.getTime())) {
-    return date.toISOString()
+  // Convert Arabic numerals to Western numerals first
+  const arabicToWestern: Record<string, string> = {
+    '٠': '0',
+    '١': '1',
+    '٢': '2',
+    '٣': '3',
+    '٤': '4',
+    '٥': '5',
+    '٦': '6',
+    '٧': '7',
+    '٨': '8',
+    '٩': '9',
+  }
+  let normalized = cleaned
+  for (const [ar, en] of Object.entries(arabicToWestern)) {
+    normalized = normalized.replace(new RegExp(ar, 'g'), en)
   }
 
-  // Try common Arabic date patterns (if needed in future)
-  // For now, return null if can't parse (don't return original text)
+  // Try DD/MM/YYYY format first (common Arabic date format)
+  // This must come BEFORE generic Date parsing because JS interprets slashes as MM/DD/YYYY
+  const ddmmyyyyMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch
+    const d = parseInt(day)
+    const m = parseInt(month)
+    const y = parseInt(year)
+    // Validate day/month ranges
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      const date = new Date(Date.UTC(y, m - 1, d))
+      if (!isNaN(date.getTime())) {
+        return date.toISOString()
+      }
+    }
+  }
+
+  // Try YYYY/MM/DD format
+  const yyyymmddMatch = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
+  if (yyyymmddMatch) {
+    const [, year, month, day] = yyyymmddMatch
+    const d = parseInt(day)
+    const m = parseInt(month)
+    const y = parseInt(year)
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      const date = new Date(Date.UTC(y, m - 1, d))
+      if (!isNaN(date.getTime())) {
+        return date.toISOString()
+      }
+    }
+  }
+
+  // Try ISO format (YYYY-MM-DD or full ISO timestamp)
+  const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (isoMatch) {
+    const isoDate = new Date(normalized)
+    if (!isNaN(isoDate.getTime())) {
+      return isoDate.toISOString()
+    }
+  }
+
+  // Return null if can't parse (don't return original text)
   // This ensures consistent return type: ISO string or null
   return null
 }
@@ -300,4 +353,34 @@ export function sanitizeText(text: string | null | undefined): string | null {
     .replace(/\s+/g, ' ') // Collapse whitespace
     .replace(/\n+/g, '\n') // Collapse newlines
     .trim()
+}
+
+/**
+ * Non-IT phrases that indicate a tender is likely not Telecom/IT (filter violation).
+ * Used when STRICT_FILTER_VERIFY=true to fail the run if filter returned wrong category.
+ */
+const NON_IT_TITLE_PATTERNS = [
+  /\bسيارات\b|\bقطع غيار.*سيارات\b|\bصيانة.*سيارات\b/i,
+  /\bقطع غيار كهرباء\b|\bمواد.*كهرباء\b/i,
+  /\bواجهات.*مبنى\b|\bصيانة.*واجهات\b|\bتأهيل.*واجهات\b/i,
+  /\bUHCG\b|\bURINE\b|\bHCG\b|\bمستشفى\b.*\bمريض\b/i,
+  /\bعربات\s*\(\s*\d+\s*\)/i,
+  /\bبنان\b.*\bهوية\b|\bجهاز التحقق من الهوية\b/i,
+]
+
+/**
+ * Check scraped tenders for obvious non-IT titles (filter logic verification).
+ * Returns list of { reference_no, title } for tenders that match non-IT patterns.
+ */
+export function detectNonItTenders(
+  tenders: Array<{ reference_no: string; title: string }>
+): Array<{ reference_no: string; title: string }> {
+  const violations: Array<{ reference_no: string; title: string }> = []
+  for (const t of tenders) {
+    const title = (t.title || '').trim()
+    if (!title) continue
+    const matchesNonIt = NON_IT_TITLE_PATTERNS.some((re) => re.test(title))
+    if (matchesNonIt) violations.push({ reference_no: t.reference_no, title })
+  }
+  return violations
 }

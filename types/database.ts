@@ -27,6 +27,9 @@ export interface Database {
           booklet_price_sar: number | null
           initial_guarantee_sar: number | null
           project_duration: string | null
+          award_amount_sar: number | null
+          award_date: string | null
+          winning_bidder: string | null
         }
         Insert: {
           id?: string
@@ -45,6 +48,9 @@ export interface Database {
           booklet_price_sar?: number | null
           initial_guarantee_sar?: number | null
           project_duration?: string | null
+          award_amount_sar?: number | null
+          award_date?: string | null
+          winning_bidder?: string | null
         }
         Update: {
           id?: string
@@ -63,6 +69,9 @@ export interface Database {
           booklet_price_sar?: number | null
           initial_guarantee_sar?: number | null
           project_duration?: string | null
+          award_amount_sar?: number | null
+          award_date?: string | null
+          winning_bidder?: string | null
         }
         Relationships: []
       }

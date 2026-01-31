@@ -1,0 +1,85 @@
+# Historical Tender Scraper - Daily scheduled run
+#
+# Scrapes all awarded (historical) Telecom/IT tenders from Etimad and syncs to the database.
+# Used to keep historical data fresh for the estimation model that produces estimated values
+# for new (active) tenders.
+#
+# Schedule: Daily at 2 AM UTC (5 AM Saudi Arabia time)
+# Manual: Can be triggered via workflow_dispatch
+
+name: Etimad Historical Scraper
+
+on:
+  # Daily at 2:00 AM UTC (5 AM Saudi Arabia)
+  schedule:
+    - cron: '0 2 * * *'
+
+  workflow_dispatch:
+    inputs:
+      batch_cap:
+        description: 'Max tenders to scrape in one run (safety cap)'
+        required: false
+        default: '5000'
+        type: string
+
+concurrency:
+  group: scraper-historical
+  cancel-in-progress: false
+
+jobs:
+  scrape-historical:
+    name: Scrape Historical (Awarded) Tenders
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # Historical run can be long (all pages)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Run historical scraper
+        run: pnpm scrape:run -- --historical
+        env:
+          API_URL: ${{ secrets.SCRAPER_API_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SCRAPER_MODE: historical
+          BATCH_SIZE: ${{ github.event.inputs.batch_cap || '5000' }}
+          DELAY_MS: 2000
+
+      - name: Upload scraper logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-historical-logs-${{ github.run_number }}
+          path: |
+            scratchpad/etimad-recon/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  notify:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: scrape-historical
+    if: failure()
+
+    steps:
+      - name: Log failure
+        run: |
+          echo "Historical scraper failed at $(date)"
+          echo "Run: ${{ github.run_id }}"

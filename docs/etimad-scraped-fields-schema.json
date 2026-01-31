@@ -1,0 +1,665 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Etimad Tender Scraped Fields Schema",
+  "description": "Complete schema of all fields scraped from Etimad portal for tender evaluation",
+  "version": "1.0.0",
+  "generated_at": "2026-01-31",
+  "source": "https://tenders.etimad.sa",
+
+  "top_level_fields": {
+    "description": "Fields extracted and normalized at the top level of ScrapedTender",
+    "fields": [
+      {
+        "field_name": "reference_no",
+        "arabic_label": "الرقم المرجعي",
+        "english_label": "Reference Number",
+        "data_type": "string",
+        "required": true,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Unique identifier for tender tracking and deduplication",
+        "sample_values": ["260139010329", "260139004011"]
+      },
+      {
+        "field_name": "title",
+        "arabic_label": "اسم المنافسة",
+        "english_label": "Tender Name/Title",
+        "data_type": "string",
+        "required": true,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Primary descriptor for scope analysis and keyword matching",
+        "sample_values": ["تأمين قطع غيار وتوضيب لعدد من السيارات", "توريد مواد وقطع غيار كهرباء"]
+      },
+      {
+        "field_name": "entity",
+        "arabic_label": "الجهة الحكوميه",
+        "english_label": "Government Entity",
+        "data_type": "string",
+        "required": true,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Client identification, relationship history, sector classification",
+        "sample_values": ["الهيئة السعودية للمياه", "القوات البحرية", "مستشفى القوات المسلحة بالرياض"]
+      },
+      {
+        "field_name": "deadline",
+        "arabic_label": "آخر موعد لتقديم العروض",
+        "english_label": "Bid Submission Deadline",
+        "data_type": "ISO8601 datetime",
+        "required": true,
+        "source_tab": "addresses_and_dates",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Timeline feasibility, urgency scoring, resource planning",
+        "sample_values": ["2026-02-10T00:00:00.000Z", "2026-02-18T00:00:00.000Z"]
+      },
+      {
+        "field_name": "estimated_value",
+        "arabic_label": "القيمة التقديرية",
+        "english_label": "Estimated Value",
+        "data_type": "number | null",
+        "required": false,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Budget alignment, profitability analysis, bid/no-bid decision",
+        "sample_values": [null, 500000, 1000000]
+      },
+      {
+        "field_name": "booklet_price",
+        "arabic_label": "قيمة وثائق المنافسة",
+        "english_label": "Tender Documents Price (SAR)",
+        "data_type": "number | null",
+        "required": false,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Cost of participation, barrier to entry indicator",
+        "sample_values": [null, 500, 50000],
+        "notes": "null when 'مجانا' (free)"
+      },
+      {
+        "field_name": "initial_guarantee",
+        "arabic_label": "الضمان الإبتدائي",
+        "english_label": "Initial Guarantee (%)",
+        "data_type": "number | null",
+        "required": false,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Financial commitment assessment, cash flow impact",
+        "sample_values": [null, 5.0, 2.0]
+      },
+      {
+        "field_name": "contract_duration",
+        "arabic_label": "مدة العقد",
+        "english_label": "Contract Duration",
+        "data_type": "string | null",
+        "required": false,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Resource allocation, project timeline planning",
+        "sample_values": ["10 يوم", "180 يوم", "1 أسبوع", "30 يوم"]
+      },
+      {
+        "field_name": "description",
+        "arabic_label": "الغرض من المنافسة",
+        "english_label": "Tender Purpose/Description",
+        "data_type": "string | null",
+        "required": false,
+        "source_tab": "basic_info",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Scope analysis, technical requirements extraction, capability matching",
+        "sample_values": ["تأمين قطع غيار وتوضيب لعدد من السيارات"]
+      },
+      {
+        "field_name": "tender_url",
+        "arabic_label": null,
+        "english_label": "Tender Detail Page URL",
+        "data_type": "string (URL)",
+        "required": false,
+        "source_tab": null,
+        "used_in_evaluation": false,
+        "evaluation_purpose": "Reference link for manual review",
+        "sample_values": ["https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=..."]
+      },
+      {
+        "field_name": "source",
+        "arabic_label": null,
+        "english_label": "Data Source",
+        "data_type": "literal 'etimad'",
+        "required": true,
+        "source_tab": null,
+        "used_in_evaluation": false,
+        "evaluation_purpose": "Source tracking for multi-source scenarios",
+        "sample_values": ["etimad"]
+      },
+      {
+        "field_name": "scraped_at",
+        "arabic_label": null,
+        "english_label": "Scrape Timestamp",
+        "data_type": "ISO8601 datetime",
+        "required": true,
+        "source_tab": null,
+        "used_in_evaluation": false,
+        "evaluation_purpose": "Data freshness tracking",
+        "sample_values": ["2026-01-31T08:04:02.831Z"]
+      },
+      {
+        "field_name": "award_amount_sar",
+        "arabic_label": "قيمة الترسية",
+        "english_label": "Award Amount (SAR)",
+        "data_type": "number | null",
+        "required": false,
+        "source_tab": "award_results",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Market price benchmarking, bid calibration",
+        "sample_values": [null, 500000, 1000000],
+        "notes": "Only present for awarded/historical tenders"
+      },
+      {
+        "field_name": "award_date",
+        "arabic_label": "تاريخ الترسية",
+        "english_label": "Award Date",
+        "data_type": "string | null (ISO8601 or raw)",
+        "required": false,
+        "source_tab": "award_results",
+        "used_in_evaluation": false,
+        "evaluation_purpose": "Historical data for timeline estimation",
+        "sample_values": [null, "2025-06-15T00:00:00.000Z"],
+        "notes": "Only present for awarded/historical tenders"
+      },
+      {
+        "field_name": "winning_bidder",
+        "arabic_label": "المورد الفائز",
+        "english_label": "Winning Bidder",
+        "data_type": "string | null",
+        "required": false,
+        "source_tab": "award_results",
+        "used_in_evaluation": true,
+        "evaluation_purpose": "Competitive intelligence, historical win rates",
+        "sample_values": [null, "شركة مثال للتوريد"],
+        "notes": "Only present for awarded/historical tenders"
+      }
+    ]
+  },
+
+  "tab_sections": {
+    "description": "All fields scraped from each Etimad detail page tab, stored in tab_sections object",
+
+    "basic_info": {
+      "tab_id": "d-1",
+      "arabic_name": "معلومات أساسية",
+      "english_name": "Basic Information",
+      "status": "working",
+      "fields": [
+        {
+          "arabic_label": "اسم المنافسة",
+          "english_label": "Tender Name",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Primary identifier and scope indicator",
+          "sample_value": "تأمين قطع غيار وتوضيب لعدد من السيارات بشعبة الصيانة منطقة الباحة"
+        },
+        {
+          "arabic_label": "رقم المنافسة",
+          "english_label": "Tender Number",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Entity-specific tender identifier",
+          "sample_value": "BH26620005",
+          "notes": "May be 'لا يوجد' (not available) for some tenders"
+        },
+        {
+          "arabic_label": "الرقم المرجعي",
+          "english_label": "Reference Number",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Unique Etimad-wide identifier",
+          "sample_value": "260139010329"
+        },
+        {
+          "arabic_label": "الغرض من المنافسة",
+          "english_label": "Tender Purpose",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Detailed scope description for technical analysis",
+          "sample_value": "تأمين قطع غيار وتوضيب لعدد من السيارات",
+          "notes": "May be truncated with '...عرض المزيد...'"
+        },
+        {
+          "arabic_label": "قيمة وثائق المنافسة",
+          "english_label": "Tender Documents Price",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Cost of entry, parsed to number when numeric",
+          "sample_values": ["مجانا", "500.00", "50000"]
+        },
+        {
+          "arabic_label": "حالة المنافسة",
+          "english_label": "Tender Status",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Eligibility check - must be 'معتمدة' (approved)",
+          "sample_value": "معتمدة"
+        },
+        {
+          "arabic_label": "مدة العقد",
+          "english_label": "Contract Duration",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Project timeline, resource planning",
+          "sample_values": ["10 يوم", "180 يوم", "1 أسبوع"]
+        },
+        {
+          "arabic_label": "هل التأمين من متطلبات المنافسة",
+          "english_label": "Insurance Required",
+          "data_type": "string (boolean-like)",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Additional compliance requirement",
+          "sample_values": ["لا", "نعم"]
+        },
+        {
+          "arabic_label": "نوع المنافسة",
+          "english_label": "Tender Type",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Procurement method affects bid strategy",
+          "sample_values": ["شراء مباشر", "منافسة عامة", "منافسة محدودة"],
+          "value_meanings": {
+            "شراء مباشر": "Direct Purchase",
+            "منافسة عامة": "Public Tender",
+            "منافسة محدودة": "Limited Tender"
+          }
+        },
+        {
+          "arabic_label": "الجهة الحكوميه",
+          "english_label": "Government Entity",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Client identification, sector categorization",
+          "sample_value": "الهيئة السعودية للمياه"
+        },
+        {
+          "arabic_label": "الوقت المتبقى",
+          "english_label": "Time Remaining",
+          "data_type": "string (formatted)",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Urgency indicator, proposal timeline",
+          "sample_value": "9 يوم : 22 ساعة : 55 دقائق",
+          "notes": "Raw format contains newlines, needs parsing"
+        },
+        {
+          "arabic_label": "طريقة تقديم العروض",
+          "english_label": "Bid Submission Method",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Determines proposal structure (single vs separate files)",
+          "sample_values": ["ملف واحد للعرض الفني والمالي معا", "ملفين منفصلين"],
+          "value_meanings": {
+            "ملف واحد للعرض الفني والمالي معا": "Single file for technical and financial proposal",
+            "ملفين منفصلين": "Separate files for technical and financial"
+          }
+        },
+        {
+          "arabic_label": "مطلوب ضمان الإبتدائي",
+          "english_label": "Initial Guarantee Required",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Financial requirement, cash flow impact",
+          "sample_values": ["لا يوجد ضمان", "ضمان إبتدائى"]
+        },
+        {
+          "arabic_label": "عنوان الضمان الإبتدائى",
+          "english_label": "Initial Guarantee Address",
+          "data_type": "string",
+          "always_present": false,
+          "used_in_evaluation": false,
+          "evaluation_purpose": "Logistics for guarantee delivery",
+          "sample_value": "كلية الملك فهد البحرية",
+          "notes": "Only present when guarantee is required"
+        },
+        {
+          "arabic_label": "الضمان النهائي",
+          "english_label": "Final Guarantee (%)",
+          "data_type": "string (numeric)",
+          "always_present": false,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Post-award financial commitment",
+          "sample_value": "5.00",
+          "notes": "Only present for certain tender types"
+        }
+      ]
+    },
+
+    "addresses_and_dates": {
+      "tab_id": "d-2",
+      "arabic_name": "العناوين والتواريخ",
+      "english_name": "Addresses and Dates",
+      "status": "working",
+      "fields": [
+        {
+          "arabic_label": "آخر موعد لإستلام الإستفسارات",
+          "english_label": "Last Date for Inquiries",
+          "data_type": "string (DD/MM/YYYY)",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Deadline to submit clarification questions",
+          "sample_value": "08/02/2026"
+        },
+        {
+          "arabic_label": "آخر موعد لتقديم العروض",
+          "english_label": "Bid Submission Deadline",
+          "data_type": "string (DD/MM/YYYY)",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Critical deadline - primary timeline driver",
+          "sample_value": "10/02/2026"
+        },
+        {
+          "arabic_label": "تاريخ فتح العروض",
+          "english_label": "Bid Opening Date",
+          "data_type": "string (DD/MM/YYYY or 'لا يوجد')",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Public opening date, competitive intelligence",
+          "sample_values": ["18/02/2026", "لا يوجد"]
+        },
+        {
+          "arabic_label": "تاريخ فحص العروض",
+          "english_label": "Bid Evaluation Date",
+          "data_type": "string (DD/MM/YYYY or 'لا يوجد')",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Expected evaluation timeline",
+          "sample_values": ["10/02/2026", "لا يوجد"]
+        },
+        {
+          "arabic_label": "التاريخ المتوقع للترسية",
+          "english_label": "Expected Award Date",
+          "data_type": "string (DD/MM/YYYY)",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Revenue recognition timeline, resource planning",
+          "sample_value": "09/02/2026"
+        },
+        {
+          "arabic_label": "تاريخ بدء الأعمال / الخدمات",
+          "english_label": "Work/Services Start Date",
+          "data_type": "string (DD/MM/YYYY)",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Mobilization planning, resource availability",
+          "sample_value": "10/02/2026"
+        },
+        {
+          "arabic_label": "بداية إرسال الأسئلة و الاستفسارات",
+          "english_label": "Inquiry Period Start Date",
+          "data_type": "string (DD/MM/YYYY)",
+          "always_present": true,
+          "used_in_evaluation": false,
+          "evaluation_purpose": "Inquiry window start",
+          "sample_value": "31/01/2026"
+        },
+        {
+          "arabic_label": "اقصى مدة للاجابة على الاستفسارات",
+          "english_label": "Max Response Time for Inquiries (days)",
+          "data_type": "string (numeric)",
+          "always_present": true,
+          "used_in_evaluation": false,
+          "evaluation_purpose": "Expected response time from entity",
+          "sample_values": ["1", "3", "5", "10", "17"]
+        },
+        {
+          "arabic_label": "مكان فتح العرض",
+          "english_label": "Bid Opening Location",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": false,
+          "evaluation_purpose": "Physical attendance requirement",
+          "sample_values": ["لا يوجد", "كلية الملك فهد البحرية"]
+        }
+      ]
+    },
+
+    "classification_and_submission": {
+      "tab_id": "d-3",
+      "arabic_name": "التصنيف والتقديم",
+      "english_name": "Classification and Submission",
+      "status": "working",
+      "fields": [
+        {
+          "arabic_label": "الحزمة",
+          "english_label": "Package/Lot",
+          "data_type": "string",
+          "always_present": false,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Multi-lot tender identification, partial bid strategy",
+          "sample_value": "جدول التسعير 2",
+          "notes": "Only present for multi-package tenders"
+        },
+        {
+          "arabic_label": "مجال التصنيف",
+          "english_label": "Classification Field/Category",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Required contractor classification, eligibility check",
+          "sample_values": ["غير مطلوب", "مقاولات عامة - الدرجة الأولى"],
+          "notes": "'غير مطلوب' means no classification required"
+        },
+        {
+          "arabic_label": "مكان التنفيذ",
+          "english_label": "Execution Location",
+          "data_type": "string",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Geographic scope, logistics planning",
+          "sample_values": ["داخل المملكة", "الرياض", "المنطقة الشرقية"],
+          "notes": "'داخل المملكة' means within Saudi Arabia"
+        },
+        {
+          "arabic_label": "التفاصيل",
+          "english_label": "Details",
+          "data_type": "string",
+          "always_present": false,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Additional scope details",
+          "sample_value": "تأمين قطع غيار وتوضيب لعدد من السيارات"
+        },
+        {
+          "arabic_label": "تشمل المنافسة على بنود توريد",
+          "english_label": "Includes Supply Items",
+          "data_type": "string (boolean-like)",
+          "always_present": true,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Supply chain requirements, local content implications",
+          "sample_values": ["لا", "نعم"]
+        }
+      ]
+    },
+
+    "award_results": {
+      "tab_id": "d-5",
+      "arabic_name": "نتائج الترسية",
+      "english_name": "Award Results",
+      "status": "usually_empty",
+      "status_reason": "Tenders filtered to 'open for bids' have not been awarded yet",
+      "fields": [
+        {
+          "arabic_label": "المورد الفائز",
+          "english_label": "Winning Bidder",
+          "data_type": "string",
+          "always_present": false,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Competitive intelligence, historical win rates",
+          "notes": "Only available for awarded tenders"
+        },
+        {
+          "arabic_label": "قيمة الترسية",
+          "english_label": "Award Amount",
+          "data_type": "string (numeric)",
+          "always_present": false,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Market price benchmarking, bid calibration",
+          "notes": "Only available for awarded tenders"
+        },
+        {
+          "arabic_label": "تاريخ الترسية",
+          "english_label": "Award Date",
+          "data_type": "string (DD/MM/YYYY)",
+          "always_present": false,
+          "used_in_evaluation": false,
+          "evaluation_purpose": "Historical data for timeline estimation",
+          "notes": "Only available for awarded tenders"
+        }
+      ]
+    },
+
+    "local_content": {
+      "tab_id": "d-6",
+      "arabic_name": "المحتوى المحلي",
+      "english_name": "Local Content",
+      "status": "usually_empty",
+      "status_reason": "Not all tenders have local content requirements",
+      "fields": [
+        {
+          "arabic_label": "نسبة المحتوى المحلي المطلوبة",
+          "english_label": "Required Local Content Percentage",
+          "data_type": "string (percentage)",
+          "always_present": false,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Local content compliance requirement",
+          "notes": "Only present when local content rules apply"
+        },
+        {
+          "arabic_label": "متطلبات المحتوى المحلي",
+          "english_label": "Local Content Requirements",
+          "data_type": "string",
+          "always_present": false,
+          "used_in_evaluation": true,
+          "evaluation_purpose": "Specific local sourcing requirements",
+          "notes": "Only present when local content rules apply"
+        }
+      ]
+    }
+  },
+
+  "evaluation_field_summary": {
+    "description": "Quick reference of fields used in tender evaluation",
+    "critical_fields": [
+      {
+        "field": "title",
+        "purpose": "Scope analysis, keyword matching, sector classification"
+      },
+      {
+        "field": "entity",
+        "purpose": "Client history, relationship scoring, sector identification"
+      },
+      {
+        "field": "deadline",
+        "purpose": "Timeline feasibility, urgency scoring"
+      },
+      {
+        "field": "estimated_value",
+        "purpose": "Budget alignment, profitability threshold"
+      },
+      {
+        "field": "contract_duration",
+        "purpose": "Resource planning, concurrent project capacity"
+      },
+      {
+        "field": "tender_type",
+        "purpose": "Bid strategy (direct purchase vs competitive)"
+      }
+    ],
+    "financial_fields": [
+      {
+        "field": "booklet_price",
+        "purpose": "Cost of participation"
+      },
+      {
+        "field": "initial_guarantee",
+        "purpose": "Cash flow impact, financial commitment"
+      },
+      {
+        "field": "final_guarantee",
+        "purpose": "Post-award financial commitment"
+      }
+    ],
+    "compliance_fields": [
+      {
+        "field": "classification_field",
+        "purpose": "Contractor classification eligibility"
+      },
+      {
+        "field": "insurance_required",
+        "purpose": "Insurance compliance"
+      },
+      {
+        "field": "local_content_percentage",
+        "purpose": "Local content compliance"
+      },
+      {
+        "field": "includes_supply_items",
+        "purpose": "Supply chain requirements"
+      }
+    ],
+    "timeline_fields": [
+      {
+        "field": "bid_submission_deadline",
+        "purpose": "Primary deadline"
+      },
+      {
+        "field": "inquiry_deadline",
+        "purpose": "Clarification window"
+      },
+      {
+        "field": "expected_award_date",
+        "purpose": "Revenue recognition planning"
+      },
+      {
+        "field": "work_start_date",
+        "purpose": "Mobilization planning"
+      }
+    ]
+  },
+
+  "database_mapping": {
+    "description": "How scraped fields map to database columns",
+    "tenders_table": {
+      "reference_no": "reference_no",
+      "title": "title",
+      "entity": "entity",
+      "deadline": "deadline (ISO8601)",
+      "estimated_value": "estimated_value",
+      "description": "description",
+      "booklet_price": "booklet_price_sar",
+      "initial_guarantee": "initial_guarantee_sar",
+      "contract_duration": "project_duration",
+      "source": "source (always 'etimad')",
+      "status": "status (default 'pending')",
+      "full_scraped_object": "raw_data (JSONB - includes all tab_sections)"
+    }
+  },
+
+  "total_field_count": {
+    "top_level": 12,
+    "basic_info": 15,
+    "addresses_and_dates": 9,
+    "classification_and_submission": 5,
+    "award_results": 3,
+    "local_content": 2,
+    "total_unique_fields": 46
+  }
+}
