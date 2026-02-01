@@ -1,0 +1,86 @@
+{
+  "version": "1.1.0",
+  "description": "Editable scoring rules for rule-based tender evaluation. Includes value estimation for missing estimated_value. Weights sum to 1.0. Scores 0-100, recommendation from thresholds.",
+  "thresholds": {
+    "qualified": 70,
+    "conditional": 40
+  },
+  "weights": {
+    "budget_fit": 0.25,
+    "timeline_fit": 0.25,
+    "cost_of_entry": 0.2,
+    "scope_clarity": 0.15,
+    "risk_penalty": 0.15
+  },
+  "rules": {
+    "budget_fit": {
+      "description": "Has estimated_value and within acceptable range (0 = no value, 100 = has value and in range)",
+      "has_value_score": 50,
+      "in_range_bonus": 50,
+      "min_value_sar": 10000,
+      "max_value_sar": 50000000
+    },
+    "timeline_fit": {
+      "description": "Days until deadline (more days = higher score, capped)",
+      "days_per_point": 2,
+      "max_days_cap": 60,
+      "min_score_if_past": 0
+    },
+    "cost_of_entry": {
+      "description": "Lower booklet_price and initial_guarantee = better (0 = very high cost, 100 = free/low)",
+      "booklet_free_score": 100,
+      "booklet_max_penalty_sar": 100000,
+      "guarantee_none_score": 100,
+      "guarantee_max_penalty_pct": 10
+    },
+    "scope_clarity": {
+      "description": "Has title and description (0 = missing, 100 = both present and non-empty)",
+      "title_weight": 0.4,
+      "description_weight": 0.6
+    },
+    "risk_penalty": {
+      "description": "Penalties for missing or risky fields (starts at 100, subtract for risks)",
+      "no_deadline_penalty": 100,
+      "no_entity_penalty": 30,
+      "no_reference_penalty": 50
+    }
+  },
+  "value_estimation": {
+    "description": "Rules for estimating missing estimated_value from available signals. TIGHTENED: ranges reduced from 20x to ~3-4x based on historical IT/Telecom tender analysis.",
+    "enabled": true,
+    "initial_guarantee_pct": 5,
+    "initial_guarantee_spread": 0.1,
+    "_comment_spread": "±10% range instead of ±20% for tighter initial guarantee estimates",
+    "booklet_tiers": [
+      { "max_sar": 5000, "min_estimate": 500000, "max_estimate": 3000000, "_ratio": "6x", "_note": "Small IT projects (no data yet)" },
+      { "max_sar": 50000, "min_estimate": 2000000, "max_estimate": 12000000, "_ratio": "6x", "_note": "IQR: 2.1M-9.2M from 68 tenders" },
+      { "max_sar": 999999, "min_estimate": 40000000, "max_estimate": 300000000, "_ratio": "7.5x", "_note": "IQR: 43M-289M from 26 tenders" }
+    ],
+    "_comment_tiers": "Calibrated from 94 historical IT/Telecom awards (2026-02-01). Run 'pnpm calibrate-values' to update.",
+    "title_keywords": [
+      { "pattern": "صيانة|تشغيل|نظافة|تنظيف", "multiplier": 0.6, "label": "maintenance" },
+      { "pattern": "تطوير|برمجة|منصة|نظام|تطبيق", "multiplier": 1.0, "label": "software" },
+      { "pattern": "أمن سيبراني|حماية|اختراق|أمن معلومات", "multiplier": 1.5, "label": "security" },
+      { "pattern": "بناء|إنشاء|تأهيل|ترميم", "multiplier": 1.2, "label": "construction" },
+      { "pattern": "توريد|شراء|تجهيز", "multiplier": 0.8, "label": "procurement" },
+      { "pattern": "استشارات|دراسة|تقييم", "multiplier": 0.7, "label": "consulting" },
+      { "pattern": "تدريب|تأهيل|ورش", "multiplier": 0.5, "label": "training" },
+      { "pattern": "تجديد|اشتراك|رخص", "multiplier": 0.8, "label": "renewal" }
+    ],
+    "entity_multipliers": [
+      { "pattern": "وزارة|الديوان", "multiplier": 1.3, "label": "ministry" },
+      { "pattern": "هيئة ملكية|هيئة", "multiplier": 1.2, "label": "authority" },
+      { "pattern": "أمانة", "multiplier": 1.1, "label": "municipality" },
+      { "pattern": "جامعة|كلية|تعليم", "multiplier": 0.8, "label": "education" },
+      { "pattern": "مستشفى|صحة|طبي", "multiplier": 1.0, "label": "healthcare" }
+    ],
+    "fallback_estimate": { "min": 1000000, "max": 3000000, "_ratio": "3x" },
+    "confidence_levels": {
+      "initial_guarantee": 95,
+      "booklet_price": 75,
+      "title_inference": 55,
+      "fallback": 35
+    },
+    "_comment_calibration": "Run 'pnpm calibrate-values' to regenerate tiers from historical award data"
+  }
+}

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import type { Tables, TablesInsert, TablesUpdate, Json } from '@/types/database'
 
 export type Tender = Tables<'tenders'>
@@ -27,53 +27,70 @@ export type TenderWithEvaluation = Tender & {
   evaluation: Tables<'evaluations'> | null
 }
 
-// Get all tenders for current user
+/**
+ * Get active tenders for dashboard (excludes historical/awarded tenders).
+ *
+ * Historical tenders (with award_amount_sar populated) are used for calibration only,
+ * not displayed as actionable items in the dashboard.
+ */
 export async function getTenders(): Promise<TenderWithEvaluation[]> {
   const supabase = createServiceClient()
-  
-  console.log('🔍 getTenders: Using service client to bypass RLS')
-  
-  // Run diagnostic test first
-  const diagResult = await testDatabaseConnection(supabase)
-  console.log('📊 Diagnostic test result:', diagResult)
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/b22f8891-a0d3-4eaa-a284-fd7127c7ef55',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/queries/tender.ts:getTenders:before',message:'About to query tenders table',data:{clientType:typeof supabase,hasFrom:typeof supabase.from,diagCount:diagResult.count,diagError:diagResult.error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H4'})}).catch(()=>{});
-  // #endregion
-  
+
   const { data, error } = await supabase
     .from('tenders')
     .select(`
       *,
       evaluations (*)
     `)
+    .is('award_amount_sar', null) // Exclude historical/awarded tenders
     .order('created_at', { ascending: false })
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/b22f8891-a0d3-4eaa-a284-fd7127c7ef55',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/queries/tender.ts:getTenders:after',message:'Query completed',data:{hasData:!!data,dataLength:data?.length,hasError:!!error,errorCode:error?.code,errorMessage:error?.message,errorHint:error?.hint},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H5'})}).catch(()=>{});
-  // #endregion
 
   if (error) {
     console.error('Error fetching tenders:', error)
-    console.error('Full error details:', JSON.stringify(error, null, 2))
     throw new Error('Failed to fetch tenders')
   }
 
-  console.log('✅ Successfully fetched tenders:', data?.length || 0)
-
-  // Type assertion needed due to Supabase complex return types
   return (data as any[]).map((tender) => ({
     ...tender,
-    evaluation: Array.isArray(tender.evaluations) 
-      ? tender.evaluations[0] || null 
+    evaluation: Array.isArray(tender.evaluations)
+      ? tender.evaluations[0] || null
       : tender.evaluations || null,
   }))
 }
 
-// Get single tender by ID
+/**
+ * Get historical tenders (awarded, with award_amount_sar).
+ * Used for value estimation calibration only.
+ */
+export async function getHistoricalTenders(): Promise<TenderWithEvaluation[]> {
+  const supabase = createServiceClient()
+
+  const { data, error } = await supabase
+    .from('tenders')
+    .select(`
+      *,
+      evaluations (*)
+    `)
+    .not('award_amount_sar', 'is', null) // Only historical/awarded tenders
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching historical tenders:', error)
+    throw new Error('Failed to fetch historical tenders')
+  }
+
+  return (data as any[]).map((tender) => ({
+    ...tender,
+    evaluation: Array.isArray(tender.evaluations)
+      ? tender.evaluations[0] || null
+      : tender.evaluations || null,
+  }))
+}
+
+// Get single tender by ID (any logged-in user can view).
 export async function getTenderById(id: string): Promise<TenderWithEvaluation | null> {
   const supabase = createServiceClient()
-  
+
   const { data, error } = await supabase
     .from('tenders')
     .select(`
@@ -84,17 +101,16 @@ export async function getTenderById(id: string): Promise<TenderWithEvaluation | 
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') return null // Not found
+    if (error.code === 'PGRST116') return null
     console.error('Error fetching tender:', error)
     throw new Error('Failed to fetch tender')
   }
 
-  // Type assertion needed due to Supabase complex return types
   const tender = data as any
   return {
     ...tender,
-    evaluation: Array.isArray(tender.evaluations) 
-      ? tender.evaluations[0] || null 
+    evaluation: Array.isArray(tender.evaluations)
+      ? tender.evaluations[0] || null
       : tender.evaluations || null,
   }
 }
@@ -198,7 +214,7 @@ export async function updateTender(id: string, update: Record<string, unknown>):
 // Delete tender
 export async function deleteTender(id: string): Promise<void> {
   const supabase = createServiceClient()
-  
+
   const { error } = await supabase
     .from('tenders')
     .delete()
@@ -210,7 +226,31 @@ export async function deleteTender(id: string): Promise<void> {
   }
 }
 
-// Get tender stats
+// Delete all tenders (and related evaluations, crm_pushes) for a fresh start.
+export async function clearAllTenders(): Promise<{ deletedTenders: number }> {
+  const supabase = createServiceClient()
+
+  const { data: tenderRows } = await supabase.from('tenders').select('id')
+  const ids = (tenderRows ?? []).map((r) => r.id)
+  if (ids.length === 0) {
+    return { deletedTenders: 0 }
+  }
+
+  await supabase.from('crm_pushes').delete().in('tender_id', ids)
+  await supabase.from('evaluations').delete().in('tender_id', ids)
+  const { data: deleted, error } = await supabase.from('tenders').delete().in('id', ids).select('id')
+
+  if (error) {
+    console.error('Error clearing tenders:', error)
+    throw new Error('Failed to clear tenders')
+  }
+
+  return { deletedTenders: deleted?.length ?? 0 }
+}
+
+/**
+ * Get tender stats for dashboard (excludes historical/awarded tenders).
+ */
 export async function getTenderStats(): Promise<{
   totalTenders: number
   qualified: number
@@ -221,27 +261,18 @@ export async function getTenderStats(): Promise<{
   pushedToCRM: number
 }> {
   const supabase = createServiceClient()
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/b22f8891-a0d3-4eaa-a284-fd7127c7ef55',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/queries/tender.ts:getTenderStats:before',message:'About to query tender stats',data:{clientType:typeof supabase},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H4'})}).catch(()=>{});
-  // #endregion
-  
-  // Get all tenders with evaluations
-  // Query all columns - Supabase will return what exists
-  // We'll handle missing columns gracefully
+
   const { data, error } = await supabase
     .from('tenders')
     .select(`
       id,
       status,
+      estimated_value,
       evaluations (
         recommendation
       )
     `)
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/b22f8891-a0d3-4eaa-a284-fd7127c7ef55',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/queries/tender.ts:getTenderStats:after',message:'Stats query completed',data:{hasData:!!data,dataLength:data?.length,hasError:!!error,errorCode:error?.code,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H5'})}).catch(()=>{});
-  // #endregion
+    .is('award_amount_sar', null) // Exclude historical/awarded tenders
 
   if (error) {
     console.error('Error fetching tender stats:', error)

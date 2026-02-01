@@ -1,8 +1,11 @@
 name: Etimad Scraper
 
-# Runs the Etimad tender scraper and syncs data to the database.
+# Runs the Etimad tender scraper, evaluates tenders, and syncs evaluations to the database.
 #
-# Schedule: Daily at 6 AM UTC (9 AM Saudi Arabia time)
+# Pipeline: scrape → evaluate-tenders → sync evaluations (evaluations table → CRM push).
+# Required secrets: SCRAPER_API_URL, CRON_SECRET, APP_BASE_URL (deployed app origin for sync).
+#
+# Schedule: Daily at 6 AM UTC (9 AM Saudi Arabia time) — disabled until deployment ready
 # Manual: Can be triggered manually via workflow_dispatch
 
 on:
@@ -65,6 +68,17 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           BATCH_SIZE: ${{ github.event.inputs.batch_size || '50' }}
           DELAY_MS: ${{ github.event.inputs.delay_ms || '2000' }}
+
+      - name: Evaluate tenders
+        run: pnpm evaluate-tenders
+        if: success()
+
+      - name: Sync evaluations to database
+        run: pnpm sync:evaluations
+        if: success()
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.APP_BASE_URL }}
 
       - name: Upload scraper logs
         if: always()

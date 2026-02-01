@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import NextLink from 'next/link'
 import { useI18n, useTranslations } from '@/components/providers/i18n-provider'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Box, Flex, Heading, Text, Button, TextField } from '@radix-ui/themes'
 import { Crown, Mail, Lock, Loader2, Globe } from 'lucide-react'
+import { loginAction } from '@/actions/auth'
 
 export default function LoginPage() {
   const { locale } = useI18n()
@@ -19,15 +20,28 @@ export default function LoginPage() {
   const otherLocale = locale === 'ar' ? 'en' : 'ar'
   const otherLocaleLabel = locale === 'ar' ? 'English' : 'العربية'
 
+  const searchParams = useSearchParams()
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Simulate login
-    setTimeout(() => {
-      router.push(`/${locale}/dashboard`)
-    }, 1500)
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+
+    const result = await loginAction(email, password)
+
+    if (result.success) {
+      // Get redirectTo from URL params or default to dashboard
+      const redirectTo = searchParams.get('redirectTo') || `/${locale}/dashboard`
+      router.push(redirectTo)
+      router.refresh()
+    } else {
+      setError(result.error)
+      setLoading(false)
+    }
   }
 
   return (
@@ -168,6 +182,7 @@ export default function LoginPage() {
                 </Text>
                 <TextField.Root
                   id="email"
+                  name="email"
                   size="3"
                   type="email"
                   required
@@ -198,6 +213,7 @@ export default function LoginPage() {
                 </Text>
                 <TextField.Root
                   id="password"
+                  name="password"
                   size="3"
                   type="password"
                   required
@@ -252,6 +268,26 @@ export default function LoginPage() {
                   <span>{tAuth('login')}</span>
                 )}
               </Button>
+
+              {/* Sign up link */}
+              <Flex justify="center" align="center" gap="2" style={{ marginTop: 'var(--space-2)' }}>
+                <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+                  {tAuth('noAccount')}
+                </Text>
+                <NextLink
+                  href={`/${locale}/signup`}
+                  className="focus-ring"
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 600,
+                    color: 'var(--color-primary-600)',
+                    textDecoration: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                  }}
+                >
+                  {tAuth('signUp')}
+                </NextLink>
+              </Flex>
             </Flex>
           </form>
         </div>

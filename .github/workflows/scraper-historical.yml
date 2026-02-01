@@ -1,8 +1,8 @@
 # Historical Tender Scraper - Daily scheduled run
 #
-# Scrapes all awarded (historical) Telecom/IT tenders from Etimad and syncs to the database.
-# Used to keep historical data fresh for the estimation model that produces estimated values
-# for new (active) tenders.
+# Scrapes all awarded (historical) Telecom/IT tenders, evaluates them, and syncs evaluations.
+# Pipeline: scrape → evaluate-tenders → sync evaluations.
+# Required secrets: SCRAPER_API_URL, CRON_SECRET, APP_BASE_URL (deployed app origin for sync).
 #
 # Schedule: Daily at 2 AM UTC (5 AM Saudi Arabia time)
 # Manual: Can be triggered via workflow_dispatch
@@ -61,6 +61,17 @@ jobs:
           SCRAPER_MODE: historical
           BATCH_SIZE: ${{ github.event.inputs.batch_cap || '5000' }}
           DELAY_MS: 2000
+
+      - name: Evaluate tenders
+        run: pnpm evaluate-tenders
+        if: success()
+
+      - name: Sync evaluations to database
+        run: pnpm sync:evaluations
+        if: success()
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.APP_BASE_URL }}
 
       - name: Upload scraper logs
         if: always()

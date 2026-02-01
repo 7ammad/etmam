@@ -1,0 +1,244 @@
+{
+  "generated_at": "2026-02-01T04:56:15.297Z",
+  "sample_size": 94,
+  "booklet_tiers": [
+    {
+      "min_booklet_sar": 0,
+      "max_booklet_sar": 500,
+      "stats": {
+        "count": 0,
+        "min": 0,
+        "max": 0,
+        "mean": 0,
+        "median": 0,
+        "stdDev": 0,
+        "p25": 0,
+        "p75": 0
+      }
+    },
+    {
+      "min_booklet_sar": 501,
+      "max_booklet_sar": 5000,
+      "stats": {
+        "count": 0,
+        "min": 0,
+        "max": 0,
+        "mean": 0,
+        "median": 0,
+        "stdDev": 0,
+        "p25": 0,
+        "p75": 0
+      }
+    },
+    {
+      "min_booklet_sar": 5001,
+      "max_booklet_sar": 50000,
+      "stats": {
+        "count": 68,
+        "min": 126500,
+        "max": 1899294345,
+        "mean": 39601929,
+        "median": 5520000,
+        "stdDev": 230387533,
+        "p25": 2117150,
+        "p75": 9200000
+      }
+    },
+    {
+      "min_booklet_sar": 50001,
+      "max_booklet_sar": 999999,
+      "stats": {
+        "count": 26,
+        "min": 22079425,
+        "max": 864225000,
+        "mean": 230459103,
+        "median": 144900000,
+        "stdDev": 256606680,
+        "p25": 43191792,
+        "p75": 288764779
+      }
+    }
+  ],
+  "title_categories": [
+    {
+      "label": "maintenance",
+      "pattern": "صيانة|تشغيل|نظافة|تنظيف",
+      "stats": {
+        "count": 11,
+        "min": 3450000,
+        "max": 1899294345,
+        "mean": 420067147,
+        "median": 199897600,
+        "stdDev": 553126555,
+        "p25": 6284290,
+        "p75": 288764779
+      }
+    },
+    {
+      "label": "software",
+      "pattern": "تطوير|برمجة|منصة|نظام|تطبيق",
+      "stats": {
+        "count": 31,
+        "min": 126500,
+        "max": 864225000,
+        "mean": 137596339,
+        "median": 41757760,
+        "stdDev": 219775217,
+        "p25": 6949163,
+        "p75": 144900000
+      }
+    },
+    {
+      "label": "security",
+      "pattern": "أمن سيبراني|حماية|اختراق|أمن معلومات",
+      "stats": {
+        "count": 4,
+        "min": 9629065,
+        "max": 1899294345,
+        "mean": 546118564,
+        "median": 265921780,
+        "stdDev": 788231707,
+        "p25": 9629065,
+        "p75": 265921780
+      }
+    },
+    {
+      "label": "construction",
+      "pattern": "بناء|إنشاء|تأهيل|ترميم",
+      "stats": {
+        "count": 0,
+        "min": 0,
+        "max": 0,
+        "mean": 0,
+        "median": 0,
+        "stdDev": 0,
+        "p25": 0,
+        "p75": 0
+      }
+    },
+    {
+      "label": "procurement",
+      "pattern": "توريد|شراء|تجهيز",
+      "stats": {
+        "count": 21,
+        "min": 126500,
+        "max": 1899294345,
+        "mean": 99996320,
+        "median": 4600000,
+        "stdDev": 402701980,
+        "p25": 1610000,
+        "p75": 8960800
+      }
+    },
+    {
+      "label": "consulting",
+      "pattern": "استشارات|دراسة|تقييم",
+      "stats": {
+        "count": 2,
+        "min": 9200000,
+        "max": 9200000,
+        "mean": 9200000,
+        "median": 9200000,
+        "stdDev": 0,
+        "p25": 9200000,
+        "p75": 9200000
+      }
+    },
+    {
+      "label": "training",
+      "pattern": "تدريب|تأهيل|ورش",
+      "stats": {
+        "count": 2,
+        "min": 7992500,
+        "max": 7992500,
+        "mean": 7992500,
+        "median": 7992500,
+        "stdDev": 0,
+        "p25": 7992500,
+        "p75": 7992500
+      }
+    }
+  ],
+  "entity_categories": [
+    {
+      "label": "ministry",
+      "pattern": "وزارة|الديوان",
+      "stats": {
+        "count": 25,
+        "min": 289800,
+        "max": 1899294345,
+        "mean": 106904609,
+        "median": 6054750,
+        "stdDev": 371542698,
+        "p25": 3079746,
+        "p75": 9993898
+      }
+    },
+    {
+      "label": "authority",
+      "pattern": "هيئة",
+      "stats": {
+        "count": 10,
+        "min": 4106420,
+        "max": 396924800,
+        "mean": 115256313,
+        "median": 61927500,
+        "stdDev": 142081379,
+        "p25": 9629065,
+        "p75": 79000000
+      }
+    },
+    {
+      "label": "municipality",
+      "pattern": "أمانة",
+      "stats": {
+        "count": 5,
+        "min": 3059000,
+        "max": 33442000,
+        "mean": 14511602,
+        "median": 6284290,
+        "stdDev": 12940360,
+        "p25": 3059000,
+        "p75": 26713722
+      }
+    },
+    {
+      "label": "education",
+      "pattern": "جامعة|كلية|تعليم",
+      "stats": {
+        "count": 15,
+        "min": 126500,
+        "max": 864225000,
+        "mean": 268760776,
+        "median": 9890000,
+        "stdDev": 330730351,
+        "p25": 1610000,
+        "p75": 288766929
+      }
+    },
+    {
+      "label": "healthcare",
+      "pattern": "مستشفى|صحة|طبي",
+      "stats": {
+        "count": 4,
+        "min": 690000,
+        "max": 5980115,
+        "mean": 2134458,
+        "median": 1177717,
+        "stdDev": 2229201,
+        "p25": 690000,
+        "p75": 1177717
+      }
+    }
+  ],
+  "overall": {
+    "count": 94,
+    "min": 126500,
+    "max": 1899294345,
+    "mean": 92392212,
+    "median": 7992500,
+    "stdDev": 252781998,
+    "p25": 3450000,
+    "p75": 41757760
+  }
+}

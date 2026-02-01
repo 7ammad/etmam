@@ -91,6 +91,40 @@ section {
   box-shadow: var(--shadow-lg);
 }
 
+/* Fancy card — distinctive, not generic: left accent, layered shadow, refined (per frontend-design) */
+.fancy-card {
+  position: relative;
+  padding: var(--space-4);
+  border-radius: var(--radius-3);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+.fancy-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--color-primary-500), var(--color-primary-600));
+  border-radius: 4px 0 0 4px;
+}
+.fancy-card:hover {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 8px 24px rgba(15, 23, 42, 0.08);
+}
+.fancy-card-accent-amber::before {
+  background: linear-gradient(180deg, var(--color-warning-500), var(--color-warning-600));
+}
+.fancy-card-accent-blue::before {
+  background: linear-gradient(180deg, var(--color-info-500), var(--color-info-600));
+}
+
 /* Non-interactive glass card */
 .glass-card-static {
   background: var(--surface-glass);
@@ -140,6 +174,38 @@ section {
 
 .bg-surface-muted {
   background-color: var(--surface-muted);
+}
+
+/* Dashboard table row — hover per DASHBOARD_DESIGN */
+.dashboard-tender-row {
+  transition: var(--transition-colors);
+}
+.dashboard-tender-row:hover {
+  background-color: var(--surface-muted);
+}
+
+/* Dashboard table — sticky header, scannable per DASHBOARD_DESIGN */
+.dashboard-table-scroll {
+  overflow: auto;
+  max-height: min(70vh, 640px);
+}
+.dashboard-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-card);
+  box-shadow: 0 1px 0 var(--border-default);
+}
+.dashboard-table-numeric {
+  text-align: end; /* RTL-aware: 'end' becomes left in RTL, right in LTR */
+  font-variant-numeric: tabular-nums;
+}
+
+/* KPI row: responsive grid per DASHBOARD_DESIGN */
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-4);
 }
 
 /* ═══════════════════════════════════════
@@ -295,6 +361,57 @@ textarea::placeholder {
 
 [dir="rtl"] .flip-rtl {
   transform: scaleX(-1);
+}
+
+/* RTL: Fancy card accent moves to right side */
+[dir="rtl"] .fancy-card::before {
+  left: auto;
+  right: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+/* RTL: Table text alignment */
+[dir="rtl"] .dashboard-table-scroll table {
+  text-align: right;
+}
+
+[dir="rtl"] .dashboard-table-scroll th,
+[dir="rtl"] .dashboard-table-scroll td {
+  text-align: right;
+}
+
+/* RTL: Numeric columns stay end-aligned (left in RTL) */
+[dir="rtl"] .dashboard-table-numeric {
+  text-align: left;
+}
+
+/* RTL: Ensure Radix Table respects RTL direction */
+[dir="rtl"] .rt-TableRoot,
+[dir="rtl"] .rt-TableRoot table,
+[dir="rtl"] .rt-TableRoot thead,
+[dir="rtl"] .rt-TableRoot tbody,
+[dir="rtl"] .rt-TableRoot tr {
+  direction: rtl;
+}
+
+[dir="rtl"] .rt-TableCell,
+[dir="rtl"] .rt-TableColumnHeaderCell {
+  text-align: start;
+}
+
+/* RTL: Badge and inline flex items */
+[dir="rtl"] .rt-Badge {
+  direction: rtl;
+}
+
+/* RTL: Force table to render columns RTL */
+[dir="rtl"] .dashboard-table-scroll {
+  direction: rtl;
+}
+
+[dir="rtl"] .dashboard-table-scroll table {
+  direction: rtl;
+  width: 100%;
 }
 
 /* ═══════════════════════════════════════

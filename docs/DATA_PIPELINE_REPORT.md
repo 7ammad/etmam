@@ -126,16 +126,26 @@ Both modes share the same technical path: **Scraper → Sync API → Supabase**.
 - **tenders:** `reference_no`, `user_id` (composite unique with reference_no), `title`, `entity`, `deadline`, `estimated_value`, `description`, `source`, `status`, `booklet_price_sar`, `initial_guarantee_sar`, `project_duration`, `award_amount_sar`, `award_date`, `winning_bidder`, `raw_data` (JSONB), timestamps.
 - **raw_data:** Full `ScrapedTender` (including `tab_sections`) for replay and analytics.
 
-### 3.6 Scheduling and Automation
+### 3.6 Evaluation and Sync (Post-Scrape)
 
-| Workflow                 | File                        | Schedule (if enabled) | Command / env |
-|--------------------------|-----------------------------|------------------------|---------------|
-| Active scraper           | `.github/workflows/scraper.yml` | When enabled: daily 06:00 UTC (schedule currently commented out) | `pnpm scrape:run`, BATCH_SIZE, DELAY_MS |
-| Historical scraper      | `.github/workflows/scraper-historical.yml` | Daily 02:00 UTC        | `pnpm scrape:run -- --historical`, SCRAPER_MODE=historical, BATCH_SIZE=5000 |
+After scraping, the pipeline runs:
 
-Secrets: `SCRAPER_API_URL`, `CRON_SECRET`; Playwright Chromium installed in CI.
+1. **run-scraper.ts** writes scraped tenders to `scraper-output/run-<timestamp>.json` so the next step has input.
+2. **evaluate-tenders** (`pnpm evaluate-tenders`) reads the latest `scraper-output/*.json`, scores each tender, and writes `data/tenders.scored.json`.
+3. **sync:evaluations** (`pnpm sync:evaluations`) POSTs `data/tenders.scored.json` to `POST /api/sync/evaluations` (Bearer `CRON_SECRET`), which upserts into the `evaluations` table for CRM push.
 
-### 3.7 Verification and Quality
+In CI, the sync step calls the **deployed app**; set `APP_BASE_URL` (e.g. `https://your-app.vercel.app`) so `NEXT_PUBLIC_APP_URL` is set in the workflow for the sync script.
+
+### 3.7 Scheduling and Automation
+
+| Workflow                 | File                        | Schedule (if enabled) | Pipeline steps |
+|--------------------------|-----------------------------|------------------------|----------------|
+| Active scraper           | `.github/workflows/scraper.yml` | When enabled: daily 06:00 UTC (schedule currently commented out) | scrape → evaluate-tenders → sync:evaluations |
+| Historical scraper      | `.github/workflows/scraper-historical.yml` | Daily 02:00 UTC        | scrape → evaluate-tenders → sync:evaluations |
+
+Secrets: `SCRAPER_API_URL`, `CRON_SECRET`, `APP_BASE_URL` (deployed app origin for evaluation sync). Playwright Chromium installed in CI.
+
+### 3.8 Verification and Quality
 
 | Check              | How |
 |--------------------|-----|
@@ -152,14 +162,18 @@ Secrets: `SCRAPER_API_URL`, `CRON_SECRET`; Playwright Chromium installed in CI.
 ```
 [Etimad] → [Playwright] → [Zod] → [ScrapeResult]
                 ↓
-         run-scraper.ts (or test-scraper.ts)
+         run-scraper.ts → scraper-output/run-<ts>.json
                 ↓
-         POST /api/cron/sync (Bearer CRON_SECRET)
+         POST /api/cron/sync (Bearer CRON_SECRET) → tenders table
                 ↓
-         tenderToDbFormat() → Supabase upsert (tenders)
+         evaluate-tenders → data/tenders.scored.json
                 ↓
-         [CRM] + [Estimation model]
+         sync:evaluations → POST /api/sync/evaluations (Bearer CRON_SECRET) → evaluations table
+                ↓
+         [CRM Push] + [Estimation model]
 ```
+
+**Combined run (local):** `pnpm pipeline:full` or `pnpm pipeline:full --historical` runs scrape → evaluate → sync in sequence.
 
 ---
 

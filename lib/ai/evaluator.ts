@@ -1,7 +1,7 @@
 import { generateText } from 'ai'
 import { getAIModel, getModelName, isAIConfigured } from './client'
-import { buildEvaluationPrompt, EVALUATOR_SYSTEM_PROMPT } from './prompts'
-import { aiEvaluationResponseSchema, type AIEvaluationResponse } from '@/types/evaluation'
+import { buildEvaluationPrompt, EVALUATOR_SYSTEM_PROMPT, BREAKDOWN_WEIGHTS } from './prompts'
+import { aiEvaluationResponseSchema, getRecommendationFromScore, type AIEvaluationResponse } from '@/types/evaluation'
 import type { Tables } from '@/types/database'
 
 type Tender = Tables<'tenders'>
@@ -61,10 +61,24 @@ export async function evaluateTender(tender: Tender): Promise<EvaluateResult> {
       }
     }
 
+    // Enforce score = weighted average of breakdown (logic must be consistent)
+    const b = validated.data.breakdown
+    const weightedScore =
+      b.budget_fit * BREAKDOWN_WEIGHTS.budget_fit +
+      b.technical_fit * BREAKDOWN_WEIGHTS.technical_fit +
+      b.timeline_fit * BREAKDOWN_WEIGHTS.timeline_fit +
+      b.strategic_fit * BREAKDOWN_WEIGHTS.strategic_fit +
+      b.risk_score * BREAKDOWN_WEIGHTS.risk_score
+    const computedScore = Math.round(Math.max(0, Math.min(100, weightedScore)))
+    const score = computedScore
+    const recommendation = getRecommendationFromScore(score)
+
     return {
       success: true,
       data: {
         ...validated.data,
+        score,
+        recommendation,
         model_used: getModelName(),
       },
     }

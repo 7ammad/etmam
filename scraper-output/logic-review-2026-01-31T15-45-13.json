@@ -1,0 +1,16 @@
+{
+  "reviewedAt": "2026-01-31T15:45:13.545Z",
+  "filesReviewed": 1,
+  "filesPassed": 1,
+  "totalTenders": 5,
+  "totalViolations": 0,
+  "results": [
+    {
+      "file": "scraped-tenders-2026-01-27T11-57-19-602Z.json",
+      "totalTenders": 5,
+      "violations": 0,
+      "violationRefs": [],
+      "passed": true
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { evaluateTender } from '@/lib/ai'
 import { getTenderById, updateTender } from '@/lib/queries/tender'
 import { upsertEvaluation, getPendingTenders } from '@/lib/queries/evaluation'
+import { loadScoringConfig, scoreTender, tenderRowToScraped } from '@/lib/evaluation'
 import type { Json } from '@/types/database'
 
 // Types for action responses
@@ -11,30 +12,70 @@ export type ActionResponse<T = void> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-// Run AI evaluation for a single tender
+/**
+ * Run evaluation for a single tender.
+ * Primary: config-driven rule-based engine (config/scoring.config.json) — simple, adjustable, no hallucination.
+ * Fallback: AI evaluator when config is not available.
+ * Oracle (runOracleEvaluation) is not used; per requirement: "نموذج بسيط قابل للتعديل".
+ */
 export async function runEvaluationAction(
   tenderId: string
 ): Promise<ActionResponse<{ score: number; recommendation: string }>> {
   try {
-    // Get the tender
     const tender = await getTenderById(tenderId)
     if (!tender) {
       return { success: false, error: 'Tender not found' }
     }
 
-    // Update status to evaluating
     await updateTender(tenderId, { status: 'evaluating' })
 
-    // Run AI evaluation
-    const result = await evaluateTender(tender)
+    const config = loadScoringConfig()
+    if (config) {
+      // Rule-based: deterministic, config-driven, no AI
+      // Includes value estimation when estimated_value is missing
+      const scraped = tenderRowToScraped(tender)
+      const scored = scoreTender(scraped, config)
 
+      // Build oracle_metadata with estimation details if value was estimated
+      const oracleMetadata: Record<string, unknown> | null = scored.budget_estimation_method
+        ? {
+            budget_estimation_method: scored.budget_estimation_method,
+            budget_estimation_confidence: scored.budget_estimation_confidence,
+          }
+        : null
+
+      await upsertEvaluation({
+        tender_id: tenderId,
+        score: scored.score,
+        recommendation: scored.recommendation,
+        summary: scored.reasons.length ? scored.reasons.join('. ') : 'Rule-based evaluation.',
+        strengths: null,
+        risks: scored.reasons.length ? scored.reasons : null,
+        missing_requirements: null,
+        action_items: null,
+        breakdown: {} as Json,
+        model_used: 'rule-based',
+        // Value estimation results
+        predicted_budget_min: scored.predicted_budget_min,
+        predicted_budget_max: scored.predicted_budget_max,
+        oracle_metadata: oracleMetadata as Json,
+      })
+      await updateTender(tenderId, { status: 'evaluated' })
+      revalidatePath('/[locale]/dashboard', 'page')
+      revalidatePath(`/[locale]/dashboard/${tenderId}`, 'page')
+      return {
+        success: true,
+        data: { score: scored.score, recommendation: scored.recommendation },
+      }
+    }
+
+    // Fallback: AI evaluation when config not available
+    const result = await evaluateTender(tender)
     if (!result.success) {
-      // Revert status on failure
       await updateTender(tenderId, { status: 'pending' })
       return { success: false, error: result.error }
     }
 
-    // Save evaluation to database
     await upsertEvaluation({
       tender_id: tenderId,
       score: result.data.score,
@@ -48,10 +89,7 @@ export async function runEvaluationAction(
       model_used: result.data.model_used,
     })
 
-    // Update tender status to evaluated
     await updateTender(tenderId, { status: 'evaluated' })
-
-    // Revalidate pages
     revalidatePath('/[locale]/dashboard', 'page')
     revalidatePath(`/[locale]/dashboard/${tenderId}`, 'page')
 

@@ -1,0 +1,75 @@
+{
+  "metadata": {
+    "startedAt": "2026-01-31T00:00:00.000Z",
+    "completedAt": "2026-01-31T00:00:05.000Z",
+    "totalScraped": 3,
+    "totalErrors": 0,
+    "config": {
+      "batchSize": 3,
+      "delayMs": 1000
+    },
+    "note": "Synthetic test data with correct values to verify evaluation logic"
+  },
+  "tenders": [
+    {
+      "reference_no": "TEST001",
+      "title": "High-value IT infrastructure project",
+      "entity": "Test Government Entity",
+      "deadline": "2026-03-15T23:59:59.999Z",
+      "estimated_value": 5000000,
+      "booklet_price": 0,
+      "initial_guarantee": 0,
+      "contract_duration": "12 months",
+      "description": "Large scale IT infrastructure upgrade project with clear scope and requirements. Includes network modernization, server deployment, and security enhancements.",
+      "tender_url": "https://example.com/tender/TEST001",
+      "source": "etimad",
+      "scraped_at": "2026-01-31T00:00:01.000Z",
+      "tab_sections": {
+        "basic_info": {
+          "reference_no": "TEST001",
+          "title": "High-value IT infrastructure project"
+        }
+      }
+    },
+    {
+      "reference_no": "TEST002",
+      "title": "Medium-value software development",
+      "entity": "Test Ministry",
+      "deadline": "2026-02-10T23:59:59.999Z",
+      "estimated_value": 500000,
+      "booklet_price": 5000,
+      "initial_guarantee": 25000,
+      "contract_duration": "6 months",
+      "description": "Custom software development for internal systems.",
+      "tender_url": "https://example.com/tender/TEST002",
+      "source": "etimad",
+      "scraped_at": "2026-01-31T00:00:02.000Z",
+      "tab_sections": {
+        "basic_info": {
+          "reference_no": "TEST002"
+        }
+      }
+    },
+    {
+      "reference_no": "TEST003",
+      "title": "Small IT support contract",
+      "entity": "Test Agency",
+      "deadline": "2026-01-25T23:59:59.999Z",
+      "estimated_value": 50000,
+      "booklet_price": 10000,
+      "initial_guarantee": null,
+      "contract_duration": "3 months",
+      "description": "Basic IT support services.",
+      "tender_url": "https://example.com/tender/TEST003",
+      "source": "etimad",
+      "scraped_at": "2026-01-31T00:00:03.000Z",
+      "tab_sections": {
+        "basic_info": {
+          "reference_no": "TEST003"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "scrapedAt": "2026-01-31T00:00:05.000Z"
+}

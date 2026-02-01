@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import { notFound } from 'next/navigation'
 import { getMessages, isValidLocale, type Locale } from '@/lib/i18n'
 import { I18nProvider } from '@/components/providers/i18n-provider'
+import { AuthProvider } from '@/components/providers/auth-provider'
 import { LocaleHtmlAttributes } from '@/components/locale-html-attributes'
+import { getCurrentUser } from '@/lib/auth/guard'
 
 export const metadata: Metadata = {
   title: {
@@ -41,12 +43,15 @@ export default async function LocaleLayout({ children, params }: Props) {
   }
 
   const messages = getMessages(locale)
+  const user = await getCurrentUser()
 
   return (
     <>
       <LocaleHtmlAttributes locale={locale} />
       <I18nProvider locale={locale} messages={messages}>
-        {children}
+        <AuthProvider initialUser={user}>
+          {children}
+        </AuthProvider>
       </I18nProvider>
     </>
   )

@@ -1,11 +1,13 @@
-export default function SettingsLayout({
-  children,
-}: {
+import { requireAuth } from '@/lib/auth/guard'
+import { AuthenticatedShell } from '@/components/layout/authenticated-shell'
+
+type Props = {
   children: React.ReactNode
-}) {
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      {children}
-    </div>
-  )
+  params: Promise<{ locale: string }>
+}
+
+export default async function SettingsLayout({ children, params }: Props) {
+  await requireAuth()
+  const { locale } = await params
+  return <AuthenticatedShell locale={locale}>{children}</AuthenticatedShell>
 }

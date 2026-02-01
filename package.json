@@ -21,7 +21,13 @@
     "verify:phase-2": "tsx scripts/verify-phase-2.ts",
     "verify:historical": "tsx scripts/verify-phase-historical.ts",
     "verify:scraper-active": "tsx scripts/verify-scraper-active.ts",
-    "review:scraped": "tsx scripts/review-scraped-data.ts"
+    "review:scraped": "tsx scripts/review-scraped-data.ts",
+    "evaluate-tenders": "tsx scripts/evaluate-tenders.ts",
+    "calibrate-values": "tsx scripts/calibrate-values.ts",
+    "sync:evaluations": "tsx scripts/sync-evaluations.ts",
+    "pipeline:full": "tsx scripts/pipeline-full.ts",
+    "generate:cron-secret": "tsx scripts/generate-cron-secret.ts",
+    "export:odoo-excel": "tsx scripts/export-odoo-excel.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",

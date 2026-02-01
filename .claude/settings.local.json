@@ -18,7 +18,21 @@
       "Bash(echo:*)",
       "Bash(/c/Users/Hammad/AppData/Roaming/npm/pnpm build)",
       "Bash(/c/Users/Hammad/AppData/Roaming/npm/pnpm add @tremor/react)",
-      "Bash(powershell.exe -Command \"cd ''c:/dev/builds/etmaam''; pnpm build 2>&1 | Select-Object -Last 40\")"
+      "Bash(powershell.exe -Command \"cd ''c:/dev/builds/etmaam''; pnpm build 2>&1 | Select-Object -Last 40\")",
+      "Bash(pnpm evaluate-tenders:*)",
+      "Bash(pnpm verify:phase-1:*)",
+      "Bash(pnpm review:scraped:*)",
+      "Bash(pnpm verify:phase-2:*)",
+      "Bash(pnpm verify:scraper-active:*)",
+      "Bash(pnpm scrape:smoke:*)",
+      "Bash(timeout /t 30 /nobreak)",
+      "Bash(pnpm exec playwright:*)",
+      "Bash(pnpm scrape:test:*)",
+      "Bash(ls:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(pnpm export:odoo-excel:*)",
+      "Bash(node -e:*)",
+      "Bash(pnpm test)"
     ]
   }
 }

@@ -9,6 +9,7 @@ import {
   createTenders,
   updateTender,
   deleteTender,
+  clearAllTenders,
   getTenderStats,
 } from '@/lib/queries/tender'
 import { parseFile } from '@/lib/parser'
@@ -213,6 +214,21 @@ export async function importTendersAction(
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to import tenders' 
+    }
+  }
+}
+
+// Clear all tenders (and evaluations, crm_pushes) for a fresh start
+export async function clearAllTendersAction(): Promise<ActionResponse<{ deletedTenders: number }>> {
+  try {
+    const { deletedTenders } = await clearAllTenders()
+    revalidatePath('/[locale]/dashboard', 'page')
+    revalidatePath('/[locale]/tenders', 'page')
+    return { success: true, data: { deletedTenders } }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to clear tenders',
     }
   }
 }

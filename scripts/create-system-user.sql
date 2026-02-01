@@ -1,50 +1,69 @@
--- Create System User for Scraped Tenders
--- This script creates the system user that owns all scraped tenders
--- 
--- IMPORTANT: Direct insertion into auth.users is complex and may break Supabase Auth.
--- RECOMMENDED: Use Supabase Dashboard instead (see instructions below)
---
--- If you must use SQL, this is a simplified version that may work,
--- but it's better to use the Dashboard method.
+-- Create System User for Scraped Tenders (fixed UUID)
+-- Run once: Supabase Dashboard SQL Editor, or: supabase db execute -f scripts/create-system-user.sql
+-- Requires: auth schema (Supabase managed). Uses pgcrypto for password hash.
 
--- ============================================================
--- RECOMMENDED METHOD: Via Supabase Dashboard
--- ============================================================
--- 1. Go to: https://supabase.com/dashboard/project/YOUR_PROJECT/auth/users
--- 2. Click "Add User" → "Create new user"
--- 3. Set:
---    - User ID: 00000000-0000-0000-0000-000000000001
---    - Email: system@etmam.local
---    - Password: (generate a secure random password - you won't need to log in)
--- 4. Click "Create User"
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- ============================================================
--- ALTERNATIVE: SQL Method (Use with caution)
--- ============================================================
--- This requires service role permissions and may not work in all Supabase setups.
--- The auth.users table structure can vary, so this is a template.
-
--- Check if user already exists
 DO $$
+DECLARE
+  v_id UUID := '00000000-0000-0000-0000-000000000001';
+  v_encrypted_pw TEXT;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM auth.users 
-    WHERE id = '00000000-0000-0000-0000-000000000001'::uuid
-  ) THEN
-    -- Note: This is a simplified version. Actual auth.users table has more required fields.
-    -- You may need to adjust based on your Supabase version.
-    RAISE NOTICE 'User does not exist. Please create via Dashboard or Supabase CLI.';
-    RAISE NOTICE 'See: https://supabase.com/docs/guides/auth/managing-users';
-  ELSE
-    RAISE NOTICE 'System user already exists!';
+  IF EXISTS (SELECT 1 FROM auth.users WHERE id = v_id) THEN
+    RAISE NOTICE 'System user already exists.';
+    RETURN;
   END IF;
-END $$;
 
--- Verify the user exists
-SELECT 
-  id, 
-  email, 
-  created_at,
-  email_confirmed_at IS NOT NULL as is_confirmed
-FROM auth.users 
-WHERE id = '00000000-0000-0000-0000-000000000001'::uuid;
+  v_encrypted_pw := crypt('system-' || gen_random_uuid()::text, gen_salt('bf'));
+
+  INSERT INTO auth.users (
+    id,
+    instance_id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    v_id,
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated',
+    'authenticated',
+    'system@etmam.local',
+    v_encrypted_pw,
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  );
+
+  INSERT INTO auth.identities (
+    id,
+    user_id,
+    identity_data,
+    provider,
+    provider_id,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    v_id,
+    v_id,
+    format('{"sub":"%s","email":"system@etmam.local"}', v_id)::jsonb,
+    'email',
+    v_id::text,
+    now(),
+    now(),
+    now()
+  );
+
+  RAISE NOTICE 'System user created: %', v_id;
+END
+$$;

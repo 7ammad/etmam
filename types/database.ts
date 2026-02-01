@@ -227,6 +227,33 @@ export interface Database {
           }
         ]
       }
+      profiles: {
+        Row: {
+          id: string
+          display_name: string | null
+          company: string | null
+          role: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          display_name?: string | null
+          company?: string | null
+          role?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          display_name?: string | null
+          company?: string | null
+          role?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

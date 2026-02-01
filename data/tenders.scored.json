@@ -1,0 +1,558 @@
+{
+  "generated_at": "2026-02-01T00:15:15.395Z",
+  "source_file": "run-2026-01-31T23-48-56-987Z.json",
+  "config_used": "config/scoring.config.json",
+  "tenders": [
+    {
+      "reference_no": "260139010187",
+      "title": "مشروع تطوير وتنفيذ نظام أتمته جميع الإجراءات الداخلية والخارجية لمركز الملك عبدالعزيز للخيل العربية الأصيلة",
+      "score": 44,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "28 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139008862",
+      "title": "MEDICAL CART STYLI VIEW SV10",
+      "score": 50,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "7 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139009288",
+      "title": "توريد وتركيب وتكامل أجهزة «بنان» لنظام التحقق من الهوية بمستشفى الإمام عبد الرحمن آل فيصل بالدمام التابع للشؤون الصحية بوزارة الحرس الوطني",
+      "score": 75,
+      "recommendation": "qualified",
+      "reasons": [
+        "No estimated value",
+        "26995 days until deadline",
+        "Low cost of entry",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139009968",
+      "title": "تأمين احتياجات إدارة التواصل في الإدارة التنفيذية العليا لتجمع جدة الصحي الثاني",
+      "score": 47,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "2 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139009338",
+      "title": "تجديد اشتراك بخدمة مقيم",
+      "score": 47,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "2 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139009423",
+      "title": "خدمات احترافية لضبط اختبارات الجودة للمشاريع والتحسينات التقنية",
+      "score": 47,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "13 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139006991",
+      "title": "تجديد رخص تطبيق ( adobe creative cloud ) و تطبيق (adobe acrobat pro ) وتوريد رخص تطبيق ( shutterstock) (Motion array) (Envato elaments)-(freepik)- (Canva Pro) أو ما يعادلها",
+      "score": 47,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "1 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139008844",
+      "title": "توفير اشتراك كاشف الاستلال العلمي iThenticate",
+      "score": 46,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "Deadline passed",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139008237",
+      "title": "مشروع أدوات البنية المؤسسية",
+      "score": 42,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "11 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251039019624",
+      "title": "تامين رخصة برامج لوكالة الوزارة لشؤون الدعوة والارشاد لإدارة الدعوة الرقمية",
+      "score": 46,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "Deadline passed",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139004525",
+      "title": "تجديد الدعم لأنظمة ساب",
+      "score": 52,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "27 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139008989",
+      "title": "تجديد الاشتراك لمنصة الموارد البشرية",
+      "score": 35,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "10 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005804",
+      "title": "توريد وتجديد رخص التطبيقات في هيئة الصحة العامة",
+      "score": 43,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "25 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005549",
+      "title": "تجديد الرخص والدعم لنظام تيراداتا",
+      "score": 47,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "25 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139007698",
+      "title": "تجديد الرخص والدعم الفني لنظام AppDynamics",
+      "score": 43,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "25 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139007088",
+      "title": "احتياج مشروع الخدمة الذاتية والنداء الالي للعيادات الخارجية بمستشفى الثغر العام بجدة",
+      "score": 46,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "0 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139008023",
+      "title": "توريد احبار لبعض الطابعات بادارة الشؤون الفنية المركزية بمنطقة حائل",
+      "score": 46,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "0 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251239005891",
+      "title": "مشروع البوابة المعرفية لمدة 3 سنوات",
+      "score": 41,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "10 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139008333",
+      "title": "تشغيل وصيانة الأمن السيبراني",
+      "score": 43,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "25 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139002652",
+      "title": "مشروع تشغيل وصيانة وتطوير تطبيب السكتات الدماغية عن بعد",
+      "score": 44,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "27 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251239002892",
+      "title": "مشروع الدعم الفني للانظمة المفتوحة - المرحلة الرابعة",
+      "score": 55,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "55 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139006813",
+      "title": "مشروع تشغيل وصيانة الخدمات الالكترونية لوكالة تنمية المجتمع",
+      "score": 48,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "24 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139003250",
+      "title": "توريد و تشغيل جهاز بنان (جهاز التحقق من الشخصية بالبصمة) لتجمع المدينة المنورة الصحي",
+      "score": 39,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "9 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251239005316",
+      "title": "استضافة وتدريب النماذج اللغوية الضخمة",
+      "score": 42,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "24 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251039001722",
+      "title": "تفعيل وبناء نماذج الدفع وشراء الخدمات الصحية المرحلة الثانية",
+      "score": 42,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "24 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251239009333",
+      "title": "الخدمات المدارة لتشغيل وصيانة منظومة أعمال تقنية المعلومات والذكاء الاصطناعي بالأمن العام",
+      "score": 42,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "24 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005919",
+      "title": "توريد وتركيب نظام التحكم بالتكييف والإضاءة (BMS)، بالمركز الرئيسي",
+      "score": 35,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "9 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139007847",
+      "title": "تطوير وتنفيذ منصة للإبلاغ عن المخالفات",
+      "score": 39,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "9 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139007772",
+      "title": "توريد أجهزة محمولة لمكتب المواءمة المالية بالديوان الملكي",
+      "score": 35,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "9 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139007796",
+      "title": "توريد وتركيب بطاريات إضافية \"UPS\" لمكتب المواءمة المالية بالديوان الملكي",
+      "score": 35,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "9 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "250939014491",
+      "title": "مركز المراقبة والتحكم وتشغيل حلول الصحة الرقمية للخدمات الطبية العسكرية",
+      "score": 55,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "53 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251239009414",
+      "title": "تشغيل مراكز الاتصال وزارة الصحة",
+      "score": 55,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "55 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139006263",
+      "title": "الخدمات المدارة للتحول الرقمي بالجامعة السعودية الالكترونية",
+      "score": 42,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "23 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139006916",
+      "title": "تجديد رخص الخوادم VMware",
+      "score": 33,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "5 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005780",
+      "title": "تجهيز ورش ومعامل المستقبل",
+      "score": 33,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "5 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139007005",
+      "title": "إدارة حوكمة أنظمة الوصول",
+      "score": 34,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "7 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139006779",
+      "title": "توفير رخص البرامج التعليمية المطلوبة في الكليات عبر تقنية VDI",
+      "score": 39,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "5 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139004682",
+      "title": "رخص وأنظمة الأمن السيبراني",
+      "score": 44,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "20 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005930",
+      "title": "تطوير منصة التكامل المركزي للخدمات الرقمية",
+      "score": 33,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "5 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005357",
+      "title": "توفير خدمات الطابعات للهيئة",
+      "score": 37,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "6 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005268",
+      "title": "تجديد الدعم لنظام ايراد 2026",
+      "score": 40,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "20 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139001546",
+      "title": "استبدال أنظمة الحماية والتحكم الحالية بأنظمة Microsoft E5 وتفعيلها",
+      "score": 38,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "4 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251139009268",
+      "title": "دعم وصيانة الأنظمة المركزية-4",
+      "score": 40,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "20 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005916",
+      "title": "تامين أجهزة اتصال مشفرة",
+      "score": 32,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "4 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005990",
+      "title": "مشروع تحديث الشبكات (الهاتفية –الانترنت –التلفزيونية) بمنطقة الرياض",
+      "score": 50,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "20 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005166",
+      "title": "فحص واختبار وتجهيز البنية الرقمية للمباني الإدارية والمراكز الاسعافية لموسم الحج 1447هـ",
+      "score": 55,
+      "recommendation": "conditional",
+      "reasons": [
+        "No estimated value",
+        "26995 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139001606",
+      "title": "تقديم خدمات تشغيل وصيانة العتاد التقني بالهيئة العامة لعقارات الدولة",
+      "score": 39,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "18 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139005113",
+      "title": "توفير دعم فني لمدة سنتين لنظام التواقيع الإلكترونية CodeTwo 365",
+      "score": 32,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "3 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "251239008689",
+      "title": "توريد وتركيب وتفعيل رخص البرامج الاحترافية",
+      "score": 33,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "6 days until deadline",
+        "Title and description present"
+      ]
+    },
+    {
+      "reference_no": "260139000019",
+      "title": "مشروع تشغيل وصيانة الحاسب الآلي (الخدمات المدارة )",
+      "score": 32,
+      "recommendation": "excluded",
+      "reasons": [
+        "No estimated value",
+        "3 days until deadline",
+        "Title and description present"
+      ]
+    }
+  ]
+}

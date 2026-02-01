@@ -1,8 +1,48 @@
 import type { Tables } from '@/types/database'
+import type { ScoringConfig } from '@/lib/evaluation'
 
 type Tender = Tables<'tenders'>
 
-// Build the evaluation prompt for a tender
+/**
+ * Strict config-executor prompt: AI only extracts/calculates against the given config.
+ * No opinion, no hallucination — execute CONFIGURATION only.
+ * Use when you want "simple adjustable model" (نموذج بسيط قابل للتعديل) without inventing requirements.
+ */
+export function buildStrictEvalPrompt(tenderText: string, config: ScoringConfig): string {
+  const { thresholds } = config
+  return `You are a Scoring Engine. You do NOT have an opinion. You only execute the following CONFIGURATION.
+
+CONFIGURATION:
+${JSON.stringify(config, null, 2)}
+
+TASK:
+1. From the tender text, extract: estimated_value (number or null), deadline (date string or null), title, entity, description, booklet_price, initial_guarantee if present.
+2. Apply each rule dimension from config (budget_fit, timeline_fit, cost_of_entry, scope_clarity, risk_penalty) using ONLY data present in the tender text. Do not invent requirements.
+3. Compute weighted score (0-100) from config weights. Recommendation: qualified >= ${thresholds.qualified}, conditional >= ${thresholds.conditional}, else excluded.
+
+TENDER TEXT:
+---
+${tenderText}
+---
+
+OUTPUT JSON ONLY (no markdown, no explanation):
+{
+  "score": number,
+  "recommendation": "qualified" | "conditional" | "excluded",
+  "reasons": ["brief reason 1", "brief reason 2"]
+}`
+}
+
+// Weights for overall score from breakdown (must sum to 1)
+const BREAKDOWN_WEIGHTS = {
+  budget_fit: 0.2,
+  technical_fit: 0.2,
+  timeline_fit: 0.2,
+  strategic_fit: 0.2,
+  risk_score: 0.2,
+} as const
+
+// Build the evaluation prompt for a tender — strict logic: breakdown first, then score = weighted average
 export function buildEvaluationPrompt(tender: Tender): string {
   const valueFormatted = tender.estimated_value
     ? new Intl.NumberFormat('ar-SA', {
@@ -16,7 +56,21 @@ export function buildEvaluationPrompt(tender: Tender): string {
     dateStyle: 'long',
   }).format(new Date(tender.deadline))
 
-  return `أنت خبير تقييم منافسات حكومية سعودية. قم بتحليل هذه المنافسة وأعطني تقييماً شاملاً.
+  return `أنت خبير تقييم منافسات حكومية سعودية. قواعد صارمة:
+
+1) احسب أولاً breakdown (خمس درجات 0–100 فقط، أعداد صحيحة):
+   - budget_fit: ملاءمة القيمة المالية (0–100)
+   - technical_fit: التوافق الفني مع المتطلبات (0–100)
+   - timeline_fit: معقولية الموعد النهائي (0–100)
+   - strategic_fit: أهمية الجهة والقطاع (0–100)
+   - risk_score: انخفاض المخاطر = درجة أعلى (0–100)
+
+2) الدرجة الإجمالية score = متوسط بسيط للخمسة (جمعهم ÷ 5)، تقريب لأقرب عدد صحيح.
+
+3) recommendation من score فقط:
+   - qualified إذا score >= 70
+   - conditional إذا 40 <= score < 70
+   - excluded إذا score < 40
 
 معلومات المنافسة:
 - العنوان: ${tender.title}
@@ -26,45 +80,41 @@ export function buildEvaluationPrompt(tender: Tender): string {
 - الموعد النهائي: ${deadlineFormatted}
 ${tender.description ? `- الوصف: ${tender.description}` : ''}
 
-قم بتقييم المنافسة بناءً على المعايير التالية:
-1. الملاءمة المالية (budget_fit): هل القيمة مناسبة؟ (0-100)
-2. التوافق الفني (technical_fit): مدى تطابق المتطلبات مع القدرات العامة (0-100)
-3. الجدول الزمني (timeline_fit): هل الموعد النهائي معقول؟ (0-100)
-4. التوافق الاستراتيجي (strategic_fit): مدى أهمية الجهة والقطاع (0-100)
-5. تقييم المخاطر (risk_score): كلما انخفضت المخاطر ارتفعت الدرجة (0-100)
-
-أعطني الناتج بالصيغة التالية (JSON فقط، بدون أي نص إضافي):
-
+أرجع JSON فقط (بدون نص قبله أو بعده)، بهذا الشكل بالضبط:
 {
-  "score": <درجة إجمالية من 0 إلى 100>,
-  "recommendation": "<qualified أو conditional أو excluded>",
-  "summary": "<ملخص في 2-3 جمل بالعربية>",
+  "breakdown": {
+    "budget_fit": <عدد 0-100>,
+    "technical_fit": <عدد 0-100>,
+    "timeline_fit": <عدد 0-100>,
+    "strategic_fit": <عدد 0-100>,
+    "risk_score": <عدد 0-100>
+  },
+  "score": <عدد صحيح = متوسط الخمسة أعلاه>,
+  "recommendation": "<qualified أو conditional أو excluded حسب score>",
+  "summary": "<ملخص عربي 2-3 جمل>",
   "strengths": ["<نقطة قوة 1>", "<نقطة قوة 2>"],
   "risks": ["<مخاطر 1>", "<مخاطر 2>"],
-  "missing_requirements": ["<متطلب ناقص 1>"],
-  "action_items": ["<خطوة مقترحة 1>", "<خطوة مقترحة 2>"],
-  "breakdown": {
-    "budget_fit": <0-100>,
-    "technical_fit": <0-100>,
-    "timeline_fit": <0-100>,
-    "strategic_fit": <0-100>,
-    "risk_score": <0-100>
-  }
+  "missing_requirements": ["<متطلب ناقص إن وجد>"],
+  "action_items": ["<خطوة مقترحة 1>", "<خطوة مقترحة 2>"]
+}`
 }
 
-قواعد التوصية:
-- qualified (مؤهل): الدرجة >= 70
-- conditional (مشروط): الدرجة بين 40 و 69
-- excluded (مستبعد): الدرجة < 40
+export { BREAKDOWN_WEIGHTS }
 
-أجب بـ JSON فقط.`
-}
+// System prompt for the AI evaluator — strict logic and output
+export const EVALUATOR_SYSTEM_PROMPT = `أنت خبير تقييم منافسات حكومية سعودية. قواعد ثابتة:
+1. احسب أولاً breakdown (خمس أعداد صحيحة 0–100): budget_fit, technical_fit, timeline_fit, strategic_fit, risk_score.
+2. score = متوسط الخمسة (جمعهم ÷ 5)، تقريب لأقرب عدد صحيح.
+3. recommendation من score فقط: qualified إذا >= 70، conditional إذا 40–69، excluded إذا < 40.
+4. أرجع JSON فقط بدون أي نص قبله أو بعده.
 
-// System prompt for the AI evaluator
-export const EVALUATOR_SYSTEM_PROMPT = `أنت مساعد متخصص في تقييم المنافسات الحكومية السعودية.
-تقوم بتحليل المنافسات وتقديم تقييم موضوعي ومفصل.
-جميع ردودك يجب أن تكون بصيغة JSON صالحة.
-استخدم اللغة العربية في جميع النصوص داخل JSON.`
+**مهم جداً - اللغة العربية إلزامية:**
+يجب أن تكون جميع النصوص التالية باللغة العربية فقط (لا تستخدم الإنجليزية أبداً):
+- summary: ملخص عربي كامل
+- strengths: نقاط القوة بالعربية
+- risks: المخاطر بالعربية
+- missing_requirements: المتطلبات الناقصة بالعربية
+- action_items: الخطوات المقترحة بالعربية`
 
 /**
  * System prompt for the Oracle (3-Stage Chain-of-Thought Reasoning Pipeline)

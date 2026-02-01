@@ -6,6 +6,7 @@ import { useI18n, useTranslations } from '@/components/providers/i18n-provider'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Box, Flex, Heading, Text, Button, TextField, Card } from '@radix-ui/themes'
 import { Crown, Mail, Loader2, ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { resetPasswordAction } from '@/actions/auth'
 
 export default function ForgotPasswordPage() {
   const { locale } = useI18n()
@@ -15,13 +16,20 @@ export default function ForgotPasswordPage() {
   const otherLocale = locale === 'ar' ? 'en' : 'ar'
   const isRTL = locale === 'ar'
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setStatus('loading')
 
-    setTimeout(() => {
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email') as string
+
+    const result = await resetPasswordAction(email)
+
+    if (result.success) {
       setStatus('success')
-    }, 1200)
+    } else {
+      setStatus('error')
+    }
   }
 
   return (
@@ -93,6 +101,7 @@ export default function ForgotPasswordPage() {
                   {tAuth('email')}
                 </Text>
                 <TextField.Root
+                  name="email"
                   size="3"
                   type="email"
                   required

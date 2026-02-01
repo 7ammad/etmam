@@ -412,9 +412,13 @@ export class EtimadScraper {
         `[Scraper] Page ${pageNum}: ${added} URLs (total: ${seen.size})`
       )
 
-      // No results on this page (past the last page)
-      if (pageUrls.length === 0 && pageNum > 1) {
-        console.log('[Scraper] No more results (empty page)')
+      // No results on this page - stop scraping
+      if (pageUrls.length === 0) {
+        if (pageNum === 1) {
+          console.log('[Scraper] No results found on page 1 - stopping (0 tenders available)')
+        } else {
+          console.log('[Scraper] No more results (empty page) - stopping')
+        }
         break
       }
 
@@ -612,6 +616,12 @@ export class EtimadScraper {
       }
 
       try {
+        // Wait for loader to disappear so tab click is not intercepted (site shows #loader / modal-backdrop)
+        await page.locator('#loader').waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {})
+        await page.locator('.modal-backdrop').waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {})
+        await delay(200)
+        // d-5/d-6 often trigger slow content load; give extra time before clicking
+        if (tabId === 'd-5' || tabId === 'd-6') await delay(2500)
         await link.click()
         await page
           .waitForSelector(`.tab-pane#${tabId}.active, .tab-pane#${tabId}.show`, {
@@ -669,6 +679,7 @@ export class EtimadScraper {
     // Extract values from tab_sections (primary source) with fallbacks
     const basicInfo = tabSections['basic_info'] || {}
     const addressesDates = tabSections['addresses_and_dates'] || {}
+    const classification = tabSections['classification'] || {}
     const awardResults = tabSections['award_results'] || {}
     const winningBidderRaw = this.findInStructuredData(awardResults, labels.winningBidder ?? [])
     const awardAmountRaw = this.findInStructuredData(awardResults, labels.awardAmount ?? [])
@@ -692,12 +703,32 @@ export class EtimadScraper {
 
     // Deadline: prefer "آخر موعد لتقديم العروض" from addresses_and_dates
     const deadlineFromTab = addressesDates['آخر موعد لتقديم العروض']
-    const finalDeadline =
-      parseDate(deadlineFromTab) || parseDate(deadlineRaw) || new Date().toISOString()
+    const parsedDeadline = parseDate(deadlineFromTab) || parseDate(deadlineRaw)
+
+    // CRITICAL: Don't fallback to current time if deadline parsing fails
+    // This was causing all deadlines to be set to scraped_at timestamp
+    if (!parsedDeadline) {
+      console.warn(`[${url}] Failed to parse deadline. deadlineFromTab="${deadlineFromTab}", deadlineRaw="${deadlineRaw}"`)
+    }
+
+    const finalDeadline = parsedDeadline || new Date('2099-12-31').toISOString() // Far future as fallback for validation
 
     // Entity: prefer "الجهة الحكوميه" or "الجهة الحكومية" from basic_info
     const entityFromTab = basicInfo['الجهة الحكوميه'] || basicInfo['الجهة الحكومية']
     const finalEntity = sanitizeText(entityFromTab) || sanitizeText(entityRaw) || 'Unknown Entity'
+
+    // Try to find estimated_value in specific tabs (it might be in basic_info or classification)
+    const estimatedValueFromBasicInfo = basicInfo['القيمة التقديرية'] || basicInfo['القيمة المقدرة']
+    const estimatedValueFromClassification = classification['القيمة التقديرية'] || classification['القيمة المقدرة']
+    const finalEstimatedValueRaw = estimatedValueFromBasicInfo || estimatedValueFromClassification || estimatedValueRaw
+
+    // Log missing estimated_value for debugging
+    const parsedEstimatedValue = parseSARAmount(finalEstimatedValueRaw)
+    if (!parsedEstimatedValue && finalEstimatedValueRaw) {
+      console.warn(`[${finalRefNo}] Failed to parse estimated_value from: "${finalEstimatedValueRaw}"`)
+    } else if (!finalEstimatedValueRaw) {
+      console.warn(`[${finalRefNo}] Estimated value not found in tender data. Check if field exists on detail page.`)
+    }
 
     // Build tender object (include award fields when present from award_results tab)
     const data: Partial<ScrapedTender> = {
@@ -705,7 +736,7 @@ export class EtimadScraper {
       title: finalTitle,
       entity: finalEntity,
       deadline: finalDeadline,
-      estimated_value: parseSARAmount(estimatedValueRaw),
+      estimated_value: parsedEstimatedValue,
       booklet_price: parseSARAmount(bookletPriceRaw),
       initial_guarantee: parsePercentage(initialGuaranteeRaw),
       contract_duration: parseDuration(contractDurationRaw),

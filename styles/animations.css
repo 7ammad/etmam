@@ -172,6 +172,11 @@
   }
 }
 
+@keyframes scrape-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
 @keyframes bounce {
   0%, 100% {
     transform: translateY(0);
@@ -309,6 +314,10 @@
 
 .animate-ping {
   animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.scrape-progress-bar {
+  animation: scrape-progress 1.2s ease-in-out infinite;
 }
 
 /* Shimmer effect for skeletons */

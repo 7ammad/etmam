@@ -119,6 +119,8 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const body: SyncPayload = await request.json()
 
+    console.log(`[Sync API] Received body.tenders length: ${body?.tenders?.length ?? 'missing'}`)
+
     // Validate payload structure
     if (!body.tenders || !Array.isArray(body.tenders)) {
       return NextResponse.json(
@@ -208,9 +210,9 @@ export async function POST(request: NextRequest) {
       console.error(`[Sync API] Error code:`, error.code)
       console.error(`[Sync API] Failed tenders count:`, validatedTenders.length)
       console.error(`[Sync API] Failed tender references:`, validatedTenders.map((t) => t.reference_no))
-      
-      // Return generic error message (security: don't leak internal details to client)
-      results.errors.push(`Database error: Failed to upsert tenders`)
+
+      // Return actual error so dashboard/child can show it (needed to fix sync)
+      results.errors.push(error.message || `Database error: Failed to upsert tenders`)
       results.success = false
       results.upserted = 0
     } else {

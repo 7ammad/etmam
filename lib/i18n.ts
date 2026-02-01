@@ -14,6 +14,28 @@ export function getMessages(locale: Locale) {
   return messages[locale] || messages[defaultLocale]
 }
 
+/** Server-side t for a namespace (avoids next-intl plugin request config). Use in server components. */
+export function getServerT(
+  locale: Locale,
+  namespace: string
+): (key: string) => string {
+  const messages = getMessages(locale) as Record<string, Record<string, unknown>>
+  const ns = messages[namespace]
+  if (!ns || typeof ns !== 'object') return (key: string) => key
+  return function t(key: string): string {
+    const parts = key.split('.')
+    let value: unknown = ns
+    for (const p of parts) {
+      if (value != null && typeof value === 'object' && p in (value as object)) {
+        value = (value as Record<string, unknown>)[p]
+      } else {
+        return key
+      }
+    }
+    return typeof value === 'string' ? value : key
+  }
+}
+
 export function isValidLocale(locale: string): locale is Locale {
   return locales.includes(locale as Locale)
 }

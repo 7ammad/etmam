@@ -1,5 +1,12 @@
 'use server'
 
+/**
+ * DISABLED per product requirement: "نموذج بسيط قابل للتعديل" (simple adjustable model).
+ * Oracle 3-stage (Requirement Hallucination → Budget Triangulation → Fit Scoring) is over-engineered
+ * and causes hallucination. Do NOT wire runOracleEvaluation in UI. Use rule-based evaluation
+ * (config/scoring.config.json) or the strict config-executor prompt instead.
+ */
+
 import { revalidatePath } from 'next/cache'
 import { generateOracleOutput } from '@/lib/ai/client'
 import { buildOraclePrompt, SYSTEM_PROMPT_ORACLE } from '@/lib/ai/prompts'
@@ -12,7 +19,7 @@ import type { Json } from '@/types/database'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * Run Oracle evaluation for a tender
+ * Run Oracle evaluation for a tender (DISABLED — do not use in UI)
  * 
  * This function performs a 3-stage Chain-of-Thought AI analysis:
  * 1. Scope Analysis

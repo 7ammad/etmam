@@ -2,15 +2,16 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * Server Layout Guard for authentication
+ * Server Layout Guard for authentication (defense-in-depth; proxy already protects routes).
  * Use in layout.tsx to protect routes:
- * 
+ *
  * export default async function ProtectedLayout({ children }) {
  *   await requireAuth()
  *   return <>{children}</>
  * }
+ * Default redirect is locale-aware (/ar/login) since app uses [locale] routes.
  */
-export async function requireAuth(redirectTo = '/login') {
+export async function requireAuth(redirectTo = '/ar/login') {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 

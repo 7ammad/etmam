@@ -41,11 +41,27 @@ export const salesforceConfigSchema = z.object({
 
 export type SalesforceConfig = z.infer<typeof salesforceConfigSchema>
 
-// Union of all config types
+export const odooConfigSchema = z.object({
+  base_url: z.string().url('Invalid Odoo base URL'),
+  db: z.string().min(1, 'Database name is required'),
+  username: z.string().min(1, 'Username is required'),
+  password: z.string().min(1, 'Password is required'),
+})
+
+export const odooEnvConfigSchema = z.object({
+  use_env: z.literal(true),
+})
+
+export type OdooConfig = z.infer<typeof odooConfigSchema>
+export type OdooEnvConfig = z.infer<typeof odooEnvConfigSchema>
+
+// Union of all config types (Odoo: full config or use_env for server-only env)
 export const crmConfigDataSchema = z.union([
   webhookConfigSchema,
   hubspotConfigSchema,
   salesforceConfigSchema,
+  odooConfigSchema,
+  odooEnvConfigSchema,
 ])
 
 export type CRMConfigData = z.infer<typeof crmConfigDataSchema>

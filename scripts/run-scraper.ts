@@ -6,7 +6,7 @@
  *
  * Run with: pnpm scrape:run
  *
- * Required environment variables:
+ * Required environment variables (or set in .env.local):
  *   API_URL - URL of the sync endpoint
  *   CRON_SECRET - Auth token for sync endpoint
  *
@@ -17,12 +17,39 @@
  *   SUB_ACTIVITY_ID - Sub-activity filter ID (default: none)
  */
 
+import * as fs from 'fs'
+import * as path from 'path'
 import { scrapePublicTenders } from '../lib/scraper'
+
+// Load .env.local so API_URL and CRON_SECRET are available when run via pnpm
+function loadEnvFile(filePath: string): void {
+  try {
+    if (!fs.existsSync(filePath)) return
+    const content = fs.readFileSync(filePath, 'utf-8')
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eqIndex = trimmed.indexOf('=')
+      if (eqIndex <= 0) continue
+      const key = trimmed.slice(0, eqIndex)
+      let value = trimmed.slice(eqIndex + 1)
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1)
+      }
+      if (!process.env[key]) process.env[key] = value
+    }
+  } catch {
+    /* ignore */
+  }
+}
+loadEnvFile(path.join(process.cwd(), '.env.local'))
 import type { SyncResponse, ActivityFilter } from '../types/scraper'
 import {
   displaySyncResults,
   displayRunComplete,
 } from './scraper-utils'
+
+const SCRAPER_OUTPUT_DIR = path.join(process.cwd(), 'scraper-output')
 
 async function main(): Promise<void> {
   console.log('='.repeat(60))
@@ -91,6 +118,24 @@ async function main(): Promise<void> {
     console.log(`  Errors: ${result.metadata.totalErrors}`)
     console.log(`  Duration: ${scrapeTime}ms`)
     console.log('')
+
+    // Write to scraper-output so evaluate-tenders can run (e.g. in CI pipeline)
+    if (result.tenders.length > 0) {
+      if (!fs.existsSync(SCRAPER_OUTPUT_DIR)) {
+        fs.mkdirSync(SCRAPER_OUTPUT_DIR, { recursive: true })
+      }
+      const runFile = path.join(
+        SCRAPER_OUTPUT_DIR,
+        `run-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+      )
+      fs.writeFileSync(
+        runFile,
+        JSON.stringify({ tenders: result.tenders, metadata: result.metadata }, null, 2),
+        'utf-8'
+      )
+      console.log(`[Output] Wrote ${result.tenders.length} tenders to ${runFile}`)
+      console.log('')
+    }
 
     // POST to sync API
     console.log(`[API] POSTing to ${apiUrl}...`)
