@@ -57,7 +57,7 @@ export function LandingHeader() {
               >
                 <Crown size={20} color="white" />
               </Flex>
-              <Text size="5" weight="bold" style={{ color: 'var(--gray-12)' }}>
+              <Text size="5" weight="bold" style={{ color: 'var(--gray-12)' }} data-testid="app-title">
                 {t('appName')}
               </Text>
             </Flex>

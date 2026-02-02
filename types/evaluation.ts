@@ -1,8 +1,17 @@
 import { z } from 'zod'
 
-// Recommendation type
+// Recommendation type (legacy / config-based scoring)
 export const recommendationSchema = z.enum(['qualified', 'conditional', 'excluded'])
 export type Recommendation = z.infer<typeof recommendationSchema>
+
+// MVP recommendation: persisted and displayed exactly
+export type MVPRecommendation = 'INVEST' | 'REVIEW' | 'SKIP'
+
+export function getMVPRecommendationFromScore(score: number): MVPRecommendation {
+  if (score >= 70) return 'INVEST'
+  if (score >= 40) return 'REVIEW'
+  return 'SKIP'
+}
 
 // Score breakdown schema
 export const scoreBreakdownSchema = z.object({

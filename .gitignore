@@ -65,3 +65,10 @@ scratchpad/
 # Playwright
 playwright-report/
 test-results/
+playwright/.auth/
+
+# Local / generated (MVP hygiene)
+.claude/settings.local.json
+output/.last-export.json
+output/*.xlsx
+scraper-output/

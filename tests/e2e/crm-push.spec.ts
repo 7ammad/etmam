@@ -55,21 +55,23 @@ test.describe('CRM Push - Tender Detail', () => {
     await page.goto('/en/dashboard')
     await page.waitForLoadState('networkidle')
 
-    // Try to find a tender link in the dashboard
     const tenderLink = page.locator('a[href*="/dashboard/"]').first()
     const hasLinks = await tenderLink.isVisible().catch(() => false)
+    if (!hasLinks) return
 
-    if (hasLinks) {
-      await tenderLink.click()
+    await tenderLink.click()
+    await page.waitForLoadState('networkidle')
+
+    // Ensure tender is evaluated: click Run analysis if the push button is not yet usable
+    const runAnalysisBtn = page.getByTestId('run-analysis-button')
+    const runVisible = await runAnalysisBtn.isVisible().catch(() => false)
+    if (runVisible) {
+      await runAnalysisBtn.click()
       await page.waitForLoadState('networkidle')
-
-      // Check for Push to CRM button or CRM section
-      const hasPushButton = await page.getByRole('button', { name: /Push to CRM/i }).isVisible().catch(() => false)
-      const hasCRMSection = await page.getByText(/CRM/i).first().isVisible().catch(() => false)
-
-      // The button should exist in the CRM section (may be disabled)
-      expect(hasPushButton || hasCRMSection).toBeTruthy()
+      await page.waitForTimeout(2000) // allow evaluation to complete
     }
+
+    await expect(page.getByTestId('push-to-crm-button')).toBeVisible()
   })
 
   test('push button shows disabled reason when not evaluated', async ({ page }) => {
@@ -85,7 +87,7 @@ test.describe('CRM Push - Tender Detail', () => {
 
       // Look for either the button or the disabled reason text
       const hasDisabledReason = await page.getByText(/Evaluate tender first|Already pushed|No evaluation/i).isVisible().catch(() => false)
-      const hasPushButton = await page.getByRole('button', { name: /Push to CRM/i }).isVisible().catch(() => false)
+      const hasPushButton = await page.getByTestId('push-to-crm-button').isVisible().catch(() => false)
 
       // Either we have a push button or a disabled reason (or both)
       expect(hasPushButton || hasDisabledReason || true).toBeTruthy() // Always pass if page loads
@@ -98,23 +100,28 @@ test.describe('CRM Push - Tender Detail', () => {
 
     const tenderLink = page.locator('a[href*="/dashboard/"]').first()
     const hasLinks = await tenderLink.isVisible().catch(() => false)
+    if (!hasLinks) return
 
-    if (hasLinks) {
-      await tenderLink.click()
+    await tenderLink.click()
+    await page.waitForLoadState('networkidle')
+
+    // Ensure tender is evaluated so push button is enabled
+    const runBtn = page.getByTestId('run-analysis-button')
+    if (await runBtn.isVisible().catch(() => false)) {
+      await runBtn.click()
       await page.waitForLoadState('networkidle')
-
-      const pushButton = page.getByRole('button', { name: /Push to CRM/i })
-      const isButtonEnabled = await pushButton.isEnabled().catch(() => false)
-
-      if (isButtonEnabled) {
-        await pushButton.click()
-        await page.waitForTimeout(1000) // Wait for dialog to open
-
-        // Check for dialog elements
-        const hasDialog = await page.getByText(/Confirm push|Opportunity summary|Cancel/i).isVisible().catch(() => false)
-        expect(hasDialog).toBeTruthy()
-      }
+      await page.waitForTimeout(2000)
     }
+
+    const pushButton = page.getByTestId('push-to-crm-button')
+    const isButtonEnabled = await pushButton.isEnabled().catch(() => false)
+    if (!isButtonEnabled) return
+
+    await pushButton.click()
+    // Dry-run may open confirmation dialog or show error when Odoo is not configured
+    await expect(
+      page.getByRole('dialog').getByTestId('push-cancel-button').or(page.getByTestId('push-error-message'))
+    ).toBeVisible({ timeout: 15000 })
   })
 })
 

@@ -45,6 +45,7 @@ export function RunAnalysisButton({ tenderId, hasEvaluation }: Props) {
         onClick={handleRun}
         disabled={loading}
         aria-label={hasEvaluation ? t('rerunAnalysis') : t('runAnalysis')}
+        data-testid="run-analysis-button"
       >
         {loading ? (
           t('evaluating')

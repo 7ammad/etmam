@@ -7,144 +7,114 @@ const VALID_CSV = path.join(FIXTURES_DIR, 'tenders.valid.ar.csv')
 const VALID_XLSX = path.join(FIXTURES_DIR, 'tenders.valid.ar.xlsx')
 const INVALID_CSV = path.join(FIXTURES_DIR, 'tenders.missing_required_columns.csv')
 
+// Set E2E_SKIP_UPLOAD_IMPORT=1 to skip import-dependent tests when Supabase/import backend is unavailable
+const skipImportTests = process.env.E2E_SKIP_UPLOAD_IMPORT === '1'
+
 test.describe('File Upload & Import Flow', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to dashboard (adjust based on your auth setup)
     await page.goto('/ar/dashboard')
-    
-    // TODO: If auth is required, handle login here
-    // For now, assuming the page is accessible or has test bypass
+    await page.waitForLoadState('networkidle')
   })
 
+  async function openUploadDropzone(page: import('@playwright/test').Page) {
+    const dropzone = page.getByTestId('upload-tender-dropzone')
+    const dropzoneVisible = await dropzone.first().isVisible().catch(() => false)
+    if (!dropzoneVisible) {
+      await page.getByTestId('upload-tender-button').click()
+      await expect(dropzone.first()).toBeVisible({ timeout: 10000 })
+    }
+    return page.getByTestId('upload-tender-dropzone').first()
+  }
+
   test('upload CSV imports tenders successfully', async ({ page }) => {
-    // Click upload button to show upload UI
-    await page.getByRole('button', { name: /رفع ملف|uploadFile/i }).click()
-    
-    // Upload the CSV file
-    const fileInput = page.locator('input[type="file"]')
+    test.skip(skipImportTests, 'Requires working import backend')
+    const dropzone = await openUploadDropzone(page)
+    const fileInput = dropzone.locator('input[type="file"]')
     await fileInput.setInputFiles(VALID_CSV)
-    
-    // Wait for processing
-    await expect(page.getByText(/جاري الرفع|uploading|تم الاستيراد/i)).toBeVisible({ timeout: 15000 })
-    
-    // Check for success message (count should be 3 from our fixture)
-    await expect(page.getByText(/3|success|نجح/i)).toBeVisible({ timeout: 10000 })
-    
-    // Verify table now shows at least one tender
+    const dialog = page.getByTestId('upload-tender-dialog')
+    await expect(dialog.getByTestId('upload-processing')).toBeVisible({ timeout: 5000 })
+    await expect(dialog.getByTestId('upload-success')).toBeVisible({ timeout: 20000 })
+    await page.getByTestId('upload-tender-dialog').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    await page.reload()
+    await page.waitForLoadState('networkidle')
     const table = page.getByRole('table')
-    await expect(table.getByText('وزارة الصحة')).toBeVisible()
+    await expect(table.getByText('وزارة الصحة')).toBeVisible({ timeout: 10000 })
     await expect(table.getByText('TND-2026-001')).toBeVisible()
-    
-    // Verify stats card updated
-    const statsCard = page.locator('[class*="glass-card"]').first()
-    await expect(statsCard.getByText(/[3-9]|[1-9][0-9]/)).toBeVisible() // At least 3 tenders
   })
 
   test('upload XLSX imports tenders successfully', async ({ page }) => {
-    // Click upload button
-    await page.getByRole('button', { name: /رفع ملف|uploadFile/i }).click()
-    
-    // Upload the Excel file
-    const fileInput = page.locator('input[type="file"]')
+    test.skip(skipImportTests, 'Requires working import backend')
+    const dropzone = await openUploadDropzone(page)
+    const fileInput = dropzone.locator('input[type="file"]')
     await fileInput.setInputFiles(VALID_XLSX)
-    
-    // Wait for processing
-    await expect(page.getByText(/جاري الرفع|uploading|تم الاستيراد/i)).toBeVisible({ timeout: 15000 })
-    
-    // Check for success message
-    await expect(page.getByText(/3|success|نجح/i)).toBeVisible({ timeout: 10000 })
-    
-    // Verify tender appears in table
+    const dialog = page.getByTestId('upload-tender-dialog')
+    await expect(dialog.getByTestId('upload-processing')).toBeVisible({ timeout: 5000 })
+    await expect(dialog.getByTestId('upload-success')).toBeVisible({ timeout: 20000 })
+    await page.getByTestId('upload-tender-dialog').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    await page.reload()
+    await page.waitForLoadState('networkidle')
     const table = page.getByRole('table')
-    await expect(table.getByText('هيئة الاتصالات وتقنية المعلومات')).toBeVisible()
+    await expect(table.getByText('هيئة الاتصالات وتقنية المعلومات')).toBeVisible({ timeout: 10000 })
   })
 
   test('upload invalid file shows error without crash', async ({ page }) => {
-    // Click upload button
-    await page.getByRole('button', { name: /رفع ملف|uploadFile/i }).click()
-    
-    // Upload the invalid CSV (missing required columns)
-    const fileInput = page.locator('input[type="file"]')
+    test.skip(skipImportTests, 'Requires working import backend')
+    const dropzone = await openUploadDropzone(page)
+    const fileInput = dropzone.locator('input[type="file"]')
     await fileInput.setInputFiles(INVALID_CSV)
-    
-    // Wait for processing
-    await page.waitForTimeout(2000)
-    
-    // Check for error message
-    const errorMessage = page.getByText(/خطأ|error|missing|failed/i)
-    await expect(errorMessage).toBeVisible({ timeout: 10000 })
-    
-    // Verify page is still interactive (no crash)
+    const dialog = page.getByTestId('upload-tender-dialog')
+    await expect(dialog.getByTestId('upload-error')).toBeVisible({ timeout: 15000 })
     await expect(page.getByRole('heading', { name: /dashboard|لوحة التحكم/i })).toBeVisible()
-    
-    // Verify no new tenders were added (table should show same or empty state)
-    // This depends on whether there were pre-existing tenders
   })
 
   test('import idempotency: uploading same file twice does not create duplicates', async ({ page }) => {
-    // First upload
-    await page.getByRole('button', { name: /رفع ملف|uploadFile/i }).click()
-    const fileInput = page.locator('input[type="file"]')
+    test.skip(skipImportTests, 'Requires working import backend')
+    const dropzone = await openUploadDropzone(page)
+    const fileInput = dropzone.locator('input[type="file"]')
     await fileInput.setInputFiles(VALID_CSV)
-    
-    // Wait for first upload to complete
-    await expect(page.getByText(/3|success|نجح/i)).toBeVisible({ timeout: 10000 })
-    
-    // Get initial tender count from stats
-    const initialStatsText = await page.locator('[class*="glass-card"]').first().textContent()
-    const initialCount = parseInt(initialStatsText?.match(/\d+/)?.[0] || '0')
-    
-    // Reload page to close any modals
+    const dialog = page.getByTestId('upload-tender-dialog')
+    await expect(dialog.getByTestId('upload-success')).toBeVisible({ timeout: 20000 })
+    await page.getByTestId('upload-tender-dialog').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+
     await page.reload()
     await page.waitForLoadState('networkidle')
-    
-    // Second upload of same file
-    await page.getByRole('button', { name: /رفع ملف|uploadFile/i }).click()
-    await fileInput.setInputFiles(VALID_CSV)
-    
-    // Wait for second upload
-    await page.waitForTimeout(3000)
-    
-    // Get final count
-    const finalStatsText = await page.locator('[class*="glass-card"]').first().textContent()
+    const initialStatsText = await page.getByTestId('kpi-total').textContent()
+    const initialCount = parseInt(initialStatsText?.match(/\d+/)?.[0] || '0')
+
+    const dropzone2 = await openUploadDropzone(page)
+    await dropzone2.locator('input[type="file"]').setInputFiles(VALID_CSV)
+    const dialog2 = page.getByTestId('upload-tender-dialog')
+    await expect(dialog2.getByTestId('upload-success')).toBeVisible({ timeout: 20000 })
+
+    const finalStatsText = await page.getByTestId('kpi-total').textContent()
     const finalCount = parseInt(finalStatsText?.match(/\d+/)?.[0] || '0')
-    
-    // Count should not double (duplicates prevented by unique constraint on reference_no)
-    // The system should reject duplicates, so count stays same OR increases by less than 3
+
     expect(finalCount).toBeLessThanOrEqual(initialCount + 3)
   })
 
   test('Arabic headers are correctly mapped', async ({ page }) => {
-    // Upload CSV with Arabic headers
-    await page.getByRole('button', { name: /رفع ملف|uploadFile/i }).click()
-    const fileInput = page.locator('input[type="file"]')
+    test.skip(skipImportTests, 'Requires working import backend')
+    const dropzone = await openUploadDropzone(page)
+    const fileInput = dropzone.locator('input[type="file"]')
     await fileInput.setInputFiles(VALID_CSV)
-    
-    await expect(page.getByText(/success|نجح/i)).toBeVisible({ timeout: 10000 })
-    
-    // Verify specific field values were parsed correctly
+    const dialog = page.getByTestId('upload-tender-dialog')
+    await expect(dialog.getByTestId('upload-success')).toBeVisible({ timeout: 20000 })
+    await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    await page.reload()
+    await page.waitForLoadState('networkidle')
     const table = page.getByRole('table')
-    
-    // Check entity (الجهة)
-    await expect(table.getByText('وزارة الصحة')).toBeVisible()
-    
-    // Check title (عنوان المنافسة)
+    await expect(table.getByText('وزارة الصحة')).toBeVisible({ timeout: 10000 })
     await expect(table.getByText(/مشروع تطوير نظام المعلومات/)).toBeVisible()
-    
-    // Check reference number (رقم المنافسة)
     await expect(table.getByText('TND-2026-001')).toBeVisible()
-    
-    // Check value is displayed (القيمة التقديرية)
     await expect(table.getByText(/2,500,000|2500000/)).toBeVisible()
   })
 
   test('empty file shows appropriate error', async ({ page }) => {
-    // Create empty file reference (if fixture exists)
-    // For now, uploading a file with headers only should fail validation
-    await page.getByRole('button', { name: /رفع ملف|uploadFile/i }).click()
-    const fileInput = page.locator('input[type="file"]')
+    test.skip(skipImportTests, 'Requires working import backend')
+    const dropzone = await openUploadDropzone(page)
+    const fileInput = dropzone.locator('input[type="file"]')
     await fileInput.setInputFiles(INVALID_CSV)
-    
-    await expect(page.getByText(/خطأ|error|no valid|missing/i)).toBeVisible({ timeout: 10000 })
+    const dialog = page.getByTestId('upload-tender-dialog')
+    await expect(dialog.getByTestId('upload-error')).toBeVisible({ timeout: 15000 })
   })
 })

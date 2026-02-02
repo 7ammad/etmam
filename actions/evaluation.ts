@@ -1,10 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { evaluateTender } from '@/lib/ai'
 import { getTenderById, updateTender } from '@/lib/queries/tender'
-import { upsertEvaluation, getPendingTenders } from '@/lib/queries/evaluation'
-import { loadScoringConfig, scoreTender, tenderRowToScraped } from '@/lib/evaluation'
+import {
+  upsertEvaluation,
+  getPendingTenders,
+} from '@/lib/queries/evaluation'
+import {
+  tenderRowToScraped,
+  getEffectiveEstimatedValueSar,
+  scoreTenderMVP,
+} from '@/lib/evaluation'
 import type { Json } from '@/types/database'
 
 // Types for action responses
@@ -13,10 +19,11 @@ export type ActionResponse<T = void> =
   | { success: false; error: string }
 
 /**
- * Run evaluation for a single tender.
- * Primary: config-driven rule-based engine (config/scoring.config.json) — simple, adjustable, no hallucination.
- * Fallback: AI evaluator when config is not available.
- * Oracle (runOracleEvaluation) is not used; per requirement: "نموذج بسيط قابل للتعديل".
+ * Run evaluation for a single tender — ONE deterministic pipeline.
+ * 1) Compute EV deterministically (award → etimad → title similarity → fallback).
+ * 2) Compute factor scores deterministically (5 factors, fixed weights).
+ * 3) Persist evaluation record with estimated_value_sar in oracle_metadata.
+ * No AI branch; no config branch. Same tender always yields same EV and score.
  */
 export async function runEvaluationAction(
   tenderId: string
@@ -29,79 +36,56 @@ export async function runEvaluationAction(
 
     await updateTender(tenderId, { status: 'evaluating' })
 
-    const config = loadScoringConfig()
-    if (config) {
-      // Rule-based: deterministic, config-driven, no AI
-      // Includes value estimation when estimated_value is missing
-      const scraped = tenderRowToScraped(tender)
-      const scored = scoreTender(scraped, config)
+    const effectiveEv = getEffectiveEstimatedValueSar(tender)
+    const scraped = tenderRowToScraped(tender)
+    const scored = scoreTenderMVP(scraped, effectiveEv.evSar)
 
-      // Build oracle_metadata with estimation details if value was estimated
-      const oracleMetadata: Record<string, unknown> | null = scored.budget_estimation_method
-        ? {
-            budget_estimation_method: scored.budget_estimation_method,
-            budget_estimation_confidence: scored.budget_estimation_confidence,
-          }
-        : null
-
-      await upsertEvaluation({
-        tender_id: tenderId,
-        score: scored.score,
-        recommendation: scored.recommendation,
-        summary: scored.reasons.length ? scored.reasons.join('. ') : 'Rule-based evaluation.',
-        strengths: null,
-        risks: scored.reasons.length ? scored.reasons : null,
-        missing_requirements: null,
-        action_items: null,
-        breakdown: {} as Json,
-        model_used: 'rule-based',
-        // Value estimation results
-        predicted_budget_min: scored.predicted_budget_min,
-        predicted_budget_max: scored.predicted_budget_max,
-        oracle_metadata: oracleMetadata as Json,
-      })
-      await updateTender(tenderId, { status: 'evaluated' })
-      revalidatePath('/[locale]/dashboard', 'page')
-      revalidatePath(`/[locale]/dashboard/${tenderId}`, 'page')
-      return {
-        success: true,
-        data: { score: scored.score, recommendation: scored.recommendation },
-      }
+    const summary = scored.top_reasons.join(' · ')
+    const dbBreakdown = {
+      budget_fit: scored.breakdown.value_fit,
+      technical_fit: scored.breakdown.scope_fit,
+      timeline_fit: scored.breakdown.time_fit,
+      strategic_fit: scored.breakdown.clarity,
+      risk_score: scored.breakdown.risk_score,
     }
 
-    // Fallback: AI evaluation when config not available
-    const result = await evaluateTender(tender)
-    if (!result.success) {
-      await updateTender(tenderId, { status: 'pending' })
-      return { success: false, error: result.error }
+    const oracleMetadata: Record<string, unknown> = {
+      estimated_value_sar: effectiveEv.evSar,
+      ev_method: effectiveEv.source,
+      ev_confidence: effectiveEv.confidence ?? null,
+      matched_examples_count: effectiveEv.matched_examples_count ?? null,
     }
 
     await upsertEvaluation({
       tender_id: tenderId,
-      score: result.data.score,
-      recommendation: result.data.recommendation,
-      summary: result.data.summary,
-      strengths: result.data.strengths,
-      risks: result.data.risks,
-      missing_requirements: result.data.missing_requirements,
-      action_items: result.data.action_items,
-      breakdown: result.data.breakdown as unknown as Json,
-      model_used: result.data.model_used,
+      score: scored.score,
+      recommendation: scored.recommendation,
+      summary,
+      strengths: null,
+      risks: null,
+      missing_requirements: null,
+      action_items: null,
+      breakdown: dbBreakdown as unknown as Json,
+      model_used: 'mvp-deterministic',
+      predicted_budget_min: effectiveEv.predictedMin,
+      predicted_budget_max: effectiveEv.predictedMax,
+      oracle_metadata: oracleMetadata as Json,
     })
-
     await updateTender(tenderId, { status: 'evaluated' })
     revalidatePath('/[locale]/dashboard', 'page')
     revalidatePath(`/[locale]/dashboard/${tenderId}`, 'page')
 
     return {
       success: true,
-      data: {
-        score: result.data.score,
-        recommendation: result.data.recommendation,
-      },
+      data: { score: scored.score, recommendation: scored.recommendation },
     }
   } catch (error) {
     console.error('Evaluation action error:', error)
+    try {
+      await updateTender(tenderId, { status: 'pending' })
+    } catch (_) {
+      // ignore rollback failure so we still return the evaluation error
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to run evaluation',
@@ -138,7 +122,6 @@ export async function evaluateAllPendingAction(): Promise<
       }
     }
 
-    // Revalidate dashboard
     revalidatePath('/[locale]/dashboard', 'page')
 
     return {
@@ -159,10 +142,7 @@ export async function rerunEvaluationAction(
   tenderId: string
 ): Promise<ActionResponse<{ score: number; recommendation: string }>> {
   try {
-    // Reset status to pending first
     await updateTender(tenderId, { status: 'pending' })
-
-    // Run evaluation
     return await runEvaluationAction(tenderId)
   } catch (error) {
     console.error('Re-evaluation action error:', error)

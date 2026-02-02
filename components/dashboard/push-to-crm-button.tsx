@@ -121,6 +121,7 @@ export function PushToCRMButton({
           disabled={isDisabled}
           title={disabledReason ?? undefined}
           style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+          data-testid="push-to-crm-button"
         >
           {state === 'previewing' ? (
             <>
@@ -140,7 +141,7 @@ export function PushToCRMButton({
           </Text>
         )}
         {state === 'error' && !dialogOpen && error && (
-          <Flex align="center" gap="1" style={{ marginTop: 'var(--space-2)' }}>
+          <Flex align="center" gap="1" style={{ marginTop: 'var(--space-2)' }} data-testid="push-error-message">
             <AlertCircle style={{ width: 14, height: 14, color: 'var(--red-11)' }} />
             <Text size="1" style={{ color: 'var(--red-11)' }}>
               {error}
@@ -150,7 +151,7 @@ export function PushToCRMButton({
       </Box>
 
       <Dialog.Root open={dialogOpen} onOpenChange={handleCloseDialog}>
-        <Dialog.Content style={{ maxWidth: 480 }}>
+        <Dialog.Content style={{ maxWidth: 480 }} data-testid="push-confirm-dialog">
           <Dialog.Title>{t('pushConfirmTitle')}</Dialog.Title>
           <Dialog.Description size="2" style={{ color: 'var(--gray-11)' }}>
             {tenderTitle}
@@ -210,11 +211,11 @@ export function PushToCRMButton({
 
               <Flex gap="3" mt="4" justify="end">
                 <Dialog.Close>
-                  <Button variant="soft" color="gray">
+                  <Button variant="soft" color="gray" data-testid="push-cancel-button">
                     {t('cancelPush')}
                   </Button>
                 </Dialog.Close>
-                <Button onClick={handleConfirmPush} disabled={state === 'pushing'}>
+                <Button onClick={handleConfirmPush} disabled={state === 'pushing'} data-testid="push-confirm-button">
                   {state === 'pushing' ? (
                     <>
                       <Loader2 className="animate-spin" style={{ width: 16, height: 16 }} />

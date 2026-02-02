@@ -9,9 +9,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  globalSetup: require.resolve('./tests/global-setup.ts'),
   use: {
     baseURL,
     trace: 'on-first-retry',
+    storageState: 'playwright/.auth/state.json',
   },
   projects: [
     {

@@ -250,6 +250,7 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading}
                 className="focus-ring"
+                data-testid="login-submit"
                 style={{ 
                   width: '100%',
                   backgroundColor: 'var(--color-primary-500)',

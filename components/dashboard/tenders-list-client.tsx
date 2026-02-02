@@ -6,12 +6,14 @@ import NextLink from 'next/link'
 import { useTranslations } from '@/components/providers/i18n-provider'
 import type { TenderWithEvaluation } from '@/lib/queries/tender'
 import { runEvaluationAction, evaluateAllPendingAction } from '@/actions/evaluation'
-import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox } from '@radix-ui/themes'
+import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox, Card } from '@radix-ui/themes'
 import { BarChart } from '@tremor/react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Search, Filter, ArrowUpDown, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import { DashboardKpiRow, type DashboardKpiStats } from './dashboard-kpi-row'
+import { getDisplayText } from '@/lib/translate-display'
+import { getEffectiveValueDisplay } from '@/lib/display-ev'
 
 const localeMap = { ar, en: enUS } as const
 const PAGE_SIZE = 10
@@ -52,7 +54,15 @@ type SortKey =
   | 'score_high_low'
 
 type TenderStatus = TenderWithEvaluation['status']
-type RecommendationFilter = '' | 'qualified' | 'conditional' | 'excluded' | 'not_evaluated'
+type RecommendationFilter = '' | 'INVEST' | 'REVIEW' | 'SKIP' | 'not_evaluated'
+/** Normalize stored recommendation to display/filter value: INVEST / REVIEW / SKIP (legacy qualified/conditional/excluded mapped). */
+function normalizeRecommendation(rec: string | null | undefined): RecommendationFilter {
+  if (rec === 'INVEST' || rec === 'REVIEW' || rec === 'SKIP' || rec === 'not_evaluated') return rec
+  if (rec === 'qualified') return 'INVEST'
+  if (rec === 'conditional') return 'REVIEW'
+  if (rec === 'excluded') return 'SKIP'
+  return 'not_evaluated'
+}
 /** Per DASHBOARD_SPEC Section B: Deadline status filter */
 type DeadlineFilter = '' | 'closing_soon' | 'open' | 'past'
 
@@ -67,10 +77,11 @@ function formatDeadline(deadline: string | null, locale: string) {
   }
 }
 
-function formatValue(value: number | null): string {
+function formatValue(value: number | null, locale: string): string {
   if (value == null) return '—'
+  const numberLocale = locale === 'ar' ? 'ar-SA' : 'en'
   return (
-    new Intl.NumberFormat('ar-SA', {
+    new Intl.NumberFormat(numberLocale, {
       style: 'decimal',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
@@ -78,20 +89,12 @@ function formatValue(value: number | null): string {
   )
 }
 
-/** Get effective estimated value with estimation indicator */
-function getEffectiveValue(
-  originalValue: number | null | undefined,
-  predictedMin: number | null | undefined,
-  predictedMax: number | null | undefined
-): { value: number | null; isEstimated: boolean } {
-  if (originalValue != null) {
-    return { value: originalValue, isEstimated: false }
-  }
-  if (predictedMin != null && predictedMax != null) {
-    const midpoint = Math.round((predictedMin + predictedMax) / 2)
-    return { value: midpoint, isEstimated: true }
-  }
-  return { value: null, isEstimated: false }
+/** Score color for progress indicator: qualified green, conditional amber, excluded red */
+function getScoreColor(score: number | null | undefined): string {
+  if (score == null) return 'var(--surface-muted)'
+  if (score >= 70) return 'var(--color-qualified-text)'
+  if (score >= 40) return 'var(--color-conditional-text)'
+  return 'var(--color-excluded-text)'
 }
 
 function parseSortKey(key: SortKey): { by: 'created_at' | 'deadline' | 'score'; dir: 'asc' | 'desc' } {
@@ -114,13 +117,16 @@ function parseSortKey(key: SortKey): { by: 'created_at' | 'deadline' | 'score'; 
 interface TendersListClientProps {
   tenders: TenderWithEvaluation[]
   locale: string
+  /** When locale is 'en', server provides AI-translated entity/title map. */
+  translationMap?: Record<string, string> | null
 }
 
-export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+export function TendersListClient({ tenders, locale, translationMap = null }: TendersListClientProps) {
   const router = useRouter()
   const t = useTranslations('tendersList')
   const tDashboard = useTranslations('dashboard')
   const tStatuses = useTranslations('tender.statuses')
+  const tTender = useTranslations('tender')
   const tEval = useTranslations('evaluation')
 
   const [search, setSearch] = useState('')
@@ -180,7 +186,7 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
     let list = tenders.filter((tender) => {
       if (q && !(tender.entity?.toLowerCase().includes(q) || tender.title?.toLowerCase().includes(q) || tender.reference_no?.toLowerCase().includes(q))) return false
       if (statusFilter && tender.status !== statusFilter) return false
-      const rec = tender.evaluation?.recommendation ?? 'not_evaluated'
+      const rec = normalizeRecommendation(tender.evaluation?.recommendation ?? 'not_evaluated')
       if (recommendationFilter && rec !== recommendationFilter) return false
       const dStatus = getDeadlineStatus(tender.deadline)
       if (deadlineFilter && dStatus !== deadlineFilter) return false
@@ -221,10 +227,10 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
     let deadlinesNext7 = 0
     let deadlinesNext30 = 0
     for (const tender of filteredAndSorted) {
-      const rec = tender.evaluation?.recommendation ?? 'not_evaluated'
-      if (rec === 'qualified') qualified++
-      else if (rec === 'conditional') conditional++
-      else if (rec === 'excluded') excluded++
+      const rec = normalizeRecommendation(tender.evaluation?.recommendation ?? 'not_evaluated')
+      if (rec === 'INVEST') qualified++
+      else if (rec === 'REVIEW') conditional++
+      else if (rec === 'SKIP') excluded++
       else notEvaluated++
       const days = getDaysFromToday(tender.deadline)
       if (days != null && days >= 0 && days <= CLOSING_SOON_DAYS) deadlinesNext7++
@@ -270,9 +276,9 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
 
   const recommendationOptions: { value: RecommendationFilter; labelKey: string }[] = [
     { value: '', labelKey: 'allRecommendations' },
-    { value: 'qualified', labelKey: 'qualified' },
-    { value: 'conditional', labelKey: 'conditional' },
-    { value: 'excluded', labelKey: 'excluded' },
+    { value: 'INVEST', labelKey: 'invest' },
+    { value: 'REVIEW', labelKey: 'review' },
+    { value: 'SKIP', labelKey: 'skip' },
     { value: 'not_evaluated', labelKey: 'notEvaluated' },
   ]
 
@@ -304,6 +310,7 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
       {/* Section A: KPI row — derived from filtered list per DASHBOARD_DESIGN */}
       <DashboardKpiRow
           stats={kpiStats}
+          locale={locale}
           labels={{
             total: t('kpiTotal'),
             qualified: t('kpiQualified'),
@@ -315,10 +322,12 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
           }}
         />
 
-        {/* Section B: Filters row — search, recommendation, deadline, sort per DASHBOARD_SPEC */}
-        <Flex direction="column" gap="3">
-          <Flex gap="4" wrap="wrap" align="center">
+        {/* Section B: Filters — card with grouped controls */}
+        <Card className="filters-container">
+          <Flex direction="column" gap="4">
             <TextField.Root
+              size="3"
+              className="search-input"
               aria-label={t('searchPlaceholder')}
               placeholder={t('searchPlaceholder')}
               value={search}
@@ -326,116 +335,149 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
                 setSearch(e.target.value)
                 setPage(1)
               }}
-              style={{ minWidth: 200, maxWidth: 320 }}
-            />
-            <Select.Root
-              value={recommendationFilter || 'all'}
-              onValueChange={(v) => {
-                setRecommendationFilter((v === 'all' ? '' : v) as RecommendationFilter)
-                setPage(1)
-              }}
+              style={{ minWidth: 200, maxWidth: 400 }}
             >
-              <Select.Trigger aria-label={t('recommendation')} placeholder={t('recommendation')} style={{ minWidth: 160 }} />
-              <Select.Content>
-                {recommendationOptions.map((opt) => (
-                  <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
-                    {opt.value === '' ? t('allRecommendations') : opt.labelKey === 'notEvaluated' ? tEval('notEvaluated') : tEval(opt.labelKey as 'qualified' | 'conditional' | 'excluded')}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
-            <Select.Root
-              value={deadlineFilter || 'all'}
-              onValueChange={(v) => {
-                setDeadlineFilter((v === 'all' ? '' : v) as DeadlineFilter)
-                setPage(1)
-              }}
-            >
-              <Select.Trigger aria-label={t('deadline')} placeholder={t('deadline')} style={{ minWidth: 140 }} />
-              <Select.Content>
-                {deadlineOptions.map((opt) => (
-                  <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
-                    {t(opt.labelKey)}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
-            <Select.Root
-              value={statusFilter || 'all'}
-              onValueChange={(v) => {
-                setStatusFilter((v === 'all' ? '' : v) as TenderStatus | '')
-                setPage(1)
-              }}
-            >
-              <Select.Trigger aria-label={t('status')} placeholder={t('status')} style={{ minWidth: 120 }} />
-              <Select.Content>
-                {statusOptions.map((opt) => (
-                  <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
-                    {opt.value === '' ? t('allStatuses') : tStatuses(opt.labelKey as TenderStatus)}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
-            <Flex align="center" gap="2">
-              <Text size="2" style={{ color: 'var(--text-secondary)' }}>
-                {t('sortBy')}
-              </Text>
-              <Select.Root value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-                <Select.Trigger aria-label={t('sortBy')} style={{ minWidth: 180 }} />
-                <Select.Content>
-                  {sortOptions.map((opt) => (
-                    <Select.Item key={opt.value} value={opt.value}>
-                      {t(opt.labelKey)}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
+              <TextField.Slot>
+                <Search size={18} className="filter-icon" />
+              </TextField.Slot>
+            </TextField.Root>
+            <Flex gap="3" wrap="wrap" align="center">
+              <Flex gap="2" align="center" className="filter-group">
+                <Filter size={14} className="filter-icon" />
+                <Select.Root
+                  value={recommendationFilter || 'all'}
+                  onValueChange={(v) => {
+                    setRecommendationFilter((v === 'all' ? '' : v) as RecommendationFilter)
+                    setPage(1)
+                  }}
+                >
+                  <Select.Trigger aria-label={t('recommendation')} placeholder={t('recommendation')} style={{ minWidth: 160 }} />
+                  <Select.Content>
+                    {recommendationOptions.map((opt) => (
+                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+                        {opt.value === '' ? t('allRecommendations') : opt.labelKey === 'notEvaluated' ? tEval('notEvaluated') : tEval(opt.labelKey as 'invest' | 'review' | 'skip')}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+                <Select.Root
+                  value={deadlineFilter || 'all'}
+                  onValueChange={(v) => {
+                    setDeadlineFilter((v === 'all' ? '' : v) as DeadlineFilter)
+                    setPage(1)
+                  }}
+                >
+                  <Select.Trigger aria-label={t('deadline')} placeholder={t('deadline')} style={{ minWidth: 140 }} />
+                  <Select.Content>
+                    {deadlineOptions.map((opt) => (
+                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+                        {t(opt.labelKey)}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+                <Select.Root
+                  value={statusFilter || 'all'}
+                  onValueChange={(v) => {
+                    setStatusFilter((v === 'all' ? '' : v) as TenderStatus | '')
+                    setPage(1)
+                  }}
+                >
+                  <Select.Trigger aria-label={t('status')} placeholder={t('status')} style={{ minWidth: 120 }} />
+                  <Select.Content>
+                    {statusOptions.map((opt) => (
+                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+                        {opt.value === '' ? t('allStatuses') : tStatuses(opt.labelKey as TenderStatus)}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </Flex>
+              <Box className="filter-divider" />
+              <Flex gap="2" align="center" className="filter-group">
+                <ArrowUpDown size={14} className="filter-icon" />
+                <Select.Root value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+                  <Select.Trigger aria-label={t('sortBy')} style={{ minWidth: 180 }} />
+                  <Select.Content>
+                    {sortOptions.map((opt) => (
+                      <Select.Item key={opt.value} value={opt.value}>
+                        {t(opt.labelKey)}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </Flex>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
+                  <X size={14} style={{ marginInlineEnd: 4 }} />
+                  {t('clearFilters')}
+                </Button>
+              )}
             </Flex>
-            {hasActiveFilters && (
-              <Button variant="soft" color="gray" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
-                {t('clearFilters')}
-              </Button>
-            )}
           </Flex>
-        </Flex>
+        </Card>
 
-        {/* Evaluation actions: select tenders and run analysis */}
-        <Flex gap="3" align="center" wrap="wrap">
-          <Button
-            size="2"
-            variant="soft"
-            disabled={evaluating || pageItems.length === 0}
-            onClick={selectAllOnPage}
-            aria-label={t('selectAllOnPage')}
-          >
-            {t('selectAllOnPage')}
-          </Button>
-          {selectedIds.size > 0 && (
-            <Button size="2" variant="soft" color="gray" onClick={clearSelection} aria-label={t('clearSelection')}>
-              {t('clearSelection')} ({selectedIds.size})
+        {/* Bulk actions bar — sticky when items selected */}
+        {selectedIds.size > 0 && (
+          <Card className="bulk-actions-bar">
+            <Flex justify="between" align="center">
+              <Flex gap="3" align="center">
+                <Checkbox
+                  checked={pageItems.length > 0 && pageItems.every((t) => selectedIds.has(t.id))}
+                  onCheckedChange={(checked) => {
+                    if (checked) selectAllOnPage()
+                    else clearSelection()
+                  }}
+                  aria-label={t('selectAllOnPage')}
+                />
+                <Text size="2" weight="medium">
+                  {t('selectedCount', { count: selectedIds.size })}
+                </Text>
+                <Button variant="ghost" size="1" onClick={clearSelection} aria-label={t('clearSelection')}>
+                  {t('clearSelection')}
+                </Button>
+              </Flex>
+              <Flex gap="2">
+                <Button
+                  size="2"
+                  disabled={evaluating}
+                  onClick={handleEvaluateSelected}
+                  className="evaluate-btn"
+                  aria-label={tDashboard('evaluateSelected')}
+                >
+                  <Sparkles size={16} style={{ marginInlineEnd: 6 }} />
+                  {evaluateProgress
+                    ? tDashboard('evaluatingCount', { current: evaluateProgress.current, total: evaluateProgress.total })
+                    : tDashboard('evaluateSelected')}
+                </Button>
+              </Flex>
+            </Flex>
+          </Card>
+        )}
+
+        {/* Evaluation actions: select all, evaluate all (when no selection) */}
+        {selectedIds.size === 0 && (
+          <Flex gap="3" align="center" wrap="wrap">
+            <Button
+              size="2"
+              variant="soft"
+              disabled={evaluating || pageItems.length === 0}
+              onClick={selectAllOnPage}
+              aria-label={t('selectAllOnPage')}
+            >
+              {t('selectAllOnPage')}
             </Button>
-          )}
-          <Button
-            size="2"
-            disabled={evaluating || selectedIds.size === 0}
-            onClick={handleEvaluateSelected}
-            aria-label={tDashboard('evaluateSelected')}
-          >
-            <Sparkles size={16} style={{ marginInlineEnd: 6 }} />
-            {evaluateProgress
-              ? tDashboard('evaluatingCount', { current: evaluateProgress.current, total: evaluateProgress.total })
-              : tDashboard('evaluateSelected')}
-          </Button>
-          <Button
-            size="2"
-            variant="soft"
-            disabled={evaluating}
-            onClick={handleEvaluateAllPending}
-            aria-label={tDashboard('evaluateAll')}
-          >
-            {evaluating && !evaluateProgress ? tDashboard('evaluating') : tDashboard('evaluateAll')}
-          </Button>
-        </Flex>
+            <Button
+              size="2"
+              variant="soft"
+              disabled={evaluating}
+              onClick={handleEvaluateAllPending}
+              aria-label={tDashboard('evaluateAll')}
+            >
+              {evaluating ? tDashboard('evaluating') : tDashboard('evaluateAll')}
+            </Button>
+          </Flex>
+        )}
 
         {/* Section C: Tenders table — sticky header, numeric right-align per DASHBOARD_DESIGN */}
         <Box
@@ -493,7 +535,7 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
                 return (
                 <Table.Row
                   key={tender.id}
-                  className="dashboard-tender-row"
+                  className="dashboard-tender-row tender-row"
                   style={{ cursor: 'pointer' }}
                   onClick={() => router.push(detailHref)}
                 >
@@ -506,13 +548,13 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
                   </Table.Cell>
                   <Table.Cell style={{ minWidth: 0, maxWidth: 160 }}>
                     <Text size="2" style={{ color: 'var(--gray-11)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                      {tender.entity ?? '—'}
+                      {getDisplayText(tender.entity, locale, translationMap) || '—'}
                     </Text>
                   </Table.Cell>
                   <Table.Cell style={{ minWidth: 0, maxWidth: 240 }}>
                     <NextLink href={detailHref} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none' }}>
                       <Text size="2" weight="medium" style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                        {tender.title ?? '—'}
+                        {getDisplayText(tender.title, locale, translationMap) || '—'}
                       </Text>
                     </NextLink>
                   </Table.Cell>
@@ -539,55 +581,81 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
                   </Table.Cell>
                   <Table.Cell className="dashboard-table-numeric">
                     {(() => {
-                      const effectiveValue = getEffectiveValue(
+                      const effectiveValue = getEffectiveValueDisplay(
                         tender.estimated_value,
                         tender.evaluation?.predicted_budget_min,
                         tender.evaluation?.predicted_budget_max
                       )
-                      return effectiveValue.isEstimated ? (
-                        <Text size="2" style={{ color: 'var(--amber-11)' }}>
-                          ~{formatValue(effectiveValue.value)}
-                        </Text>
-                      ) : (
-                        <Text size="2" style={{ color: 'var(--text-secondary)' }}>
-                          {formatValue(effectiveValue.value)}
-                        </Text>
+                      const hasValue = effectiveValue.value != null && formatValue(effectiveValue.value, locale) !== '—'
+                      return (
+                        <Flex gap="2" align="center" wrap="wrap">
+                          {effectiveValue.isEstimated ? (
+                            <Text size="2" style={{ color: 'var(--amber-11)' }}>
+                              ~{formatValue(effectiveValue.value, locale)}
+                            </Text>
+                          ) : (
+                            <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+                              {formatValue(effectiveValue.value, locale)}
+                            </Text>
+                          )}
+                          {effectiveValue.isEstimated && (
+                            <Badge size="1" variant="soft" color="amber" style={{ fontWeight: 500, fontSize: '0.65rem' }}>
+                              {tTender('estimated')}
+                            </Badge>
+                          )}
+                          {!effectiveValue.isEstimated && hasValue && (
+                            <Badge size="1" variant="soft" color="green" style={{ fontWeight: 500, fontSize: '0.65rem' }}>
+                              {tTender('provided')}
+                            </Badge>
+                          )}
+                        </Flex>
                       )
                     })()}
                   </Table.Cell>
-                  <Table.Cell className="dashboard-table-numeric">
-                    <Text size="2" weight="medium">
-                      {tender.evaluation != null ? String(Math.round(Math.min(100, Math.max(0, Number(tender.evaluation.score))))) : '—'}
-                    </Text>
+                  <Table.Cell className="dashboard-table-numeric score-cell">
+                    {tender.evaluation != null ? (
+                      <Flex direction="column" gap="1" align="end">
+                        <Flex gap="2" align="center" style={{ width: '100%', minWidth: 64 }}>
+                          <Box className="score-indicator" style={{ flex: 1 }}>
+                            <Box
+                              className="score-indicator-fill"
+                              style={{
+                                width: `${Math.min(100, Math.max(0, Number(tender.evaluation.score)))}%`,
+                                backgroundColor: getScoreColor(tender.evaluation?.score ?? null),
+                              }}
+                            />
+                          </Box>
+                          <Text size="2" className="score-value" style={{ color: getScoreColor(tender.evaluation?.score ?? null), minWidth: 24 }}>
+                            {Math.round(Math.min(100, Math.max(0, Number(tender.evaluation.score))))}
+                          </Text>
+                        </Flex>
+                      </Flex>
+                    ) : (
+                      <Text size="2" style={{ color: 'var(--text-tertiary)' }}>—</Text>
+                    )}
                   </Table.Cell>
                     <Table.Cell>
-                      <Badge
-                        size="1"
-                        style={{
-                          backgroundColor: tender.evaluation
-                            ? tender.evaluation.recommendation === 'qualified'
-                              ? 'var(--color-qualified-bg)'
-                              : tender.evaluation.recommendation === 'conditional'
-                                ? 'var(--color-conditional-bg)'
-                                : 'var(--color-excluded-bg)'
-                            : 'var(--gray-a3)',
-                          color: tender.evaluation
-                            ? tender.evaluation.recommendation === 'qualified'
-                              ? 'var(--color-qualified-text)'
-                              : tender.evaluation.recommendation === 'conditional'
-                                ? 'var(--color-conditional-text)'
-                                : 'var(--color-excluded-text)'
-                            : 'var(--gray-11)',
-                        }}
-                      >
-                        {tender.evaluation
-                          ? tender.evaluation.recommendation === 'qualified'
-                            ? tEval('qualified')
-                            : tender.evaluation.recommendation === 'conditional'
-                              ? tEval('conditional')
-                              : tEval('excluded')
-                          : tEval('notEvaluated')}
-                      </Badge>
+                      {(() => {
+                        const recNorm = normalizeRecommendation(tender.evaluation?.recommendation)
+                        const isInvest = recNorm === 'INVEST'
+                        const isReview = recNorm === 'REVIEW'
+                        const isSkip = recNorm === 'SKIP'
+                        return (
+                          <Badge
+                            size="1"
+                            style={{
+                              backgroundColor: tender.evaluation
+                                ? isInvest ? 'var(--color-qualified-bg)' : isReview ? 'var(--color-conditional-bg)' : isSkip ? 'var(--color-excluded-bg)' : 'var(--gray-a3)'
+                                : 'var(--gray-a3)',
+                              color: tender.evaluation
+                                ? isInvest ? 'var(--color-qualified-text)' : isReview ? 'var(--color-conditional-text)' : isSkip ? 'var(--color-excluded-text)' : 'var(--gray-11)'
+                                : 'var(--gray-11)',
+                            }}
+                          >
+                            {tender.evaluation ? tEval(recNorm === 'INVEST' ? 'invest' : recNorm === 'REVIEW' ? 'review' : recNorm === 'SKIP' ? 'skip' : 'notEvaluated') : tEval('notEvaluated')}
+                          </Badge>
+                        )
+                      })()}
                     </Table.Cell>
                     <Table.Cell>
                       <Badge size="1" color="gray" variant="soft">

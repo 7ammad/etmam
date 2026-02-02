@@ -82,7 +82,7 @@ export interface Database {
           updated_at: string
           tender_id: string
           score: number
-          recommendation: 'qualified' | 'conditional' | 'excluded'
+          recommendation: 'qualified' | 'conditional' | 'excluded' | 'INVEST' | 'REVIEW' | 'SKIP'
           summary: string
           strengths: string[] | null
           risks: string[] | null
@@ -101,7 +101,7 @@ export interface Database {
           updated_at?: string
           tender_id: string
           score: number
-          recommendation: 'qualified' | 'conditional' | 'excluded'
+          recommendation: 'qualified' | 'conditional' | 'excluded' | 'INVEST' | 'REVIEW' | 'SKIP'
           summary: string
           strengths?: string[] | null
           risks?: string[] | null
@@ -120,7 +120,7 @@ export interface Database {
           updated_at?: string
           tender_id?: string
           score?: number
-          recommendation?: 'qualified' | 'conditional' | 'excluded'
+          recommendation?: 'qualified' | 'conditional' | 'excluded' | 'INVEST' | 'REVIEW' | 'SKIP'
           summary?: string
           strengths?: string[] | null
           risks?: string[] | null

@@ -1,11 +1,15 @@
+import { Suspense } from 'react'
 import { getTenders } from '@/lib/queries/tender'
 import type { TenderWithEvaluation } from '@/lib/queries/tender'
 import { getServerT } from '@/lib/i18n'
 import type { Locale } from '@/lib/i18n'
 import { ErrorState } from '@/components/dashboard/error-state'
 import { TendersListClient } from '@/components/dashboard/tenders-list-client'
+import { TendersListTranslated } from '@/components/dashboard/tenders-list-translated'
+import { TendersListSkeleton } from '@/components/dashboard/tenders-list-skeleton'
 import { ExportOdooCard } from '@/components/dashboard/export-odoo-card'
 import { ScrapeActionsCard } from '@/components/dashboard/scrape-actions-card'
+import { UploadTenderTrigger } from '@/components/dashboard/upload-tender-trigger'
 import { UploadTenderForm } from '@/components/dashboard/upload-tender-form'
 import { Container, Flex, Box, Text } from '@radix-ui/themes'
 import { FileSearch } from 'lucide-react'
@@ -30,20 +34,26 @@ export default async function DashboardPage({ params }: Props) {
   }
 
   return (
-    <Container size="4" py="6">
+    <Container size="4" py="6" className="dashboard-page">
       <Flex direction="column" gap="6">
-        {/* Top: page title — primary task per DASHBOARD_DESIGN */}
-        <h1 style={{ margin: 0 }}>
-          <Text size="6" weight="bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-latin)' }}>
-            {t('pageTitle')}
+        {/* Hero: primary task per DASHBOARD_DESIGN */}
+        <header className="dashboard-hero">
+          <h1 style={{ margin: 0 }}>
+            <Text size="8" weight="bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-latin)', letterSpacing: '-0.02em' }}>
+              {t('pageTitle')}
+            </Text>
+          </h1>
+          <Text size="2" style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
+            {t('pageSubtitle')}
           </Text>
-        </h1>
+        </header>
 
-        {/* Tools row: scrape + export — secondary, compact */}
-        <Flex gap="4" wrap="wrap" align="stretch">
+        {/* Tools strip: scrape + export + upload — single row, compact */}
+        <section className="dashboard-tools-strip" aria-label={t('toolsLabel')}>
           <ScrapeActionsCard locale={locale} />
           <ExportOdooCard locale={locale} />
-        </Flex>
+          <UploadTenderTrigger locale={locale} />
+        </section>
 
         {tenders.length === 0 ? (
           <Flex
@@ -75,8 +85,12 @@ export default async function DashboardPage({ params }: Props) {
             </Flex>
             <UploadTenderForm locale={locale} />
           </Flex>
+        ) : locale === 'en' ? (
+          <Suspense fallback={<TendersListSkeleton />}>
+            <TendersListTranslated tenders={tenders} locale={locale} />
+          </Suspense>
         ) : (
-          <TendersListClient tenders={tenders} locale={locale} />
+          <TendersListClient tenders={tenders} locale={locale} translationMap={null} />
         )}
       </Flex>
     </Container>

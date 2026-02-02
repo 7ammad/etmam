@@ -94,7 +94,7 @@ export function UploadTenderForm({ onSuccess, locale = 'en' }: UploadTenderFormP
 
         {/* Success state */}
         {state === 'success' && result && (
-          <Flex direction="column" gap="3" align="center" py="4">
+          <Flex direction="column" gap="3" align="center" py="4" data-testid="upload-success">
             <CheckCircle style={{ width: 40, height: 40, color: 'var(--green-11)' }} />
             <Text size="3" weight="bold" style={{ color: 'var(--green-11)' }}>
               {t('success')}
@@ -153,7 +153,7 @@ export function UploadTenderForm({ onSuccess, locale = 'en' }: UploadTenderFormP
 
         {/* Uploading state */}
         {state === 'uploading' && (
-          <Flex direction="column" gap="3" align="center" py="4">
+          <Flex direction="column" gap="3" align="center" py="4" data-testid="upload-processing">
             <Loader2 className="animate-spin" style={{ width: 40, height: 40, color: 'var(--color-primary-600)' }} />
             <Text size="3" weight="bold" style={{ color: 'var(--text-primary)' }}>
               {t('processing')}
@@ -170,6 +170,7 @@ export function UploadTenderForm({ onSuccess, locale = 'en' }: UploadTenderFormP
         {(state === 'idle' || state === 'dragover') && (
           <Box
             {...getRootProps()}
+            data-testid="upload-tender-dropzone"
             style={{
               padding: 'var(--space-6)',
               borderRadius: 'var(--radius-3)',

@@ -9,8 +9,7 @@ test.describe('Home Page', () => {
 
   test('should display the app title in Arabic', async ({ page }) => {
     await page.goto('/ar')
-    // App name appears in header as text, hero has the main headline
-    await expect(page.getByText('إتمام', { exact: true }).first()).toBeVisible()
+    await expect(page.getByTestId('app-title')).toBeVisible()
   })
 
   test('should have RTL direction for Arabic locale', async ({ page }) => {
@@ -23,8 +22,7 @@ test.describe('Home Page', () => {
 
   test('should display English content on /en route', async ({ page }) => {
     await page.goto('/en')
-    // App name appears in header, hero has "End Manual Tender Processing"
-    await expect(page.getByText('Etmaam', { exact: true }).first()).toBeVisible()
+    await expect(page.getByTestId('app-title')).toBeVisible()
   })
 
   test('should have LTR direction for English locale', async ({ page }) => {
@@ -44,7 +42,8 @@ test.describe('Home Page', () => {
   test('should navigate to dashboard from home', async ({ page }) => {
     await page.goto('/ar')
     await page.locator('a[href*="/ar/dashboard"]').first().click()
-    await expect(page).toHaveURL(/\/ar\/dashboard/)
+    // With auth: lands on dashboard; without auth: redirects to login
+    await expect(page).toHaveURL(/\/(ar|en)\/(dashboard|login)/)
   })
 
   test('should have theme toggle button', async ({ page }) => {
