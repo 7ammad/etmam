@@ -19,6 +19,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { toSar } from '@/lib/currency'
 import { runFeedDashboardTranslations } from '@/lib/feed-dashboard-translations'
 import { recalculateCalibration } from '@/lib/evaluation/calibration-service'
+import { summarizeEntitiesBatch, summarizeTitlesBatch } from '@/lib/ai/summarize'
+import { isAIConfigured } from '@/lib/ai/client'
 import { scrapedTenderSchema } from '@/types/scraper'
 import type { SyncPayload, SyncResponse, ScrapedTender } from '@/types/scraper'
 import type { Database, Json } from '@/types/database'
@@ -69,8 +71,16 @@ function verifyCronSecret(request: NextRequest): boolean {
 /**
  * Convert a ScrapedTender to the database format.
  * All scraped information (including every tab and award fields) is stored in raw_data under this tender.
+ *
+ * @param tender - The scraped tender data
+ * @param entityEnMap - Optional map of Arabic entity → English entity_en (from AI)
+ * @param titleEnMap - Optional map of Arabic title → English title_en (from AI)
  */
-function tenderToDbFormat(tender: ScrapedTender): TenderInsert {
+function tenderToDbFormat(
+  tender: ScrapedTender,
+  entityEnMap?: Record<string, string>,
+  titleEnMap?: Record<string, string>
+): TenderInsert {
   // Normalize money fields from halala to SAR at ingest (100x bug fix)
   const estimated_value =
     tender.estimated_value != null ? toSar(tender.estimated_value, 'estimated_value') : null
@@ -99,6 +109,9 @@ function tenderToDbFormat(tender: ScrapedTender): TenderInsert {
       ...tender,
       tab_sections: tender.tab_sections,
     } as Json,
+    // English translations (populated by AI at sync time, used for English locale display)
+    entity_en: entityEnMap?.[tender.entity] ?? null,
+    title_en: titleEnMap?.[tender.title] ?? null,
   }
 }
 
@@ -196,9 +209,41 @@ export async function POST(request: NextRequest) {
     // Create Supabase service client (bypasses RLS)
     const supabase = createServiceClient()
 
+    // Extract unique entities and titles for batch translation
+    const uniqueEntities = [...new Set(validatedTenders.map((t) => t.entity).filter(Boolean))]
+    const uniqueTitles = [...new Set(validatedTenders.map((t) => t.title).filter(Boolean))]
+
+    // Translate entities and titles to English (if AI is configured)
+    // These are stored directly on the tender record for fast English locale display
+    let entityEnMap: Record<string, string> = {}
+    let titleEnMap: Record<string, string> = {}
+    let translationStats = { entities: 0, titles: 0 }
+
+    if (isAIConfigured()) {
+      console.log(`[Sync API] Translating ${uniqueEntities.length} entities and ${uniqueTitles.length} titles via AI`)
+      try {
+        const [entityResults, titleResults] = await Promise.all([
+          summarizeEntitiesBatch(uniqueEntities),
+          summarizeTitlesBatch(uniqueTitles),
+        ])
+        entityEnMap = entityResults
+        titleEnMap = titleResults
+        translationStats = {
+          entities: Object.keys(entityResults).length,
+          titles: Object.keys(titleResults).length,
+        }
+        console.log(`[Sync API] Translated ${translationStats.entities} entities, ${translationStats.titles} titles`)
+      } catch (translationErr) {
+        console.warn('[Sync API] AI translation failed (non-fatal, will use fallback):', translationErr)
+      }
+    } else {
+      console.log('[Sync API] AI not configured, skipping inline translation (fallback will be used)')
+    }
+
     // Convert all tenders to DB format (React Best Practice 1.4: batch operations)
     // Using validatedTenders ensures type safety after Zod validation
-    const dbTenders = validatedTenders.map((tender) => tenderToDbFormat(tender))
+    // Pass translation maps to populate entity_en and title_en fields
+    const dbTenders = validatedTenders.map((tender) => tenderToDbFormat(tender, entityEnMap, titleEnMap))
 
     // Batch upsert all tenders at once (Postgres Best Practice 6.1: Batch INSERT)
     // This is 10-50x faster than sequential upserts

@@ -570,6 +570,33 @@
     "viewDocumentation": "View Documentation",
     "contactSupport": "Contact Support"
   },
+  "analysis": {
+    "pageTitle": "Market Analysis",
+    "subtitle": "{count} historic tenders analyzed",
+    "kpi": {
+      "totalAwarded": "Total Awarded Value",
+      "uniqueCompetitors": "Unique Competitors",
+      "avgAward": "Average Award",
+      "historicTenders": "Historic Tenders"
+    },
+    "competitors": {
+      "title": "Top Competitors",
+      "rank": "Rank",
+      "bidder": "Bidder",
+      "wins": "Wins",
+      "totalValue": "Total Value",
+      "avgValue": "Avg Value",
+      "lastWin": "Last Win"
+    },
+    "charts": {
+      "winsByBidder": "Wins by Bidder",
+      "trendsOverTime": "Award Trends Over Time"
+    },
+    "empty": {
+      "title": "No historic data yet",
+      "guidance": "Load historic tenders to see market analysis."
+    }
+  },
   "landing": {
     "tagline": "From Etimad to CRM in seconds",
     "subtitle": "Intelligent evaluation and automatic opportunity creation",

@@ -30,6 +30,10 @@ export interface Database {
           award_amount_sar: number | null
           award_date: string | null
           winning_bidder: string | null
+          deleted_at: string | null
+          is_protected: boolean | null
+          entity_en: string | null
+          title_en: string | null
         }
         Insert: {
           id?: string
@@ -51,6 +55,10 @@ export interface Database {
           award_amount_sar?: number | null
           award_date?: string | null
           winning_bidder?: string | null
+          deleted_at?: string | null
+          is_protected?: boolean | null
+          entity_en?: string | null
+          title_en?: string | null
         }
         Update: {
           id?: string
@@ -72,6 +80,10 @@ export interface Database {
           award_amount_sar?: number | null
           award_date?: string | null
           winning_bidder?: string | null
+          deleted_at?: string | null
+          is_protected?: boolean | null
+          entity_en?: string | null
+          title_en?: string | null
         }
         Relationships: []
       }

@@ -11,6 +11,11 @@ interface ScrapeStatus {
   status: 'idle' | 'running' | 'completed' | 'failed'
   message?: string
   error?: string
+  percent?: number
+  phase?: 'initializing' | 'collecting' | 'scraping' | 'syncing'
+  tendersScraped?: number
+  tendersTotal?: number
+  urlsCollected?: number
 }
 
 const POLL_INTERVAL_MS = 2000
@@ -130,6 +135,8 @@ export function CommandCenter({ locale: _locale = 'en' }: { locale?: string }) {
 
   const running = scrapeStatus.status === 'running'
   const disabledScrape = running || syncing
+  const progressPercent = scrapeStatus.percent ?? 0
+  const progressMessage = scrapeStatus.message ?? (running ? tScrape('running') : '')
 
   return (
     <section
@@ -196,7 +203,7 @@ export function CommandCenter({ locale: _locale = 'en' }: { locale?: string }) {
                     gap: 4,
                   }}
                 >
-                  <RefreshCw size={18} style={{ opacity: running ? 0.7 : 1 }} />
+                  <RefreshCw size={18} style={{ opacity: running ? 0.7 : 1 }} className={running ? 'animate-spin' : ''} />
                   <Text size="1" weight="medium">{tDM('active')}</Text>
                 </Button>
                 <Button
@@ -220,6 +227,48 @@ export function CommandCenter({ locale: _locale = 'en' }: { locale?: string }) {
                   <FileUp size={18} />
                   <Text size="1" weight="medium">{tDM('historic')}</Text>
                 </Button>
+                {/* Progress indicator when running */}
+                {running && (
+                  <Box
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: 56,
+                      padding: '0 8px',
+                    }}
+                  >
+                    <Text
+                      size="4"
+                      weight="bold"
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        color: 'var(--amber-11)',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {progressPercent}%
+                    </Text>
+                    <Text
+                      size="1"
+                      style={{
+                        color: 'var(--text-tertiary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: 80,
+                      }}
+                      title={progressMessage}
+                    >
+                      {scrapeStatus.tendersScraped != null && scrapeStatus.tendersTotal != null
+                        ? `${scrapeStatus.tendersScraped}/${scrapeStatus.tendersTotal}`
+                        : scrapeStatus.phase === 'collecting'
+                          ? `${scrapeStatus.urlsCollected ?? 0} URLs`
+                          : progressMessage.slice(0, 12)}
+                    </Text>
+                  </Box>
+                )}
                 <Box style={{ marginLeft: 'auto', flexShrink: 0 }}>
                   <Button
                     size="2"

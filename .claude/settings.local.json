@@ -34,7 +34,12 @@
       "Bash(node -e:*)",
       "Bash(pnpm test)",
       "Bash(pnpm scrape:run:*)",
-      "WebFetch(domain:dribbble.com)"
+      "WebFetch(domain:dribbble.com)",
+      "Bash(pnpm lint:*)",
+      "Bash(del \"c:\\\\Dev\\\\Builds\\\\etmam-app\\\\components\\\\dashboard\\\\dual-track-visualization.tsx\" \"c:\\\\Dev\\\\Builds\\\\etmam-app\\\\components\\\\dashboard\\\\ai-price-intelligence.tsx\")",
+      "Bash(set \"PGPASSWORD=postgres\")",
+      "Bash(psql:*)",
+      "Bash(find:*)"
     ]
   }
 }

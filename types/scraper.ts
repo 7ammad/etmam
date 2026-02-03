@@ -70,6 +70,30 @@ export interface ActivityFilter {
 }
 
 /**
+ * Progress callback for real-time scraping updates
+ */
+export interface ScrapeProgress {
+  /** Current phase: 'initializing' | 'collecting' | 'scraping' | 'syncing' */
+  phase: 'initializing' | 'collecting' | 'scraping' | 'syncing'
+  /** Human-readable message */
+  message: string
+  /** Progress percentage (0-100) */
+  percent: number
+  /** Number of URLs collected so far */
+  urlsCollected?: number
+  /** Total URLs to scrape */
+  urlsTotal?: number
+  /** Number of tenders scraped so far */
+  tendersScraped?: number
+  /** Number of tenders to scrape */
+  tendersTotal?: number
+  /** Current page number (during collection) */
+  currentPage?: number
+}
+
+export type ProgressCallback = (progress: ScrapeProgress) => void
+
+/**
  * Scraper configuration
  */
 export interface ScraperConfig {
@@ -93,6 +117,8 @@ export interface ScraperConfig {
   mode?: 'active' | 'historical'
   /** Optional: items per page on list (6, 12, 18, 24). Default: 24 for historical, 6 for active. */
   listPageSize?: 6 | 12 | 18 | 24
+  /** Optional: progress callback for real-time updates */
+  onProgress?: ProgressCallback
 }
 
 /**

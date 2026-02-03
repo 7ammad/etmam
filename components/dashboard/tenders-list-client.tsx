@@ -13,7 +13,7 @@ import { ar, enUS } from 'date-fns/locale'
 import { DashboardKpiRow, type DashboardKpiStats } from './dashboard-kpi-row'
 import { TenderIngestionStrip } from './tender-ingestion-strip'
 import { UploadTenderTrigger } from './upload-tender-trigger'
-import { getDisplayText } from '@/lib/translate-display'
+import { getDisplayEntity, getDisplayTitle, getDisplayText } from '@/lib/translate-display'
 import { getEffectiveValueDisplay } from '@/lib/display-ev'
 import { trackFilterChange } from '@/lib/analytics'
 import { runEvaluationAction } from '@/actions/evaluation'
@@ -807,13 +807,13 @@ export function TendersListClient({
                   <Table.Cell className="dashboard-td-title">
                     <NextLink href={detailHref} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none' }}>
                       <Text size="2" weight="medium" style={{ color: 'var(--text-primary)', display: 'block' }}>
-                        {maxWords(getDisplayText(tender.title ?? '', locale, titleSummaryMap ?? translationMap) || '—', 5)}
+                        {maxWords(getDisplayTitle(tender.title, tender.title_en, locale, titleSummaryMap ?? translationMap) || '—', 5)}
                       </Text>
                     </NextLink>
                   </Table.Cell>
                   <Table.Cell className="dashboard-td-entity">
                     <Text size="2" style={{ color: 'var(--gray-11)', display: 'block' }}>
-                      {getDisplayText(tender.entity ?? '', locale, entitySummaryMap ?? translationMap) || '—'}
+                      {getDisplayEntity(tender.entity, tender.entity_en, locale, entitySummaryMap ?? translationMap) || '—'}
                     </Text>
                   </Table.Cell>
                   <Table.Cell className="dashboard-td-deadline">
@@ -936,7 +936,7 @@ export function TendersListClient({
                     <Flex justify="between" align="start" gap="2">
                       <NextLink href={detailHref} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none', flex: 1, minWidth: 0 }}>
                         <Text size="2" weight="medium" style={{ color: 'var(--text-primary)' }}>
-                          {maxWords(getDisplayText(tender.title ?? '', locale, titleSummaryMap ?? translationMap) || '—', 8)}
+                          {maxWords(getDisplayTitle(tender.title, tender.title_en, locale, titleSummaryMap ?? translationMap) || '—', 8)}
                         </Text>
                       </NextLink>
                       <Checkbox
@@ -947,7 +947,7 @@ export function TendersListClient({
                       />
                     </Flex>
                     <Text size="1" style={{ color: 'var(--gray-11)' }}>
-                      {getDisplayText(tender.entity ?? '', locale, entitySummaryMap ?? translationMap) || '—'}
+                      {getDisplayEntity(tender.entity, tender.entity_en, locale, entitySummaryMap ?? translationMap) || '—'}
                     </Text>
                     <Flex justify="between" align="center" wrap="wrap" gap="2">
                       <Text size="1" style={{ color: 'var(--text-secondary)' }}>{formatDeadline(tender.deadline, locale)}</Text>

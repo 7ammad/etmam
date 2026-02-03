@@ -570,6 +570,33 @@
     "viewDocumentation": "عرض التوثيق",
     "contactSupport": "الاتصال بالدعم"
   },
+  "analysis": {
+    "pageTitle": "تحليل السوق",
+    "subtitle": "{count} منافسة تاريخية تم تحليلها",
+    "kpi": {
+      "totalAwarded": "إجمالي القيمة الممنوحة",
+      "uniqueCompetitors": "المنافسون الفريدون",
+      "avgAward": "متوسط قيمة الترسية",
+      "historicTenders": "المنافسات التاريخية"
+    },
+    "competitors": {
+      "title": "أفضل المنافسين",
+      "rank": "الترتيب",
+      "bidder": "المتقدم",
+      "wins": "الفوز",
+      "totalValue": "القيمة الإجمالية",
+      "avgValue": "متوسط القيمة",
+      "lastWin": "آخر فوز"
+    },
+    "charts": {
+      "winsByBidder": "الفوز حسب المتقدم",
+      "trendsOverTime": "اتجاهات الترسية عبر الزمن"
+    },
+    "empty": {
+      "title": "لا توجد بيانات تاريخية بعد",
+      "guidance": "قم بتحميل المنافسات التاريخية لرؤية تحليل السوق."
+    }
+  },
   "landing": {
     "tagline": "من اعتماد إلى CRM في ثوانٍ",
     "subtitle": "تقييم ذكي وإنشاء فرص تلقائي",

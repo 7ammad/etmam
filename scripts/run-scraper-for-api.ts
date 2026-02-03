@@ -8,7 +8,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { scrapePublicTenders } from '../lib/scraper'
-import type { SyncResponse } from '../types/scraper'
+import type { SyncResponse, ScrapeProgress } from '../types/scraper'
 
 const PROGRESS_FILE =
   process.env.SCRAPE_PROGRESS_FILE ?? path.join(process.cwd(), '.scrape-progress.json')
@@ -35,11 +35,27 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  writeProgress({ status: 'running', startedAt: Date.now(), message: 'Scraping…' })
+  writeProgress({ status: 'running', startedAt: Date.now(), message: 'Scraping…', percent: 0 })
 
-  const batchSize = parseInt(process.env.BATCH_SIZE ?? '50', 10)
+  // Default batch size: 120 (matches DEFAULT_CONFIG; allows ~5 pages at 24/page)
+  const batchSize = parseInt(process.env.BATCH_SIZE ?? '120', 10)
   const delayMs = parseInt(process.env.DELAY_MS ?? '2000', 10)
   const isHistorical = process.env.SCRAPE_MODE === 'historical'
+
+  // Progress callback writes real-time updates to progress file
+  const onProgress = (progress: ScrapeProgress): void => {
+    writeProgress({
+      status: 'running',
+      message: progress.message,
+      percent: progress.percent,
+      phase: progress.phase,
+      urlsCollected: progress.urlsCollected,
+      urlsTotal: progress.urlsTotal,
+      tendersScraped: progress.tendersScraped,
+      tendersTotal: progress.tendersTotal,
+      currentPage: progress.currentPage,
+    })
+  }
 
   try {
     const result = await scrapePublicTenders({
@@ -49,6 +65,7 @@ async function main(): Promise<void> {
       activityFilter: { mainActivityId: '9' },
       listPageSize: 24,
       mode: isHistorical ? 'historical' : 'active',
+      onProgress,
     })
 
     writeProgress({

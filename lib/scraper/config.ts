@@ -11,10 +11,16 @@ import type { ScraperConfig, EtimadSelectors } from '@/types/scraper'
 
 /**
  * Default scraper configuration
+ *
+ * PAGINATION AND BATCH LIMITS (2026-02-03):
+ * - batchSize: Maximum tenders to collect/scrape in active mode (default: 120)
+ * - Historical mode uses MAX_HISTORICAL_TENDERS (5000) and MAX_HISTORICAL_PAGES (500) caps
+ * - Scraper stops early when a page adds 0 new unique URLs (duplicate detection)
+ * - See: docs/reports/implementations/scraper-pagination-and-batch-fix-2026-02-03.md
  */
 export const DEFAULT_CONFIG: ScraperConfig = {
   baseUrl: 'https://tenders.etimad.sa',
-  batchSize: 120, // Default: collect up to 120 tenders (6 per page → ~20 pages)
+  batchSize: 120, // Default: collect up to 120 tenders (24/page → ~5 pages for active)
   delayMs: 2000, // 2 second delay between requests (be polite)
   maxRetries: 3,
   userAgent:
@@ -140,8 +146,16 @@ export const ETIMAD_SELECTORS: EtimadSelectors = {
     deadline: '.tender-chart .text-chart-indicator',
     /** Pagination controls */
     pagination: '.pagination, nav[aria-label*="pagination"]',
-    /** Next page button */
-    nextPage: '.pagination .page-link[rel="next"], .pagination-next',
+    /**
+     * Next page button/link selectors (verified 2026-02-03)
+     *
+     * Portal uses a <button> for Next (not <a rel="next">).
+     * Primary detection uses Playwright getByRole('button', {name: /next|»/i}).
+     * These CSS selectors are fallbacks.
+     *
+     * See: docs/reports/implementations/scraper-pagination-and-batch-fix-2026-02-03.md
+     */
+    nextPage: '.pagination .page-item:not(.disabled) .page-link[aria-label*="Next"], .pagination .page-item:last-child:not(.disabled) .page-link, .pagination-next:not(.disabled), button[aria-label*="Next"]',
     /** Tender status filter dropdown (in filter panel) */
     filterActive: '#TenderCategory',
     /** Filter panel toggle - top-left "بحث" button; opens #Search collapse */

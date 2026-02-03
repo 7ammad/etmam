@@ -31,7 +31,8 @@
     "export:odoo-excel": "tsx scripts/export-odoo-excel.ts",
     "feed:translations": "tsx scripts/feed-translations.ts",
     "load:historic": "tsx scripts/load-historic-to-db.ts",
-    "calibrate:from-db": "tsx scripts/calibrate-from-db.ts"
+    "calibrate:from-db": "tsx scripts/calibrate-from-db.ts",
+    "backfill:translations": "tsx scripts/backfill-translations.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",

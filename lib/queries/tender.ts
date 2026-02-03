@@ -41,6 +41,7 @@ export async function getTenders(): Promise<TenderWithEvaluation[]> {
       evaluations (*)
     `)
     .is('award_amount_sar', null) // Exclude historical/awarded tenders
+    .is('deleted_at', null) // Exclude soft-deleted tenders
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -131,6 +132,7 @@ export async function getHistoricalTenders(): Promise<TenderWithEvaluation[]> {
       evaluations (*)
     `)
     .not('award_amount_sar', 'is', null) // Only historical/awarded tenders
+    .is('deleted_at', null) // Exclude soft-deleted tenders
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -339,6 +341,7 @@ export async function getTenderStats(): Promise<{
       )
     `)
     .is('award_amount_sar', null) // Exclude historical/awarded tenders
+    .is('deleted_at', null) // Exclude soft-deleted tenders
 
   if (error) {
     console.error('Error fetching tender stats:', error)

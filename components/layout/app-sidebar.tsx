@@ -24,14 +24,17 @@ export function AppSidebar({ locale, mobileOpen = true, onClose }: AppSidebarPro
 
   const dashboardHref = `/${locale}/dashboard`
   const opportunitiesHref = `/${locale}/dashboard/opportunities`
+  const analysisHref = `/${locale}/dashboard/analysis`
   const settingsHref = `/${locale}/settings`
 
-  /** Tenders: active on /dashboard (exact) or /dashboard/[tenderId], not on /dashboard/opportunities. */
+  /** Tenders: active on /dashboard (exact) or /dashboard/[tenderId], not on /dashboard/opportunities or /dashboard/analysis. */
   const isTendersActive =
     pathname === dashboardHref ||
-    ((pathname?.startsWith(dashboardHref + '/') ?? false) && pathname !== opportunitiesHref)
+    ((pathname?.startsWith(dashboardHref + '/') ?? false) && pathname !== opportunitiesHref && pathname !== analysisHref)
   /** Opportunities: active only on /dashboard/opportunities. */
   const isOpportunitiesActive = pathname === opportunitiesHref
+  /** Analysis: active only on /dashboard/analysis. */
+  const isAnalysisActive = pathname === analysisHref
   const isSettingsActive = pathname?.startsWith(settingsHref) ?? false
 
   const navLinkStyle = (active: boolean) => ({
@@ -128,13 +131,10 @@ export function AppSidebar({ locale, mobileOpen = true, onClose }: AppSidebarPro
           <Settings size={18} aria-hidden />
           {t('settings')}
         </NextLink>
-        <span style={disabledNavStyle()} title={tNav('analyticsComingSoon')} aria-disabled="true">
+        <NextLink {...linkProps(analysisHref, isAnalysisActive)}>
           <BarChart3 size={18} aria-hidden />
           {tNav('analytics')}
-          <Text size="1" style={{ color: 'var(--sidebar-text-muted)', marginInlineStart: 'auto' }}>
-            (v2)
-          </Text>
-        </span>
+        </NextLink>
       </Flex>
     </aside>
     </div>

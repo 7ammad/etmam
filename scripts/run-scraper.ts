@@ -73,7 +73,9 @@ async function main(): Promise<void> {
   }
 
   // Parse optional configuration
-  const batchSize = parseInt(process.env.BATCH_SIZE || '50', 10)
+  // Default batch size: 120 (matches DEFAULT_CONFIG; allows ~5 pages at 24/page)
+  // Can be overridden via BATCH_SIZE env var
+  const batchSize = parseInt(process.env.BATCH_SIZE || '120', 10)
   const delayMs = parseInt(process.env.DELAY_MS || '2000', 10)
   const hasHistoricalFlag = process.argv.includes('--historical')
   const scraperMode = (process.env.SCRAPER_MODE || (hasHistoricalFlag ? 'historical' : 'active')) as 'active' | 'historical'

@@ -20,6 +20,7 @@ import type {
   ScrapeError,
   ScraperConfig,
   ScrapeMetadata,
+  ScrapeProgress,
 } from '@/types/scraper'
 import { scrapedTenderSchema } from '@/types/scraper'
 import {
@@ -96,6 +97,19 @@ export class EtimadScraper {
   }
 
   /**
+   * Report progress if callback is configured
+   */
+  private reportProgress(progress: ScrapeProgress): void {
+    if (this.config.onProgress) {
+      try {
+        this.config.onProgress(progress)
+      } catch {
+        // Ignore callback errors
+      }
+    }
+  }
+
+  /**
    * Main entry point: scrape active tenders from Etimad
    *
    * @returns Scrape result with tenders, errors, and metadata
@@ -113,7 +127,8 @@ export class EtimadScraper {
     const page = await this.context!.newPage()
 
     try {
-      // Step 1: Navigate to tender list (base URL; no query params – filters applied via UI)
+      // Step 1: Navigate to tender list
+      this.reportProgress({ phase: 'initializing', message: 'Navigating to portal...', percent: 5 })
       console.log('[Scraper] Navigating to tender list...')
       const listUrl = this.buildListUrl()
       console.log(`[Scraper] URL: ${listUrl}`)
@@ -125,24 +140,49 @@ export class EtimadScraper {
         throw new BlockedError('Blocking detected on list page', listUrl)
       }
 
-      // Step 3: Apply filters via UI (search button → Tender status: open for bids, Main: Telecom & IT, Sub: IT → Search)
+      // Step 3: Apply filters via UI
+      this.reportProgress({ phase: 'initializing', message: 'Applying filters...', percent: 10 })
       await this.applyFiltersViaUI(page)
 
-      // Step 3b: Set list page size (e.g. 24 for historical to get more tenders per page)
+      // Step 3b: Set list page size
       await this.setListPageSize(page)
 
-      // Step 4: Collect tender URLs from list (with pagination until we have enough or all pages for historical)
+      // Step 4: Collect tender URLs from list (with pagination)
+      this.reportProgress({ phase: 'collecting', message: 'Collecting tender URLs...', percent: 15, urlsCollected: 0 })
       console.log('[Scraper] Collecting tender URLs (with pagination)...')
       const tenderUrls = await this.collectTenderUrlsWithPagination(page)
       console.log(`[Scraper] Found ${tenderUrls.length} tender URLs`)
 
-      // Step 5: Deep scrape tenders (slice to batchSize; historical run uses high batchSize to get all)
+      // Step 5: Deep scrape tenders
       const urlsToScrape = tenderUrls.slice(0, this.config.batchSize)
-      console.log(`[Scraper] Scraping ${urlsToScrape.length} tenders...`)
+      const totalToScrape = urlsToScrape.length
+      console.log(`[Scraper] Scraping ${totalToScrape} tenders...`)
+
+      this.reportProgress({
+        phase: 'scraping',
+        message: `Scraping 0/${totalToScrape} tenders...`,
+        percent: 20,
+        tendersScraped: 0,
+        tendersTotal: totalToScrape,
+        urlsCollected: tenderUrls.length,
+        urlsTotal: tenderUrls.length,
+      })
 
       for (let i = 0; i < urlsToScrape.length; i++) {
         const url = urlsToScrape[i]
-        console.log(`[Scraper] [${i + 1}/${urlsToScrape.length}] ${url}`)
+        console.log(`[Scraper] [${i + 1}/${totalToScrape}] ${url}`)
+
+        // Report progress before each tender (20-95% range for scraping)
+        const scrapePercent = 20 + Math.floor((i / totalToScrape) * 75)
+        this.reportProgress({
+          phase: 'scraping',
+          message: `Scraping ${i + 1}/${totalToScrape} tenders...`,
+          percent: scrapePercent,
+          tendersScraped: tenders.length,
+          tendersTotal: totalToScrape,
+          urlsCollected: tenderUrls.length,
+          urlsTotal: tenderUrls.length,
+        })
 
         try {
           const tender = await this.scrapeTenderDetail(page, url)
@@ -166,6 +206,15 @@ export class EtimadScraper {
           await delay(this.config.delayMs)
         }
       }
+
+      // Final progress before validation
+      this.reportProgress({
+        phase: 'scraping',
+        message: `Scraped ${tenders.length}/${totalToScrape} tenders`,
+        percent: 95,
+        tendersScraped: tenders.length,
+        tendersTotal: totalToScrape,
+      })
 
       // Logic verification: when STRICT_FILTER_VERIFY=true, fail if any scraped tender looks non-IT
       if (process.env.STRICT_FILTER_VERIFY === 'true' && tenders.length > 0) {
@@ -200,6 +249,7 @@ export class EtimadScraper {
       completedAt,
       totalScraped: tenders.length,
       totalErrors: errors.length,
+      totalFound: tenders.length + errors.length,
       config: {
         batchSize: this.config.batchSize,
         delayMs: this.config.delayMs,
@@ -391,15 +441,25 @@ export class EtimadScraper {
   /**
    * Collect tender detail URLs from list, following pagination until we have
    * enough (batchSize) or all pages (historical mode) or no next page.
+   *
+   * IMPORTANT (2026-02-03): Pagination stops when:
+   * 1. A page returns 0 results (pageUrls.length === 0)
+   * 2. A page adds 0 NEW unique URLs (added === 0) - portal returns duplicates on invalid pages
+   * 3. Next button is disabled or not found
+   * 4. Max pages reached (safety cap)
+   *
+   * See: docs/reports/implementations/scraper-pagination-and-batch-fix-2026-02-03.md
    */
   private async collectTenderUrlsWithPagination(page: Page): Promise<string[]> {
     const isHistorical = this.config.mode === 'historical'
     const targetCount = isHistorical
       ? EtimadScraper.MAX_HISTORICAL_TENDERS
       : this.config.batchSize
-    const maxPages = isHistorical ? 500 : 50 // Higher cap for historical
+    // Safety caps: historical has higher page limit but still bounded
+    const maxPages = isHistorical ? 500 : 50
     const seen = new Set<string>()
     let pageNum = 1
+    let consecutiveZeroAdded = 0 // Track consecutive pages with 0 new URLs
 
     while (seen.size < targetCount && pageNum <= maxPages) {
       const pageUrls = await this.extractTenderUrlsFromCurrentPage(page)
@@ -408,11 +468,23 @@ export class EtimadScraper {
         seen.add(url)
       }
       const added = seen.size - before
+
+      // Improved logging: show both on-page count and new count (AC3)
       console.log(
-        `[Scraper] Page ${pageNum}: ${added} URLs (total: ${seen.size})`
+        `[Scraper] Page ${pageNum}: ${pageUrls.length} URLs on page, ${added} new (total: ${seen.size})`
       )
 
-      // No results on this page - stop scraping
+      // Report progress during URL collection (15-20% range)
+      const collectPercent = 15 + Math.min(5, Math.floor((seen.size / targetCount) * 5))
+      this.reportProgress({
+        phase: 'collecting',
+        message: `Collecting URLs... Page ${pageNum}, ${seen.size} found`,
+        percent: collectPercent,
+        urlsCollected: seen.size,
+        currentPage: pageNum,
+      })
+
+      // Early exit: no results on this page (empty page)
       if (pageUrls.length === 0) {
         if (pageNum === 1) {
           console.log('[Scraper] No results found on page 1 - stopping (0 tenders available)')
@@ -422,17 +494,42 @@ export class EtimadScraper {
         break
       }
 
-      if (seen.size >= targetCount && !isHistorical) break
+      // Early exit: page returned results but all were duplicates (AC1, C1)
+      // This happens when portal returns page 1 content for invalid page numbers
+      if (added === 0 && pageNum > 1) {
+        consecutiveZeroAdded++
+        console.log(
+          `[Scraper] Page ${pageNum} added 0 new URLs (all duplicates) - consecutive: ${consecutiveZeroAdded}`
+        )
+        // Stop after 1 consecutive page with 0 new URLs (portal wraps to page 1)
+        if (consecutiveZeroAdded >= 1) {
+          console.log('[Scraper] Stopping: no new URLs on this page (duplicate content detected)')
+          break
+        }
+      } else {
+        consecutiveZeroAdded = 0 // Reset counter when we get new URLs
+      }
+
+      if (seen.size >= targetCount && !isHistorical) {
+        console.log(`[Scraper] Reached target count (${targetCount}) - stopping`)
+        break
+      }
 
       const hasNext = await this.goToNextListPage(page)
       if (!hasNext) {
-        console.log('[Scraper] No more pages')
+        console.log('[Scraper] No more pages (Next button disabled or not found)')
         break
       }
+
       pageNum++
       await delay(this.config.delayMs)
     }
 
+    if (pageNum >= maxPages) {
+      console.log(`[Scraper] Reached max pages cap (${maxPages}) - stopping`)
+    }
+
+    console.log(`[Scraper] Pagination complete: ${seen.size} unique URLs from ${pageNum} pages`)
     return isHistorical ? [...seen] : [...seen].slice(0, this.config.batchSize)
   }
 
@@ -476,53 +573,152 @@ export class EtimadScraper {
   }
 
   /**
-   * Go to the next list page (click next link or follow next URL). Returns
+   * Go to the next list page (click next button or follow next URL). Returns
    * true if navigation happened, false if there is no next page.
+   *
+   * UPDATED 2026-02-03: Per Playwright docs (getByRole, waitFor), uses:
+   * 1. Button-based detection (portal uses <button> for Next, not <a rel="next">)
+   * 2. Wait for list content to update after navigation
+   * 3. Early return when Next button is disabled
+   *
+   * See: https://playwright.dev/docs/locators#locate-by-role
+   *      https://playwright.dev/docs/api/class-locator#locator-wait-for
    */
   private async goToNextListPage(page: Page): Promise<boolean> {
+    // Capture first tender ID before navigation to verify content changed
+    const firstTenderBefore = await this.getFirstTenderId(page)
+
+    // Strategy 1: Try Playwright's getByRole for Next button (recommended approach)
+    // Portal uses button with text "Next" or "»" or Arabic equivalent
+    try {
+      const nextButton = page.getByRole('button', { name: /next|التالي|»|›/i }).first()
+      const isVisible = await nextButton.isVisible().catch(() => false)
+
+      if (isVisible) {
+        // Check if button is disabled (last page indicator)
+        const isDisabled = await nextButton.isDisabled().catch(() => false)
+        if (isDisabled) {
+          console.log('[Scraper] Next button is disabled (last page)')
+          return false
+        }
+
+        await nextButton.click()
+        await this.waitForListUpdate(page, firstTenderBefore)
+        return true
+      }
+    } catch {
+      // Try CSS selectors
+    }
+
+    // Strategy 2: CSS selectors for pagination controls
     const nextSelectors = ETIMAD_SELECTORS.listPage.nextPage.split(', ')
 
     for (const selector of nextSelectors) {
       try {
-        const link = await page.$(selector.trim())
-        if (!link) continue
+        const element = await page.$(selector.trim())
+        if (!element) continue
 
-        const href = await link.getAttribute('href')
         const isDisabled =
-          (await link.getAttribute('aria-disabled')) === 'true' ||
-          (await link.getAttribute('disabled')) != null
+          (await element.getAttribute('aria-disabled')) === 'true' ||
+          (await element.getAttribute('disabled')) != null ||
+          (await element.getAttribute('class'))?.includes('disabled')
 
-        if (isDisabled) return false
+        if (isDisabled) {
+          console.log(`[Scraper] Next element (${selector}) is disabled`)
+          return false
+        }
+
+        const href = await element.getAttribute('href')
 
         if (href && href !== '#' && !href.startsWith('javascript:')) {
           const nextUrl = href.startsWith('http')
             ? href
             : `${this.config.baseUrl}${href}`
           await this.navigateWithRetry(page, nextUrl)
+          await this.waitForListUpdate(page, firstTenderBefore)
           return true
         }
 
-        await link.click()
-        await page.waitForLoadState('networkidle')
-        await delay(1000)
+        await element.click()
+        await this.waitForListUpdate(page, firstTenderBefore)
         return true
       } catch {
         // Try next selector
       }
     }
 
-    // Fallback: URL-based pagination (portal uses PageNumber=1, PageNumber=2, ...)
+    // Strategy 3: URL-based pagination fallback (portal uses PageNumber param)
+    // Only use this when button/link detection fails
     try {
       const currentUrl = page.url()
       const url = new URL(currentUrl)
       const pageNum = parseInt(url.searchParams.get('PageNumber') || '1', 10)
       url.searchParams.set('PageNumber', String(pageNum + 1))
+
+      console.log(`[Scraper] Using URL fallback: PageNumber=${pageNum + 1}`)
       await this.navigateWithRetry(page, url.toString())
-      await delay(this.config.delayMs)
+      await this.waitForListUpdate(page, firstTenderBefore)
       return true
     } catch {
       return false
     }
+  }
+
+  /**
+   * Get the first tender's ID/reference from the current list page.
+   * Used to verify content actually changed after pagination.
+   */
+  private async getFirstTenderId(page: Page): Promise<string | null> {
+    try {
+      const firstCard = page.locator('.tender-card[data-ref]').first()
+      const dataRef = await firstCard.getAttribute('data-ref').catch(() => null)
+      return dataRef
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Wait for list content to update after navigation.
+   * Per Playwright docs: use locator.waitFor() for dynamic/async content.
+   *
+   * See: https://playwright.dev/docs/api/class-locator#locator-wait-for
+   */
+  private async waitForListUpdate(page: Page, previousFirstId: string | null): Promise<void> {
+    // Wait for load state first (but use 'load' instead of 'networkidle' per Playwright docs)
+    await page.waitForLoadState('load')
+
+    // Wait for tender list container to be visible
+    try {
+      await page.locator(ETIMAD_SELECTORS.listPage.tenderList).waitFor({
+        state: 'visible',
+        timeout: 10000,
+      })
+    } catch {
+      // Container may already be visible, continue
+    }
+
+    // Wait for at least one tender card to appear
+    try {
+      await page.locator('.tender-card').first().waitFor({
+        state: 'visible',
+        timeout: 10000,
+      })
+    } catch {
+      // No cards found - might be empty page
+    }
+
+    // If we had a previous ID, wait briefly and verify content changed
+    // (This catches the case where navigation "succeeded" but content is same)
+    if (previousFirstId) {
+      await delay(500) // Brief wait for DOM to stabilize
+      const newFirstId = await this.getFirstTenderId(page)
+      if (newFirstId && newFirstId === previousFirstId) {
+        console.log('[Scraper] Warning: First tender ID unchanged after navigation (may be duplicate page)')
+      }
+    }
+
+    await delay(this.config.delayMs)
   }
 
   /**
