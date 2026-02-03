@@ -123,6 +123,8 @@ export interface ScoredTenderV2 extends Omit<ScoredTender, 'breakdown' | 'budget
   exotech_score: number
   /** Work type from classifier (Commodity → score forced to 0) */
   work_type: WorkTypeCommodityOrPro
+  /** Routing: which entity leads (WORLD_CLASS_UX_PLAN) */
+  routing_decision: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID'
 }
 
 function recommendationFromScore(
@@ -578,6 +580,19 @@ export function scoreTenderV2(
 
   const recommendation = recommendationFromScore(score, config.thresholds)
 
+  // Routing decision for Dual-Track: which entity leads (WORLD_CLASS_UX_PLAN)
+  type RoutingDecision = 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID'
+  let routing_decision: RoutingDecision
+  if (score === 0 || work_type === 'Commodity') {
+    routing_decision = 'NO_BID'
+  } else if (infratech_score > exotech_score) {
+    routing_decision = 'INFRATECH'
+  } else if (exotech_score > infratech_score) {
+    routing_decision = 'EXOTECH'
+  } else {
+    routing_decision = 'JOINT'
+  }
+
   return {
     reference_no: tender.reference_no,
     title: tender.title,
@@ -600,6 +615,7 @@ export function scoreTenderV2(
     infratech_score,
     exotech_score,
     work_type,
+    routing_decision,
   }
 }
 

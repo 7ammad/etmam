@@ -77,6 +77,7 @@ export async function runEvaluationAction(
       infratech_score: scored.infratech_score,
       exotech_score: scored.exotech_score,
       work_type: scored.work_type,
+      routing_decision: scored.routing_decision,
     })
     await updateTender(tenderId, { status: 'evaluated' })
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo, useState, useEffect } from 'react'
 import { Flex, Box, Text, Badge } from '@radix-ui/themes'
 import { Building2, Hash, Calendar, Banknote } from 'lucide-react'
 
@@ -8,12 +9,16 @@ export interface TenderHeroProps {
   entity: string
   referenceNo: string
   deadlineFormatted: string
+  /** ISO date string for countdown when deadline ≤7 days (AC-2.5) */
+  deadline?: string | null
   daysUntilDeadline: number | null
   valueFormatted: string
   isEstimated: boolean
   locale: string
   /** Actions (e.g. Run analysis, Push to CRM) shown on the right side of the hero card */
   actions?: React.ReactNode
+  /** AI Price Intelligence block (Financials: Booklet, Tender Estimate, AI Model Estimate) */
+  aiPriceBlock?: React.ReactNode
   labels: {
     entity: string
     title: string
@@ -23,6 +28,8 @@ export interface TenderHeroProps {
     provided: string
     closingSoon: string
     past: string
+    /** AC-2.5: "X days Y hours remaining" when deadline ≤7 days */
+    countdownRemaining?: string
   }
 }
 
@@ -31,13 +38,32 @@ export function TenderHero({
   entity,
   referenceNo,
   deadlineFormatted,
+  deadline: deadlineIso,
   daysUntilDeadline,
   valueFormatted,
   isEstimated,
   locale,
   actions,
+  aiPriceBlock,
   labels,
 }: TenderHeroProps) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!deadlineIso || daysUntilDeadline == null || daysUntilDeadline < 0 || daysUntilDeadline > 7) return
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [deadlineIso, daysUntilDeadline])
+
+  const countdown = useMemo(() => {
+    if (!deadlineIso || daysUntilDeadline == null || daysUntilDeadline < 0 || daysUntilDeadline > 7) return null
+    const end = new Date(deadlineIso).getTime()
+    const diff = end - now
+    if (diff <= 0) return null
+    const days = Math.floor(diff / (24 * 60 * 60 * 1000))
+    const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
+    return { days, hours }
+  }, [deadlineIso, daysUntilDeadline, now])
+
   const deadlineBadge =
     daysUntilDeadline === null
       ? null
@@ -55,9 +81,9 @@ export function TenderHero({
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
       style={{
         background: isUrgent
-          ? 'linear-gradient(135deg, var(--surface-card) 0%, rgba(239, 68, 68, 0.05) 100%)'
+          ? 'linear-gradient(135deg, var(--surface-card) 0%, var(--color-urgency-overlay) 100%)'
           : 'var(--surface-card)',
-        border: isUrgent ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid var(--border-default)',
+        border: isUrgent ? '1px solid var(--color-urgency-border)' : '1px solid var(--border-default)',
         borderRadius: 'var(--radius-card)',
         padding: 'var(--space-6)',
         position: 'relative',
@@ -119,7 +145,7 @@ export function TenderHero({
               </Text>
             </Flex>
 
-            {/* Deadline */}
+            {/* Deadline — AC-2.5: countdown "X days Y hours remaining" when ≤7 days */}
             <Flex gap="2" align="center">
               <Calendar size={14} style={{ color: deadlineBadge ? 'var(--color-excluded-text)' : 'var(--text-tertiary)' }} />
               <Text
@@ -138,6 +164,11 @@ export function TenderHero({
                 >
                   {deadlineBadge.label}
                 </Badge>
+              )}
+              {countdown && labels.countdownRemaining && (
+                <Text size="2" style={{ color: 'var(--color-excluded-text)', fontVariantNumeric: 'tabular-nums' }}>
+                  {labels.countdownRemaining.replace('{days}', String(countdown.days)).replace('{hours}', String(countdown.hours))}
+                </Text>
               )}
             </Flex>
 
@@ -176,6 +207,7 @@ export function TenderHero({
               )}
             </Flex>
           </Flex>
+          {aiPriceBlock != null && aiPriceBlock}
         </Flex>
 
         {/* Actions */}

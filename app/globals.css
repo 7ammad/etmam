@@ -190,6 +190,47 @@ section {
 .dashboard-tender-row:hover {
   background-color: var(--surface-muted);
 }
+/* Inline quick actions: fade in 150ms on row hover (WORLD_CLASS_UX_PLAN); respect prefers-reduced-motion (CC-7) */
+.dashboard-tender-row .row-actions {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.dashboard-tender-row:hover .row-actions {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-tender-row .row-actions {
+    transition: none;
+  }
+}
+
+/* CC-4: Desktop table visible; mobile card list visible on small viewport */
+.tenders-table-desktop {
+  display: block;
+}
+.tenders-table-mobile {
+  display: none;
+}
+@media (max-width: 768px) {
+  .tenders-table-desktop {
+    display: none;
+  }
+  .tenders-table-mobile {
+    display: block;
+  }
+  .opportunities-table-desktop {
+    display: none;
+  }
+  .opportunities-table-mobile {
+    display: block;
+  }
+}
+.opportunities-table-desktop {
+  display: block;
+}
+.opportunities-table-mobile {
+  display: none;
+}
 
 /* Dashboard table — sticky header; height fits content with sensible max (responsive). */
 .dashboard-table-scroll {
@@ -246,6 +287,68 @@ section {
 .dashboard-table-scroll td.dashboard-td-rec { min-width: 100px; }
 .dashboard-table-scroll th.dashboard-th-status,
 .dashboard-table-scroll td.dashboard-td-status { min-width: 88px; }
+
+/* ═══════════════════════════════════════
+   SIDEBAR DRAWER (CC-4: mobile hamburger)
+   ═══════════════════════════════════════ */
+.sidebar-drawer {
+  transition: transform 0.2s ease;
+}
+.sidebar-overlay {
+  transition: opacity 0.2s ease;
+}
+.header-menu-button {
+  display: none;
+}
+@media (max-width: 767px) {
+  .sidebar-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    max-width: 85vw;
+    height: 100vh;
+    z-index: 50;
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar-drawer-closed {
+    transform: translateX(-100%);
+  }
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+  }
+  .sidebar-overlay.sidebar-overlay-visible {
+    display: block;
+  }
+  .header-menu-button {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+}
+[dir="rtl"] .sidebar-drawer-closed {
+  transform: translateX(100%);
+}
+[dir="rtl"] .sidebar-drawer {
+  left: auto;
+  right: 0;
+}
+@media (min-width: 768px) {
+  .sidebar-drawer {
+    position: relative;
+    transform: none !important;
+  }
+  .sidebar-drawer-closed {
+    transform: none !important;
+  }
+  .header-menu-button {
+    display: none !important;
+  }
+}
 
 /* ═══════════════════════════════════════
    DASHBOARD LANDING LAYOUT
@@ -324,6 +427,16 @@ section {
 /* KPI section — Figma mb-5; no left accent on cards */
 .dashboard-kpi-section {
   margin-bottom: 20px; /* Figma mb-5 */
+}
+
+/* Opportunities KPI: 3 cards; stack on narrow viewports */
+.opportunities-kpi-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 520px) {
+  .opportunities-kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* KPI card — thin container: theme-bound, rounded-xl, hover:shadow-xl. No left accent. */
@@ -542,7 +655,7 @@ section {
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-/* Score breakdown styling */
+/* Score breakdown styling — CC-7: respect prefers-reduced-motion */
 .score-breakdown-list {
   margin-top: var(--space-3);
 }
@@ -551,6 +664,24 @@ section {
 }
 .breakdown-row:not(:last-child) {
   border-bottom: 1px solid var(--border-muted);
+}
+.breakdown-bar-fill {
+  transition: width 0.5s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .breakdown-bar-fill {
+    transition: none;
+  }
+}
+
+/* Dual-track bar fill (tender detail) — CC-7 */
+.dual-track-bar-fill {
+  transition: width 0.3s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dual-track-bar-fill {
+    transition: none;
+  }
 }
 
 /* Evaluation list cards with left accent */

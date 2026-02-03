@@ -1,17 +1,29 @@
 /**
  * POST /api/scrape/sync-latest — sync tenders from the latest scraper-output/run-*.json to the DB.
+ * Accepts optional `mode` body param: 'active' | 'historical' | undefined (any).
  * Matches run-active-* and run-historical-* (latest by mtime). Runs on the server (same process as sync API).
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import * as fs from 'fs'
 import * as path from 'path'
 
 const SCRAPER_OUTPUT_DIR = path.join(process.cwd(), 'scraper-output')
 
-function getLatestRunFile(): string | null {
+type SyncMode = 'active' | 'historical' | undefined
+
+function getLatestRunFile(mode: SyncMode): string | null {
   if (!fs.existsSync(SCRAPER_OUTPUT_DIR)) return null
-  const files = fs.readdirSync(SCRAPER_OUTPUT_DIR).filter((f) => f.startsWith('run-') && f.endsWith('.json'))
+
+  let files = fs.readdirSync(SCRAPER_OUTPUT_DIR).filter((f) => f.startsWith('run-') && f.endsWith('.json'))
+
+  // Filter by mode if specified
+  if (mode === 'active') {
+    files = files.filter((f) => f.startsWith('run-active-'))
+  } else if (mode === 'historical') {
+    files = files.filter((f) => f.startsWith('run-historical-'))
+  }
+
   if (files.length === 0) return null
   const withStats = files.map((f) => ({
     name: f,
@@ -21,16 +33,27 @@ function getLatestRunFile(): string | null {
   return path.join(SCRAPER_OUTPUT_DIR, withStats[0].name)
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // Parse optional mode from body
+  let mode: SyncMode
+  try {
+    const body = await request.json().catch(() => ({}))
+    if (body && typeof body === 'object' && (body.mode === 'active' || body.mode === 'historical')) {
+      mode = body.mode
+    }
+  } catch {
+    // No body or invalid — use any mode
+  }
   const cronSecret = process.env.CRON_SECRET
   if (!cronSecret) {
     return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
   }
 
-  const filePath = getLatestRunFile()
+  const filePath = getLatestRunFile(mode)
   if (!filePath) {
+    const modeLabel = mode ? `run-${mode}-*` : 'run-*'
     return NextResponse.json(
-      { error: 'No scraper-output/run-*.json found. Run a scrape first.' },
+      { error: `No scraper-output/${modeLabel}.json found. Run a scrape first.` },
       { status: 404 }
     )
   }

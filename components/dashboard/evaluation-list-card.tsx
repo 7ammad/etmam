@@ -24,8 +24,8 @@ const variantStyles: Record<EvaluationListCardVariant, { iconBg: string; iconCol
     iconColor: 'var(--color-excluded-text)',
   },
   info: {
-    iconBg: 'var(--color-info-100, rgba(59, 130, 246, 0.1))',
-    iconColor: 'var(--color-info-600, #2563eb)',
+    iconBg: 'var(--color-info-100)',
+    iconColor: 'var(--color-info-600)',
   },
 }
 

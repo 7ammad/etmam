@@ -6,16 +6,17 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import NextLink from 'next/link'
 import { useTranslations } from '@/components/providers/i18n-provider'
 import type { TenderWithEvaluation } from '@/lib/queries/tender'
-import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox } from '@radix-ui/themes'
-import { Search, X } from 'lucide-react'
+import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox, Card } from '@radix-ui/themes'
+import { Search, X, Eye, Play, FileText } from 'lucide-react'
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import { DashboardKpiRow, type DashboardKpiStats } from './dashboard-kpi-row'
-import { TenderDataBlock } from './tender-data-block'
+import { TenderIngestionStrip } from './tender-ingestion-strip'
 import { UploadTenderTrigger } from './upload-tender-trigger'
 import { getDisplayText } from '@/lib/translate-display'
 import { getEffectiveValueDisplay } from '@/lib/display-ev'
 import { trackFilterChange } from '@/lib/analytics'
+import { runEvaluationAction } from '@/actions/evaluation'
 
 const localeMap = { ar, en: enUS } as const
 const PAGE_SIZE = 10
@@ -182,6 +183,8 @@ interface TendersListClientProps {
 }
 
 const SEARCH_DEBOUNCE_MS = 400
+/** AC-2.6: save filters when navigating to detail so Back to Tenders can restore */
+const DASHBOARD_FILTERS_KEY = 'dashboard-filters'
 
 export function TendersListClient({
   tenders,
@@ -210,6 +213,9 @@ export function TendersListClient({
   const [sortKey, setSortKey] = useState<SortKey>(() => parseStateFromSearchParams(searchParams).sortKey)
   const [page, setPageState] = useState(() => parseStateFromSearchParams(searchParams).page)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkEvaluating, setBulkEvaluating] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null)
+  const [rowEvaluatingId, setRowEvaluatingId] = useState<string | null>(null)
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -223,17 +229,37 @@ export function TendersListClient({
     [pathname, router]
   )
 
+  /** AC-2.6: restore filters when returning from tender detail (Back to Tenders) */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = sessionStorage.getItem(DASHBOARD_FILTERS_KEY)
+    if (!saved) return
+    try {
+      const state = JSON.parse(saved) as UrlState
+      const params = buildSearchParams(state)
+      const query = params.toString()
+      const url = query ? `${pathname}?${query}` : pathname
+      router.replace(url, { scroll: false })
+      sessionStorage.removeItem(DASHBOARD_FILTERS_KEY)
+    } catch {
+      sessionStorage.removeItem(DASHBOARD_FILTERS_KEY)
+    }
+  }, [pathname, router])
+
   useEffect(() => {
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current)
       searchDebounceRef.current = null
     }
     const next = parseStateFromSearchParams(searchParams)
-    setSearchState(next.search)
-    setRecommendationFilter(next.recommendationFilter)
-    setDeadlineFilter(next.deadlineFilter)
-    setSortKey(next.sortKey)
-    setPageState(next.page)
+    // Defer sync so setState is not synchronous in effect (satisfies react-hooks/set-state-in-effect)
+    queueMicrotask(() => {
+      setSearchState(next.search)
+      setRecommendationFilter(next.recommendationFilter)
+      setDeadlineFilter(next.deadlineFilter)
+      setSortKey(next.sortKey)
+      setPageState(next.page)
+    })
   }, [searchParams])
 
   const setSearch = useCallback(
@@ -330,6 +356,45 @@ export function TendersListClient({
     setSelectedIds(new Set(pageItems.map((t) => t.id)))
   }
   const clearSelection = () => setSelectedIds(new Set())
+
+  const handleEvaluateAll = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    setBulkEvaluating(true)
+    setBulkProgress({ current: 0, total: ids.length })
+    for (let i = 0; i < ids.length; i++) {
+      await runEvaluationAction(ids[i])
+      setBulkProgress({ current: i + 1, total: ids.length })
+    }
+    setBulkEvaluating(false)
+    setBulkProgress(null)
+    setSelectedIds(new Set())
+    router.refresh()
+  }, [selectedIds, router])
+
+  const handleCreateOpportunities = useCallback(() => {
+    router.push(`/${locale}/dashboard/opportunities`)
+  }, [locale, router])
+
+  const handleRowEvaluate = useCallback(
+    async (e: React.MouseEvent, tenderId: string) => {
+      e.stopPropagation()
+      setRowEvaluatingId(tenderId)
+      await runEvaluationAction(tenderId)
+      setRowEvaluatingId(null)
+      router.refresh()
+    },
+    [router]
+  )
+
+  const handleEmptyGetActive = useCallback(async () => {
+    try {
+      await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      router.refresh()
+    } catch {
+      // no-op
+    }
+  }, [router])
 
   const filteredAndSorted = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -431,8 +496,23 @@ export function TendersListClient({
     { value: 'score_high_low', labelKey: 'sortScoreHighLow' },
   ]
 
+  const tTenders = useTranslations('tenders')
+
   return (
     <Flex direction="column" gap="3">
+      {/* Page title and subtitle (dynamic counts per WORLD_CLASS_UX_PLAN) */}
+      <header style={{ marginBottom: 'var(--space-1)' }}>
+        <h1 className="dashboard-page-title" style={{ fontSize: 'var(--font-size-5)', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
+          {tTenders('title')}
+        </h1>
+        <p className="dashboard-page-subtitle" style={{ fontSize: 'var(--font-size-2)', color: 'var(--text-secondary)', margin: 'var(--space-1) 0 0', lineHeight: 1.4 }}>
+          {tTenders('subtitle', {
+            count: kpiStats.total,
+            qualified: kpiStats.qualified,
+            pending: kpiStats.notEvaluated,
+          })}
+        </p>
+      </header>
       {/* Section A: KPI row — derived from filtered list per DASHBOARD_DESIGN */}
         <DashboardKpiRow
           stats={kpiStats}
@@ -448,8 +528,8 @@ export function TendersListClient({
           }}
         />
 
-        {/* Tender data only: ingestion (Get Active / Historic, Stop, Upload). Opportunities live on Opportunities page. */}
-        <TenderDataBlock locale={locale} />
+        {/* Tender ingestion strip per WORLD_CLASS_UX_PLAN (replaces TenderDataBlock). */}
+        <TenderIngestionStrip locale={locale} />
 
         {/* Section B: Filters — single horizontal bar in light container (Figma) */}
         <section
@@ -538,6 +618,61 @@ export function TendersListClient({
         </Flex>
         </section>
 
+        {/* Bulk actions bar: when 1+ selected, show [X selected] [Evaluate All] [Create Opportunities] ✕ */}
+        {selectedIds.size > 0 && (
+          <section
+            aria-label={tTenders('bulk.selected', { count: selectedIds.size })}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-2) var(--space-3)',
+              background: 'var(--surface-muted)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: 'var(--space-3)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <Text size="2" weight="medium" style={{ color: 'var(--text-primary)' }}>
+              {tTenders('bulk.selected', { count: selectedIds.size })}
+            </Text>
+            <Flex align="center" gap="2">
+              <Button
+                size="2"
+                variant="solid"
+                color="green"
+                onClick={handleEvaluateAll}
+                disabled={bulkEvaluating}
+                aria-label={tTenders('bulk.evaluateAll')}
+              >
+                {bulkEvaluating && bulkProgress
+                  ? tDashboard('evaluatingCount', { current: bulkProgress.current, total: bulkProgress.total })
+                  : tTenders('bulk.evaluateAll')}
+              </Button>
+              <Button
+                size="2"
+                variant="soft"
+                color="gray"
+                onClick={handleCreateOpportunities}
+                disabled={bulkEvaluating}
+                aria-label={tTenders('bulk.createOpptys')}
+              >
+                {tTenders('bulk.createOpptys')}
+              </Button>
+              <Button
+                size="2"
+                variant="ghost"
+                color="gray"
+                onClick={clearSelection}
+                aria-label={t('clearSelection')}
+              >
+                <X size={16} />
+              </Button>
+            </Flex>
+          </section>
+        )}
+
         {/* Section C: Tender Opportunities — thin container: title bar (with select-all) + table + pagination */}
         <section
           className="table-section-figma"
@@ -569,7 +704,8 @@ export function TendersListClient({
               {t('tableTitle')}
             </Text>
           </Flex>
-          <Box className="dashboard-table-scroll" style={{ background: 'transparent' }}>
+          {/* CC-4: Desktop table */}
+          <Box className="dashboard-table-scroll tenders-table-desktop" style={{ background: 'transparent' }}>
           <Table.Root variant="surface" size="2" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
             <Table.Header>
               <Table.Row>
@@ -589,40 +725,77 @@ export function TendersListClient({
                 <Table.ColumnHeaderCell scope="col" className="dashboard-table-numeric dashboard-th-value">{t('tableEstValue')}</Table.ColumnHeaderCell>
                 <Table.ColumnHeaderCell scope="col" className="dashboard-table-numeric dashboard-th-score">{t('score')}</Table.ColumnHeaderCell>
                 <Table.ColumnHeaderCell scope="col" className="dashboard-th-rec">{t('status')}</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell scope="col" style={{ width: 100 }}>{tTender('actions')}</Table.ColumnHeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
               {              pageItems.length === 0 ? (
                 <Table.Row>
-                  <Table.Cell colSpan={7}>
-                    <Flex direction="column" align="center" gap="4" style={{ padding: 32 }}>
-                      <Text size="2" style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
-                        {tenders.length === 0 ? tDashboard('noTendersFound') : t('noMatchingTenders')}
-                      </Text>
-                      {tenders.length === 0 && (
-                        <Text size="1" style={{ color: 'var(--text-tertiary)', textAlign: 'center' }}>
-                          {tDashboard('emptyGuidance')}
-                        </Text>
-                      )}
+                  <Table.Cell colSpan={8}>
+                    <Flex direction="column" align="center" gap="4" style={{ padding: 40 }}>
                       {tenders.length === 0 ? (
-                        <UploadTenderTrigger locale={locale} />
-                      ) : hasActiveFilters ? (
-                        <Button variant="soft" color="gray" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
-                          {t('clearFilters')}
-                        </Button>
-                      ) : null}
+                        <>
+                          <Flex align="center" justify="center" style={{ color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                            <FileText size={48} strokeWidth={1.5} aria-hidden />
+                          </Flex>
+                          <Text size="4" weight="bold" style={{ color: 'var(--text-primary)', textAlign: 'center' }}>
+                            {tTenders('empty.title')}
+                          </Text>
+                          <Text size="2" style={{ color: 'var(--text-secondary)', textAlign: 'center', maxWidth: 400 }}>
+                            {tTenders('empty.guidance')}
+                          </Text>
+                          <Flex gap="3" wrap="wrap" justify="center">
+                            <Button
+                              size="2"
+                              variant="solid"
+                              color="green"
+                              onClick={handleEmptyGetActive}
+                              aria-label={tTenders('empty.getActive')}
+                            >
+                              {tTenders('empty.getActive')}
+                            </Button>
+                            <UploadTenderTrigger locale={locale} testId="upload-tender-empty" />
+                          </Flex>
+                        </>
+                      ) : (
+                        <>
+                          <Text size="2" style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
+                            {t('noMatchingTenders')}
+                          </Text>
+                          {hasActiveFilters && (
+                            <Button variant="soft" color="gray" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
+                              {t('clearFilters')}
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </Flex>
                   </Table.Cell>
                 </Table.Row>
               ) : (
               pageItems.map((tender) => {
                 const detailHref = `/${locale}/dashboard/${tender.id}`
+                const recNorm = normalizeRecommendation(tender.evaluation?.recommendation ?? 'not_evaluated')
+                const accentBarStyle: React.CSSProperties =
+                  recNorm === 'INVEST'
+                    ? { borderInlineStart: '3px solid var(--color-primary-500)', cursor: 'pointer' }
+                    : recNorm === 'REVIEW'
+                      ? { borderInlineStart: '3px solid var(--color-conditional-text)', cursor: 'pointer' }
+                      : recNorm === 'SKIP'
+                        ? { borderInlineStart: '3px solid var(--color-excluded-text)', cursor: 'pointer' }
+                        : { borderInlineStart: '3px dashed var(--gray-8)', cursor: 'pointer' }
                 return (
                 <Table.Row
                   key={tender.id}
                   className="dashboard-tender-row tender-row"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => router.push(detailHref)}
+                  style={accentBarStyle}
+                  onClick={() => {
+                    sessionStorage.setItem(
+                      DASHBOARD_FILTERS_KEY,
+                      JSON.stringify({ search, recommendationFilter, deadlineFilter, sortKey, page })
+                    )
+                    router.push(detailHref)
+                  }}
                 >
                   <Table.Cell style={{ width: 44 }} onClick={(e) => e.stopPropagation()}>
                     <Checkbox
@@ -697,12 +870,126 @@ export function TendersListClient({
                         )
                       })()}
                     </Table.Cell>
+                    <Table.Cell onClick={(e) => e.stopPropagation()} style={{ width: 100 }}>
+                      <Flex gap="2" align="center" className="row-actions" style={{ justifyContent: 'flex-end' }}>
+                        <Button
+                          size="1"
+                          variant="ghost"
+                          color="gray"
+                          asChild
+                          aria-label={tTender('viewDetails')}
+                        >
+                          <NextLink href={detailHref}>
+                            <Eye size={14} />
+                          </NextLink>
+                        </Button>
+                        <Button
+                          size="1"
+                          variant="ghost"
+                          color="gray"
+                          onClick={(e) => handleRowEvaluate(e, tender.id)}
+                          disabled={rowEvaluatingId === tender.id}
+                          aria-label={tDashboard('runAnalysis')}
+                        >
+                          <Play size={14} />
+                        </Button>
+                      </Flex>
+                    </Table.Cell>
                 </Table.Row>
                 )
               })
               )}
             </Table.Body>
           </Table.Root>
+          </Box>
+          {/* CC-4: Mobile card view (< 768px) */}
+          <Box className="tenders-table-mobile" style={{ padding: 'var(--space-3)' }} aria-label="Tenders list (mobile cards)">
+            {pageItems.map((tender) => {
+              const detailHref = `/${locale}/dashboard/${tender.id}`
+              const recNorm = normalizeRecommendation(tender.evaluation?.recommendation ?? 'not_evaluated')
+              const effectiveValue = getEffectiveValueDisplay(
+                tender.estimated_value,
+                tender.evaluation?.predicted_budget_min,
+                tender.evaluation?.predicted_budget_max
+              )
+              return (
+                <Card
+                  key={tender.id}
+                  size="2"
+                  className="dashboard-tender-card-mobile"
+                  style={{
+                    marginBottom: 'var(--space-3)',
+                    borderInlineStart: `3px solid ${
+                      recNorm === 'INVEST' ? 'var(--color-primary-500)' : recNorm === 'REVIEW' ? 'var(--color-conditional-text)' : recNorm === 'SKIP' ? 'var(--color-excluded-text)' : 'var(--gray-8)'
+                    }`,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    sessionStorage.setItem(
+                      DASHBOARD_FILTERS_KEY,
+                      JSON.stringify({ search, recommendationFilter, deadlineFilter, sortKey, page })
+                    )
+                    router.push(detailHref)
+                  }}
+                >
+                  <Flex direction="column" gap="2">
+                    <Flex justify="between" align="start" gap="2">
+                      <NextLink href={detailHref} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none', flex: 1, minWidth: 0 }}>
+                        <Text size="2" weight="medium" style={{ color: 'var(--text-primary)' }}>
+                          {maxWords(getDisplayText(tender.title ?? '', locale, titleSummaryMap ?? translationMap) || '—', 8)}
+                        </Text>
+                      </NextLink>
+                      <Checkbox
+                        checked={selectedIds.has(tender.id)}
+                        onCheckedChange={() => toggleSelection(tender.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={t('selectTender', { ref: tender.reference_no ?? tender.id })}
+                      />
+                    </Flex>
+                    <Text size="1" style={{ color: 'var(--gray-11)' }}>
+                      {getDisplayText(tender.entity ?? '', locale, entitySummaryMap ?? translationMap) || '—'}
+                    </Text>
+                    <Flex justify="between" align="center" wrap="wrap" gap="2">
+                      <Text size="1" style={{ color: 'var(--text-secondary)' }}>{formatDeadline(tender.deadline, locale)}</Text>
+                      {tender.evaluation != null ? (
+                        <Badge
+                          size="1"
+                          style={{
+                            fontSize: '0.6875rem',
+                            backgroundColor:
+                              recNorm === 'INVEST' ? 'var(--color-qualified-bg)' : recNorm === 'REVIEW' ? 'var(--color-conditional-bg)' : recNorm === 'SKIP' ? 'var(--color-excluded-bg)' : 'var(--gray-a3)',
+                            color: getScoreColor(tender.evaluation?.score ?? null),
+                          }}
+                        >
+                          {Math.round(Math.min(100, Math.max(0, Number(tender.evaluation.score))))}%
+                        </Badge>
+                      ) : (
+                        <Text size="1" style={{ color: 'var(--text-tertiary)' }}>—</Text>
+                      )}
+                    </Flex>
+                    <Flex gap="2" align="center" onClick={(e) => e.stopPropagation()}>
+                      <Button size="1" variant="ghost" color="gray" asChild>
+                        <NextLink href={detailHref}>
+                          <Eye size={14} style={{ marginInlineEnd: 4 }} />
+                          {tTender('viewDetails')}
+                        </NextLink>
+                      </Button>
+                      <Button
+                        size="1"
+                        variant="ghost"
+                        color="gray"
+                        onClick={(e) => handleRowEvaluate(e, tender.id)}
+                        disabled={rowEvaluatingId === tender.id}
+                        aria-label={tDashboard('runAnalysis')}
+                      >
+                        <Play size={14} style={{ marginInlineEnd: 4 }} />
+                        {tDashboard('runAnalysis')}
+                      </Button>
+                    </Flex>
+                  </Flex>
+                </Card>
+              )
+            })}
           </Box>
           {/* Pagination at bottom right of table (Figma spec) — inside same container */}
           <Flex

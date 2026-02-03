@@ -63,6 +63,10 @@
   --color-error-600: #dc2626;
   --color-error-900: #7f1d1d;
 
+  /* Urgency (deadline ≤7 days) — hero overlay/border per AC-2.5 */
+  --color-urgency-overlay: rgba(239, 68, 68, 0.05);
+  --color-urgency-border: rgba(239, 68, 68, 0.2);
+
   /* Info shades */
   --color-info-50:  #eff6ff;
   --color-info-100: #dbeafe;
@@ -78,6 +82,10 @@
   --color-excluded:    #DF0404;  /* Red - Figma "Inactive" */
   --color-pending:     #64748b;  /* Gray - waiting */
   --color-evaluating:  #3b82f6;  /* Blue - processing */
+
+  /* V2 Dual-Track (WORLD_CLASS_UX_PLAN) */
+  --color-infratech-500: #06b6d4;  /* Cyan/Teal - Cyber/Infra/OT */
+  --color-exotech-500:   #8b5cf6;  /* Purple/Indigo - AI/Data/Robotics */
 
   /* Status background colors (light mode) */
   --color-qualified-bg:   #ecfdf5;
@@ -107,6 +115,13 @@
   --surface-sidebar:      #ffffff;
   --surface-card:         #ffffff;
   --surface-page:         #fafbff;
+
+  /* App sidebar (dark teal — Figma) — CC-1 */
+  --sidebar-bg:           #153331;
+  --sidebar-active-bg:    rgba(255, 255, 255, 0.12);
+  --sidebar-text:         #ffffff;
+  --sidebar-text-muted:   rgba(255, 255, 255, 0.5);
+  --sidebar-logo-bg:      rgba(255, 255, 255, 0.2);
   
   /* Stat Card Icon Backgrounds */
   --stat-icon-primary-bg: rgba(16, 185, 129, 0.12);

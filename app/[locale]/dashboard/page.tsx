@@ -36,6 +36,7 @@ export default async function DashboardPage({ params }: Props) {
   return (
     <Box className="dashboard-page" style={{ width: '100%', maxWidth: '100%' }}>
       <DashboardViewTracker locale={locale} path={`/${locale}/dashboard`} />
+      {/* Visible page title is "Tenders" with dynamic subtitle in TendersListClient (WORLD_CLASS_UX_PLAN). Screen-reader fallback for route. */}
       <h1 className="sr-only" data-testid="dashboard-page-title">{t('pageTitle')}</h1>
       <Flex direction="column" gap="3">
         {/* Approved design: KPI first. No big Command center / Export to Odoo cards in main content; header has Run analysis, Export to CRM, Upload. */}

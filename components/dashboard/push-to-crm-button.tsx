@@ -4,15 +4,20 @@ import { useState } from 'react'
 import { useTranslations } from '@/components/providers/i18n-provider'
 import { pushToCRM, pushToCRMDryRun } from '@/actions/crm'
 import { Box, Flex, Text, Button, Dialog } from '@radix-ui/themes'
-import { Loader2, Send, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react'
+import { Loader2, Send, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react'
 
 type TenderStatus = 'pending' | 'evaluating' | 'evaluated' | 'approved' | 'pushed' | 'rejected'
+
+/** When provided (e.g. from Opportunities list), overrides display: Retry for failed, Pushed for pushed. */
+export type PushStatusOverride = 'ready' | 'pushed' | 'failed'
 
 interface PushToCRMButtonProps {
   tenderId: string
   tenderTitle: string
   hasEvaluation: boolean
   currentStatus: TenderStatus
+  /** Optional: from getOpportunityReadyTendersWithPushStatus; enables Retry label and correct disabled state. */
+  pushStatus?: PushStatusOverride
 }
 
 type ButtonState = 'idle' | 'previewing' | 'pushing' | 'success' | 'error'
@@ -39,22 +44,32 @@ export function PushToCRMButton({
   tenderTitle,
   hasEvaluation,
   currentStatus,
+  pushStatus,
 }: PushToCRMButtonProps) {
   const t = useTranslations('crm')
+  const tOpp = useTranslations('opportunitiesPage')
   const tCommon = useTranslations('common')
   const [state, setState] = useState<ButtonState>('idle')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [preview, setPreview] = useState<PreviewPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const isPushed = currentStatus === 'pushed'
-  const isDisabled = isPushed || !hasEvaluation || state === 'previewing' || state === 'pushing'
+  const isPushed = pushStatus === 'pushed' || (!pushStatus && currentStatus === 'pushed')
+  const isFailed = pushStatus === 'failed'
+  const isDisabled = (isPushed && !isFailed) || !hasEvaluation || state === 'previewing' || state === 'pushing'
 
   const getDisabledReason = (): string | null => {
-    if (isPushed) return t('alreadyPushed')
+    if (isPushed && !isFailed) return t('alreadyPushed')
     if (!hasEvaluation) return t('noEvaluation')
     return null
   }
+
+  const buttonLabel = isPushed && !isFailed
+    ? tOpp('pushedDisabled')
+    : isFailed
+      ? tOpp('retry')
+      : t('pushButton')
+  const ButtonIcon = isPushed && !isFailed ? CheckCircle : isFailed ? RotateCcw : Send
 
   const handleOpenDialog = async () => {
     setState('previewing')
@@ -130,8 +145,8 @@ export function PushToCRMButton({
             </>
           ) : (
             <>
-              <Send style={{ width: 16, height: 16 }} />
-              {t('pushButton')}
+              <ButtonIcon style={{ width: 16, height: 16 }} />
+              {buttonLabel}
             </>
           )}
         </Button>

@@ -6,9 +6,10 @@ import { RunAnalysisButton } from '@/components/dashboard/run-analysis-button'
 import { TenderHero } from '@/components/dashboard/tender-hero'
 import { ScoreGauge } from '@/components/dashboard/score-gauge'
 import { ScoreBreakdownList } from '@/components/dashboard/score-breakdown'
-import { EvaluationListCard } from '@/components/dashboard/evaluation-list-card'
-import { Container, Flex, Box, Text, Card, Link } from '@radix-ui/themes'
-import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, ListChecks, Sparkles, ArrowRight, Briefcase } from 'lucide-react'
+import { EvaluationTabs } from '@/components/dashboard/evaluation-tabs'
+import { AiPriceBlock } from '@/components/dashboard/ai-price-block'
+import { Container, Flex, Box, Text, Card, Link, Badge } from '@radix-ui/themes'
+import { ArrowLeft, Sparkles, ArrowRight, Briefcase } from 'lucide-react'
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import type { TenderWithEvaluation } from '@/lib/queries/tender'
@@ -117,42 +118,11 @@ export function TenderDetailView({
           entity={entityDisplay}
           referenceNo={tender.reference_no ?? '—'}
           deadlineFormatted={formatDeadline(tender.deadline ?? null, locale)}
+          deadline={tender.deadline ?? null}
           daysUntilDeadline={daysUntilDeadline}
           valueFormatted={formatValue(effectiveValue.value, locale)}
           isEstimated={effectiveValue.isEstimated}
           locale={locale}
-          actions={
-            <Flex direction="column" gap="3" align="end">
-              <RunAnalysisButton tenderId={tender.id} hasEvaluation={hasEvaluation} />
-              {isOpportunityReady && (
-                <Link asChild size="2" color="gray" underline="hover">
-                  <NextLink
-                    href={opportunitiesHref}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: 'var(--space-1) var(--space-2)',
-                      borderRadius: 'var(--radius-2)',
-                      background: 'var(--gray-a2)',
-                      color: 'var(--text-primary)',
-                      textDecoration: 'none',
-                      fontWeight: 500,
-                    }}
-                  >
-                    <Briefcase size={16} />
-                    {tCrm('createOpportunity')}
-                  </NextLink>
-                </Link>
-              )}
-              <PushToCRMButton
-                tenderId={tender.id}
-                tenderTitle={tender.title ?? ''}
-                hasEvaluation={hasEvaluation}
-                currentStatus={tender.status ?? 'pending'}
-              />
-            </Flex>
-          }
           labels={{
             entity: tTender('entity'),
             title: tList('tenderTitle'),
@@ -162,7 +132,25 @@ export function TenderDetailView({
             provided: tTender('provided'),
             closingSoon: tList('deadlineClosingSoon'),
             past: tList('deadlinePast'),
+            countdownRemaining: tEval('countdownRemaining'),
           }}
+          aiPriceBlock={
+            hasEvaluation && ev ? (
+              <AiPriceBlock
+                tenderEstimate={effectiveValue.value}
+                predictedValueSar={ev.predicted_value_sar ?? null}
+                bookletPrice={null}
+                locale={locale}
+                labels={{
+                  financials: tEval('financials'),
+                  officialBooklet: tEval('officialBookletPrice'),
+                  tenderEstimate: tEval('tenderEstimate'),
+                  aiModelEstimate: tEval('aiModelEstimate'),
+                  tooltip: tEval('predictedByEtmamAiTooltip'),
+                }}
+              />
+            ) : null
+          }
         />
 
         {/* Main content grid */}
@@ -215,49 +203,46 @@ export function TenderDetailView({
                     />
                   </Flex>
 
-                  {/* Strategic Analysis & Dual-Track Scores */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 p-4 border rounded-lg bg-muted/20">
-                    {/* Infratech Score (Cyber/Infra) */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm font-medium">
-                        <span>Infratech Fit (Cyber/Infra)</span>
-                        <span>{ev.infratech_score ?? 0}%</span>
-                      </div>
-                      <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-600"
-                          style={{ width: `${ev.infratech_score ?? 0}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Exotech Score (AI/Data) */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm font-medium">
-                        <span>Exotech Fit (AI/Data)</span>
-                        <span>{ev.exotech_score ?? 0}%</span>
-                      </div>
-                      <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-purple-600"
-                          style={{ width: `${ev.exotech_score ?? 0}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Financial Prediction */}
-                    <div className="md:col-span-2 flex items-center justify-between pt-2 border-t mt-2">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-muted-foreground">Predicted Value (AI Model):</span>
-                        <span className="text-xs text-muted-foreground/70">Method: {ev.value_method ?? 'N/A'}</span>
-                      </div>
-                      <span className="text-lg font-bold font-mono">
-                        {ev.predicted_value_sar
-                          ? new Intl.NumberFormat('en-SA', { style: 'currency', currency: 'SAR' }).format(ev.predicted_value_sar)
-                          : 'N/A'}
-                      </span>
-                    </div>
-                  </div>
+                  {/* V2 Dual-Track: Infratech / Exotech (design tokens) */}
+                  <Box style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--surface-muted)', borderRadius: 'var(--radius-md)' }}>
+                    <Flex direction="column" gap="3">
+                      <Flex justify="between" align="center">
+                        <Text size="2" weight="medium" style={{ color: 'var(--text-secondary)' }}>{tEval('infratechFit')}</Text>
+                        <Text size="2" weight="bold" style={{ color: 'var(--color-infratech-500)', fontVariantNumeric: 'tabular-nums' }}>{ev.infratech_score ?? 0}%</Text>
+                      </Flex>
+                      <Box style={{ height: 8, borderRadius: 4, background: 'var(--surface-card)', overflow: 'hidden' }}>
+                        <Box className="dual-track-bar-fill" style={{ width: `${ev.infratech_score ?? 0}%`, height: '100%', background: 'var(--color-infratech-500)', borderRadius: 4 }} />
+                      </Box>
+                      <Flex justify="between" align="center">
+                        <Text size="2" weight="medium" style={{ color: 'var(--text-secondary)' }}>{tEval('exotechFit')}</Text>
+                        <Text size="2" weight="bold" style={{ color: 'var(--color-exotech-500)', fontVariantNumeric: 'tabular-nums' }}>{ev.exotech_score ?? 0}%</Text>
+                      </Flex>
+                      <Box style={{ height: 8, borderRadius: 4, background: 'var(--surface-card)', overflow: 'hidden' }}>
+                        <Box className="dual-track-bar-fill" style={{ width: `${ev.exotech_score ?? 0}%`, height: '100%', background: 'var(--color-exotech-500)', borderRadius: 4 }} />
+                      </Box>
+                      {/* Routing decision badge */}
+                      {(() => {
+                        const routing = ev.routing_decision ?? (ev.infratech_score != null && ev.exotech_score != null
+                          ? (ev.infratech_score > ev.exotech_score ? 'INFRATECH' : ev.exotech_score > ev.infratech_score ? 'EXOTECH' : 'JOINT')
+                          : null)
+                        if (!routing) return null
+                        const badgeStyle = routing === 'INFRATECH'
+                          ? { background: 'var(--color-infratech-500)', color: 'white' }
+                          : routing === 'EXOTECH'
+                            ? { background: 'var(--color-exotech-500)', color: 'white' }
+                            : routing === 'JOINT'
+                              ? { background: 'linear-gradient(90deg, var(--color-infratech-500), var(--color-exotech-500))', color: 'white' }
+                              : { background: 'var(--gray-8)', color: 'var(--text-secondary)' }
+                        const label = routing === 'INFRATECH' ? tEval('routingInfratech') : routing === 'EXOTECH' ? tEval('routingExotech') : routing === 'JOINT' ? tEval('routingJoint') : tEval('routingNoBid')
+                        return (
+                          <Flex align="center" gap="2" style={{ marginTop: 'var(--space-2)' }}>
+                            <Text size="1" weight="medium" style={{ color: 'var(--text-tertiary)' }}>{tEval('routing')}:</Text>
+                            <Badge size="1" style={badgeStyle}>{label}</Badge>
+                          </Flex>
+                        )
+                      })()}
+                    </Flex>
+                  </Box>
 
                   {/* Score breakdown */}
                   {breakdownItems.length > 0 && (
@@ -273,7 +258,7 @@ export function TenderDetailView({
                           display: 'block',
                         }}
                       >
-                        {tEval('breakdown') || 'Score Breakdown'}
+                        {tEval('breakdown')}
                       </Text>
                       <ScoreBreakdownList items={breakdownItems} />
                     </Box>
@@ -310,58 +295,62 @@ export function TenderDetailView({
             </Card>
           </Flex>
 
-          {/* Right column - Summary and details */}
+          {/* Right column - Actions panel + Evaluation tabs (WORLD_CLASS_UX_PLAN) */}
           <Flex direction="column" gap="4" className="tender-detail-right">
-            {/* Summary card */}
-            {hasEvaluation && summaryText != null && String(summaryText).trim() !== '' && (
-              <Card size="3" className="summary-card">
-                <Flex direction="column" gap="3">
-                  <Text size="2" weight="bold" style={{ color: 'var(--text-primary)' }}>
-                    {tEval('summary')}
-                  </Text>
-                  <Text size="2" className="summary-card-text">
-                    {summaryText}
-                  </Text>
-                </Flex>
-              </Card>
-            )}
+            {/* Actions: Run Analysis (primary), Create Opportunity (secondary), Push to CRM (tertiary) */}
+            <Card size="3" style={{ background: 'var(--surface-card)' }}>
+              <Text size="2" weight="bold" style={{ color: 'var(--text-primary)', marginBottom: 'var(--space-3)', display: 'block' }}>{t('nextAction')}</Text>
+              <Flex direction="column" gap="3">
+                <RunAnalysisButton tenderId={tender.id} hasEvaluation={hasEvaluation} />
+                {isOpportunityReady && (
+                  <Link asChild size="2" color="gray" underline="hover">
+                    <NextLink
+                      href={opportunitiesHref}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: 'var(--space-2) var(--space-3)',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--surface-muted)',
+                        color: 'var(--text-primary)',
+                        textDecoration: 'none',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <Briefcase size={16} />
+                      {tCrm('createOpportunity')}
+                    </NextLink>
+                  </Link>
+                )}
+                <PushToCRMButton
+                  tenderId={tender.id}
+                  tenderTitle={tender.title ?? ''}
+                  hasEvaluation={hasEvaluation}
+                  currentStatus={tender.status ?? 'pending'}
+                />
+              </Flex>
+            </Card>
 
-            {/* Evaluation list cards */}
+            {/* Evaluation details: tabs (Summary, Strengths, Risks, Requirements, Actions) */}
             {hasEvaluation && (
-              <>
-                {strengthsList && Array.isArray(strengthsList) && strengthsList.length > 0 && (
-                  <EvaluationListCard
-                    title={tEval('strengths')}
-                    items={strengthsList.map(String)}
-                    icon={CheckCircle}
-                    variant="success"
-                  />
-                )}
-                {risksList && Array.isArray(risksList) && risksList.length > 0 && (
-                  <EvaluationListCard
-                    title={tEval('risks')}
-                    items={risksList.map(String)}
-                    icon={AlertTriangle}
-                    variant="warning"
-                  />
-                )}
-                {missingList && Array.isArray(missingList) && missingList.length > 0 && (
-                  <EvaluationListCard
-                    title={tEval('missingRequirements')}
-                    items={missingList.map(String)}
-                    icon={XCircle}
-                    variant="danger"
-                  />
-                )}
-                {actionList && Array.isArray(actionList) && actionList.length > 0 && (
-                  <EvaluationListCard
-                    title={tEval('actionItems')}
-                    items={actionList.map(String)}
-                    icon={ListChecks}
-                    variant="info"
-                  />
-                )}
-              </>
+              <Card size="3" style={{ background: 'var(--surface-card)' }}>
+                <EvaluationTabs
+                  summary={summaryText}
+                  strengths={strengthsList}
+                  risks={risksList}
+                  missingRequirements={missingList}
+                  actionItems={actionList}
+                  labels={{
+                    summary: tEval('summary'),
+                    strengths: tEval('strengths'),
+                    risks: tEval('risks'),
+                    requirements: tEval('missingRequirements'),
+                    actions: tEval('actionItems'),
+                    noDataAvailable: tEval('noDataAvailable'),
+                  }}
+                />
+              </Card>
             )}
 
             {/* Next steps card */}

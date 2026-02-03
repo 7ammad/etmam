@@ -7,24 +7,22 @@ export type TenderUpdate = TablesUpdate<'tenders'>
 
 // Diagnostic function to test database connectivity (uses RLS-scoped client)
 async function testDatabaseConnection(supabase: Awaited<ReturnType<typeof createClient>>) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/b22f8891-a0d3-4eaa-a284-fd7127c7ef55',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/queries/tender.ts:testDatabaseConnection',message:'Testing raw RPC call',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-H5'})}).catch(()=>{});
-  // #endregion
-  
-  // Try a simple count query using RPC
   const { count, error: countError } = await supabase
     .from('tenders')
     .select('*', { count: 'exact', head: true })
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/b22f8891-a0d3-4eaa-a284-fd7127c7ef55',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/queries/tender.ts:testDatabaseConnection:result',message:'Count query result',data:{count,hasError:!!countError,errorCode:countError?.code,errorMessage:countError?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-H5'})}).catch(()=>{});
-  // #endregion
-  
+
   return { count, error: countError }
 }
 
 export type TenderWithEvaluation = Tender & {
   evaluation: Tables<'evaluations'> | null
+}
+
+/** Push status for opportunity list: ready (not pushed), pushed (success), failed (last attempt failed). */
+export type OpportunityPushStatus = 'ready' | 'pushed' | 'failed'
+
+export type TenderWithEvaluationAndPushStatus = TenderWithEvaluation & {
+  pushStatus: OpportunityPushStatus
 }
 
 /**
@@ -50,11 +48,13 @@ export async function getTenders(): Promise<TenderWithEvaluation[]> {
     throw new Error('Failed to fetch tenders')
   }
 
-  return (data as any[]).map((tender) => ({
+  type Row = Tender & { evaluations: Tables<'evaluations'>[] | null }
+  const rows = (data ?? []) as Row[]
+  return rows.map((tender) => ({
     ...tender,
     evaluation: Array.isArray(tender.evaluations)
-      ? tender.evaluations[0] || null
-      : tender.evaluations || null,
+      ? tender.evaluations[0] ?? null
+      : tender.evaluations ?? null,
   }))
 }
 
@@ -70,6 +70,50 @@ export async function getOpportunityReadyTenders(): Promise<TenderWithEvaluation
   return all.filter((t) => {
     const rec = t.evaluation?.recommendation
     return rec != null && OPPORTUNITY_READY_RECOMMENDATIONS.includes(rec as (typeof OPPORTUNITY_READY_RECOMMENDATIONS)[number])
+  })
+}
+
+/**
+ * Get opportunity-ready tenders with push status for the Opportunities page.
+ * pushStatus: 'pushed' when tender.status === 'pushed'; 'failed' when latest crm_push is failed; else 'ready'.
+ */
+export async function getOpportunityReadyTendersWithPushStatus(): Promise<TenderWithEvaluationAndPushStatus[]> {
+  const tenders = await getOpportunityReadyTenders()
+  if (tenders.length === 0) return []
+
+  const supabase = await createClient()
+  const ids = tenders.map((t) => t.id)
+  const { data: pushes, error } = await supabase
+    .from('crm_pushes')
+    .select('tender_id, status, created_at')
+    .in('tender_id', ids)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching crm_pushes for opportunities:', error)
+    return tenders.map((t) => ({
+      ...t,
+      pushStatus: (t.status === 'pushed' ? 'pushed' : 'ready') as OpportunityPushStatus,
+    }))
+  }
+
+  const latestByTender = new Map<string, { status: 'pending' | 'success' | 'failed' }>()
+  for (const p of pushes ?? []) {
+    const tid = (p as { tender_id: string }).tender_id
+    if (!latestByTender.has(tid)) {
+      latestByTender.set(tid, { status: (p as { status: 'pending' | 'success' | 'failed' }).status })
+    }
+  }
+
+  return tenders.map((t) => {
+    if (t.status === 'pushed') {
+      return { ...t, pushStatus: 'pushed' as OpportunityPushStatus }
+    }
+    const latest = latestByTender.get(t.id)
+    if (latest?.status === 'failed') {
+      return { ...t, pushStatus: 'failed' as OpportunityPushStatus }
+    }
+    return { ...t, pushStatus: 'ready' as OpportunityPushStatus }
   })
 }
 

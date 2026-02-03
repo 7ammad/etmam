@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from '@/components/providers/i18n-provider'
 import { testCRMConnection, saveCRMConnection } from '@/actions/crm'
 import { Box, Flex, Text, TextField, Button } from '@radix-ui/themes'
-import { Loader2, Plug } from 'lucide-react'
+import { Loader2, Plug, Eye, EyeOff } from 'lucide-react'
 
 type OdooFormData = {
   base_url: string
@@ -20,6 +20,7 @@ interface OdooIntegrationFormProps {
 export function OdooIntegrationForm({ initial }: OdooIntegrationFormProps) {
   const t = useTranslations('crm')
   const tSettings = useTranslations('settings')
+  const tCrmStatus = useTranslations('settingsCrm')
   const [form, setForm] = useState<OdooFormData>({
     base_url: initial?.base_url ?? '',
     db: initial?.db ?? '',
@@ -28,6 +29,7 @@ export function OdooIntegrationForm({ initial }: OdooIntegrationFormProps) {
   })
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
@@ -59,9 +61,9 @@ export function OdooIntegrationForm({ initial }: OdooIntegrationFormProps) {
     })
     setTesting(false)
     if (result.success) {
-      setMessage({ type: 'success', text: t('connectionSuccess') })
+      setMessage({ type: 'success', text: tCrmStatus('testSuccess', { database: form.db.trim() || 'Odoo' }) })
     } else {
-      setMessage({ type: 'error', text: result.error ?? t('connectionFailed') })
+      setMessage({ type: 'error', text: result.error ?? tCrmStatus('testFailed', { error: result.error ?? t('connectionFailed') }) })
     }
   }
 
@@ -92,7 +94,7 @@ export function OdooIntegrationForm({ initial }: OdooIntegrationFormProps) {
   }
 
   return (
-    <Box className="fancy-card fancy-card-accent-blue">
+    <Box className="fancy-card fancy-card-accent-blue" style={{ overflow: 'visible' }}>
       <Flex direction="column" gap="4">
         <Flex align="center" gap="2">
           <Plug size={20} style={{ color: 'var(--color-info-600)' }} />
@@ -140,15 +142,27 @@ export function OdooIntegrationForm({ initial }: OdooIntegrationFormProps) {
           </label>
           <label>
             <Text size="2" style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-              {t('odooPassword')}
+              {t('apiKey')}
             </Text>
-            <TextField.Root
-              type="password"
-              placeholder={initial?.hasPassword ? '••••••••' : t('odooPasswordPlaceholder')}
-              value={form.password}
-              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-              style={{ width: '100%', maxWidth: 400 }}
-            />
+            <Flex gap="2" align="center" style={{ maxWidth: 400 }}>
+              <TextField.Root
+                type={showPassword ? 'text' : 'password'}
+                placeholder={initial?.hasPassword ? '••••••••' : t('odooPasswordPlaceholder')}
+                value={form.password}
+                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                style={{ flex: 1 }}
+              />
+              <Button
+                type="button"
+                variant="soft"
+                color="gray"
+                size="1"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? t('hideApiKey') : t('showApiKey')}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </Button>
+            </Flex>
             {initial?.hasPassword && (
               <Text size="1" style={{ color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
                 Re-enter password to update credentials.
@@ -162,7 +176,13 @@ export function OdooIntegrationForm({ initial }: OdooIntegrationFormProps) {
           </Text>
         )}
         <Flex gap="3" wrap="wrap">
-          <Button type="button" disabled={testing || saving} onClick={handleTest}>
+          <Button
+            type="button"
+            disabled={testing || saving}
+            onClick={handleTest}
+            data-testid="crm-test-connection"
+            aria-label={t('testConnection')}
+          >
             {testing ? (
               <>
                 <Loader2 className="animate-spin" size={16} />

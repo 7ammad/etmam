@@ -26,20 +26,20 @@ function getRecommendationColors(recommendation: RecommendationDisplay): {
     return {
       primary: 'var(--color-qualified-text)',
       bg: 'var(--color-qualified-bg)',
-      stroke: '#10b981',
+      stroke: 'var(--color-primary-500)',
     }
   }
   if (isReview) {
     return {
       primary: 'var(--color-conditional-text)',
       bg: 'var(--color-conditional-bg)',
-      stroke: '#f59e0b',
+      stroke: 'var(--color-conditional)',
     }
   }
   return {
     primary: 'var(--color-excluded-text)',
     bg: 'var(--color-excluded-bg)',
-    stroke: '#ef4444',
+    stroke: 'var(--color-excluded)',
   }
 }
 

@@ -13,7 +13,6 @@ import { ErrorState } from '@/components/dashboard/error-state'
 import { TenderDetailContent } from '@/components/dashboard/tender-detail-content'
 import { TenderDetailSkeleton } from '@/components/dashboard/tender-detail-skeleton'
 import { TenderDetailViewTracker } from '@/components/dashboard/tender-detail-view-tracker'
-import type { ScoreBreakdown } from '@/types/evaluation'
 import { Container } from '@radix-ui/themes'
 import { getEffectiveValueDisplay } from '@/lib/display-ev'
 
@@ -76,26 +75,32 @@ export default async function TenderDetailPage({ params }: Props) {
       rawBreakdown = ev.breakdown as Record<string, unknown>
     }
   }
-  const getBreakdownValue = (raw: Record<string, unknown>, snakeKey: keyof ScoreBreakdown): number => {
-    const v = raw[snakeKey]
-    if (typeof v === 'number' && !Number.isNaN(v)) return Math.round(Math.max(0, Math.min(100, v)))
-    const camelKey = snakeKey === 'risk_score' ? 'riskScore' : (snakeKey.replace(/_([a-z])/g, (_, c) => c.toUpperCase()) as string)
-    const w = raw[camelKey]
-    if (typeof w === 'number' && !Number.isNaN(w)) return Math.round(Math.max(0, Math.min(100, w)))
-    return 0
-  }
-  const breakdownKeyToLabel: Record<keyof ScoreBreakdown, string> = {
+  // V2 Engine: 6 dimensions (service_fit, budget_fit, timeline_fit, complexity_fit, strategic_fit, risk_score)
+  const v2BreakdownKeys = ['service_fit', 'budget_fit', 'timeline_fit', 'complexity_fit', 'strategic_fit', 'risk_score'] as const
+  const v2KeyToLabel: Record<string, string> = {
+    service_fit: tEval('serviceFit'),
     budget_fit: tEval('budgetFit'),
-    technical_fit: tEval('technicalFit'),
     timeline_fit: tEval('timelineFit'),
+    complexity_fit: tEval('complexityFit'),
     strategic_fit: tEval('strategicFit'),
     risk_score: tEval('riskScore'),
   }
+  // Legacy 5-dim: technical_fit -> complexity_fit for display
+  const getBreakdownValueAny = (raw: Record<string, unknown>, key: string): number => {
+    const v = raw[key]
+    if (typeof v === 'number' && !Number.isNaN(v)) return Math.round(Math.max(0, Math.min(100, v)))
+    const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+    const w = raw[camel]
+    if (typeof w === 'number' && !Number.isNaN(w)) return Math.round(Math.max(0, Math.min(100, w)))
+    if (key === 'complexity_fit' && typeof raw.technical_fit === 'number') return Math.round(Math.max(0, Math.min(100, raw.technical_fit as number)))
+    if (key === 'service_fit' && typeof raw.technical_fit === 'number') return Math.round(Math.max(0, Math.min(100, raw.technical_fit as number)))
+    return 0
+  }
   const breakdownItems = rawBreakdown
-    ? (['budget_fit', 'technical_fit', 'timeline_fit', 'strategic_fit', 'risk_score'] as const).map((key) => ({
+    ? v2BreakdownKeys.map((key) => ({
         key,
-        label: breakdownKeyToLabel[key],
-        value: getBreakdownValue(rawBreakdown, key),
+        label: v2KeyToLabel[key] ?? key,
+        value: getBreakdownValueAny(rawBreakdown!, key),
       }))
     : []
 
