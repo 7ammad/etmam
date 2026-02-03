@@ -1,82 +1,54 @@
 'use client'
 
 import NextLink from 'next/link'
-import { useTranslations, useI18n } from '@/components/providers/i18n-provider'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { LogoutButton } from '@/components/auth/logout-button'
-import { Button, Flex, Container, Box, Text, Link } from '@radix-ui/themes'
-import { Crown, LayoutDashboard, Settings } from 'lucide-react'
+import { useI18n } from '@/components/providers/i18n-provider'
+import { Button, Flex, Box, Text } from '@radix-ui/themes'
+import { HeaderToolsStrip } from './header-tools-strip'
+import { UserProfileDropdown } from './user-profile-dropdown'
 
 interface DashboardHeaderProps {
   locale: string
 }
 
+/**
+ * Figma: white header bar. Left: Run Analysis (green), Export to CRM, Upload Tenders.
+ * Right: EN | AR language toggle, user menu (avatar + dropdown). No logo (logo in sidebar).
+ */
 export function DashboardHeader({ locale }: DashboardHeaderProps) {
-  const t = useTranslations('common')
   const { locale: currentLocale } = useI18n()
-
-  const otherLocale = currentLocale === 'ar' ? 'en' : 'ar'
-  const otherLocaleLabel = currentLocale === 'ar' ? 'EN' : 'عربي'
 
   return (
     <Box
+      role="banner"
       style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
         borderBottom: '1px solid var(--border-default)',
-        backgroundColor: 'var(--surface-raised)',
+        backgroundColor: 'var(--surface-card)',
         boxShadow: 'var(--shadow-xs)',
       }}
     >
-      <Container size="4">
-        <Flex justify="between" align="center" height="64px" px="4">
-          <NextLink href={`/${locale}/dashboard`} style={{ textDecoration: 'none' }}>
-            <Flex align="center" gap="3" style={{ cursor: 'pointer' }}>
-              <Flex
-                align="center"
-                justify="center"
-                width="40px"
-                height="40px"
-                style={{
-                  borderRadius: 'var(--radius-3)',
-                  background: 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700))',
-                  boxShadow: 'var(--shadow-primary)',
-                }}
-              >
-                <Crown size={20} color="white" />
-              </Flex>
-              <Text size="5" weight="bold" style={{ color: 'var(--text-primary)' }}>
-                {t('appName')}
-              </Text>
-            </Flex>
-          </NextLink>
+      <Flex justify="between" align="center" height="64px" px="4" wrap="wrap" gap="3" style={{ width: '100%' }}>
+        <HeaderToolsStrip locale={locale} />
 
-          <Flex display={{ initial: 'none', sm: 'flex' }} gap="4" align="center">
-            <Link asChild size="2" weight="medium" color="green" highContrast underline="none">
-              <NextLink href={`/${locale}/dashboard`}>
-                <Flex align="center" gap="2">
-                  <LayoutDashboard size={16} />
-                  {t('dashboard')}
-                </Flex>
+        <Flex align="center" gap="3">
+          <Flex align="center" gap="1" style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }} role="group" aria-label="Language">
+            <Button asChild variant="ghost" color="gray" size="1">
+              <NextLink href="/en/dashboard" style={{ fontWeight: currentLocale === 'en' ? 600 : 400, color: 'inherit' }}>
+                EN
               </NextLink>
-            </Link>
-            <Link asChild size="2" weight="medium" color="gray" underline="none">
-              <NextLink href={`/${locale}/settings`}>
-                <Flex align="center" gap="2">
-                  <Settings size={16} />
-                  {t('settings')}
-                </Flex>
-              </NextLink>
-            </Link>
-          </Flex>
-
-          <Flex align="center" gap="3">
-            <Button asChild variant="ghost" color="gray" size="2">
-              <NextLink href={`/${otherLocale}/dashboard`}>{otherLocaleLabel}</NextLink>
             </Button>
-            <ThemeToggle />
-            <LogoutButton variant="ghost" size="2" showIcon showText />
+            <Text size="1" style={{ color: 'var(--text-tertiary)' }}>|</Text>
+            <Button asChild variant="ghost" color="gray" size="1">
+              <NextLink href="/ar/dashboard" style={{ fontWeight: currentLocale === 'ar' ? 600 : 400, color: 'inherit' }}>
+                AR
+              </NextLink>
+            </Button>
           </Flex>
+          <UserProfileDropdown locale={locale} />
         </Flex>
-      </Container>
+      </Flex>
     </Box>
   )
 }

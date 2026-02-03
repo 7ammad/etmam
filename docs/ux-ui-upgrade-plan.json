@@ -1,0 +1,416 @@
+{
+  "final_ux_ui_plan": {
+    "global_layout": {
+      "header": "Logo, language toggle (EN/AR), user menu, tools strip (Run Analysis, Export to CRM, Upload Tenders)",
+      "sidebar": "Dashboard, Tenders, Settings — RTL layout (sidebar on right), theme toggle at bottom",
+      "theme": "Light/dark toggle, Tailwind tokens, semantic color support",
+      "spacing": "4px base scale, consistent across all components",
+      "typography": "Noto Kufi Arabic (RTL), Cairo (LTR)"
+    },
+    "dashboard_page": {
+      "kpi_cards": {
+        "count": 7,
+        "labels_en": ["Total Tenders", "Qualified", "Conditional", "Excluded", "Not Evaluated", "Due in 7 Days", "Due in 30 Days"],
+        "per_card": "Label, value, delta/trend indicator; high-quality icon with subtle Framer Motion animation (no heavy 3D); RTL layout and semantic spacing"
+      },
+      "filters": "Search field; Recommendation filter (Qualified, Conditional, Excluded); Deadline filter (Closing Soon, Open, Past); Sort dropdown; URL sync for filter state",
+      "tender_table": "Columns: Tender Name, Entity, Deadline, Estimated Value, Score, Status; hover state, RTL alignment, numeric formatting; pagination",
+      "chart_section": "Bar chart: Tenders by Deadline Window; categories: 0–7, 8–14, 15–30, 30+ days; ApexCharts with RTL axis and motion transitions"
+    },
+    "tender_detail_page": {
+      "global_layout_reuse": "Same header + sidebar",
+      "tender_summary_card": "Title, Entity, Department, Deadline, Estimated Value, Score, Status; large score icon, semantic status badge; data from scraper JSON; graceful fallback for missing fields",
+      "evaluation_breakdown": "Criteria, weights, scores; visual hierarchy and semantic grouping",
+      "additional_sections": "Summary, strengths, risks (from JSON); Push to CRM button; breadcrumb or back navigation"
+    },
+    "component_system_rules": {
+      "motion": "Framer Motion for KPI transitions, list stagger, hover micro-interactions",
+      "accessibility": "WCAG AA, prefers-reduced-motion, aria-labels, semantic roles",
+      "performance": "Lazy load charts, dynamic imports, font preload",
+      "analytics": "Events for dashboard_view, filter_change, tender_detail_view"
+    },
+    "tech_stack": "Tailwind 4, Radix, shadcn/ui, Framer Motion, ApexCharts, Lottie"
+  },
+  "audit_summary": {
+    "heuristic_findings": {
+      "usability": [
+        "Primary task (review tenders) is clear; tools strip (scrape, export, upload) is compact but could be more discoverable on mobile.",
+        "Progressive disclosure is present (KPIs → table → chart); chart is below fold — consider optional expand or sticky summary.",
+        "Filters (search, recommendation, deadline) live in client component; URL sync would improve shareability and back-button behavior."
+      ],
+      "visual_hierarchy": [
+        "Strong: hero title, KPI row, tools strip, then table. Fancy-card and kpi-card accents support hierarchy.",
+        "Gap: no clear visual weight difference between 'Run analysis' and 'Export to Odoo'; primary vs secondary CTAs could be stronger.",
+        "Table density is default; alternating rows and score indicator help; numeric columns use text-align: end (RTL-aware)."
+      ],
+      "information_scent": [
+        "Row click navigates to tender detail; breadcrumb/back from detail could be more prominent.",
+        "Deadline status (closing soon / open / past) and recommendation (INVEST/REVIEW/SKIP) are visible; estimated value and score are key scents — ensure they are above fold on small viewports."
+      ],
+      "accessibility": [
+        "Skip link, focus-visible ring, semantic table structure (thead/tbody), and RTL table direction are implemented.",
+        "Chart (Tremor BarChart) may lack full ARIA/screen-reader description; KPI cards have aria-label on section but individual cards could use aria-describedby for value+label.",
+        "Color contrast: status uses semantic colors plus text; verify WCAG AA for --text-secondary and badge text on backgrounds."
+      ],
+      "performance_hotspots": [
+        "Dashboard page is server-rendered; TendersListClient is client with table + chart — large list may benefit from virtualization or pagination (PAGE_SIZE=10 already).",
+        "BarChart from @tremor/react and all Radix primitives load in client bundle; consider dynamic import for chart below fold.",
+        "Fonts: Cairo + Noto Kufi Arabic loaded from Google Fonts; consider self-host or font-display: swap to improve LCP."
+      ]
+    },
+    "top_10_prioritized_issues": [
+      { "id": 1, "title": "No Framer Motion or Lottie", "impact": 8, "effort": 5, "notes": "Signature stack calls for motion; current CSS-only animations. Add Framer Motion for KPIs, row hover, skeletons; Lottie for empty/loading states." },
+      { "id": 2, "title": "Chart library mismatch (Tremor vs ApexCharts)", "impact": 6, "effort": 6, "notes": "tenders-list-client uses @tremor/react BarChart. Migrate to ApexCharts for consistency and better config/accessibility control." },
+      { "id": 3, "title": "Filters not in URL", "impact": 7, "effort": 4, "notes": "Search, recommendation, deadline, sort are client state only. Add URL searchParams sync for shareable links and back-button." },
+      { "id": 4, "title": "Chart accessibility", "impact": 7, "effort": 3, "notes": "BarChart needs aria-label, role, and optional data-table or summary for screen readers." },
+      { "id": 5, "title": "Mobile tools strip", "impact": 6, "effort": 3, "notes": "Tools strip stacks at 720px; ensure tap targets ≥44px and order (scrape, export, upload) is logical for thumb reach." },
+      { "id": 6, "title": "LCP / font loading", "impact": 6, "effort": 4, "notes": "Google Fonts block; self-host or font-display: swap; preload critical font files." },
+      { "id": 7, "title": "Loading skeletons consistency", "impact": 5, "effort": 2, "notes": "TendersListSkeleton and TenderDetailSkeleton exist; align with Framer Motion stagger and shared token durations." },
+      { "id": 8, "title": "KPI delta/trend", "impact": 5, "effort": 5, "notes": "KPIs show counts only; add optional trend vs previous period (e.g. +3) with small Framer Motion reveal." },
+      { "id": 9, "title": "RTL chart and axes", "impact": 5, "effort": 4, "notes": "Ensure ApexCharts (and current Tremor) render category axis and legend RTL when dir=rtl." },
+      { "id": 10, "title": "Analytics instrumentation", "impact": 8, "effort": 5, "notes": "No events defined; add events for page views, filter changes, export, run analysis, and tender open for redesign validation." }
+    ]
+  },
+  "analytics_requirements": {
+    "events": [
+      { "name": "dashboard_view", "payload": { "locale": "ar", "path": "/ar/dashboard" }, "where": "app/[locale]/dashboard/page.tsx or layout" },
+      { "name": "tender_detail_view", "payload": { "tender_id": "<id>", "locale": "ar" }, "where": "app/[locale]/dashboard/[tenderId]/page.tsx" },
+      { "name": "filter_change", "payload": { "filter_type": "recommendation|deadline|search|sort", "value": "<value>" }, "where": "components/dashboard/tenders-list-client.tsx" },
+      { "name": "run_analysis_click", "payload": { "scope": "selected|all" }, "where": "Run analysis button / evaluateAllPendingAction" },
+      { "name": "export_odoo_click", "payload": {}, "where": "ExportOdooCard / export action" },
+      { "name": "upload_tender_open", "payload": {}, "where": "UploadTenderTrigger" },
+      { "name": "upload_tender_submit", "payload": { "file_type": "csv|xlsx" }, "where": "UploadTenderForm submit" },
+      { "name": "push_to_crm_click", "payload": { "tender_id": "<id>" }, "where": "PushToCrmButton" }
+    ],
+    "suggested_dashboards": [
+      "Redesign rollout: dashboard_view + tender_detail_view by locale and date; filter_change funnel.",
+      "Conversion: run_analysis_click and export_odoo_click rate vs dashboard_view; push_to_crm_click vs tender_detail_view."
+    ],
+    "kpis_to_track": [
+      "Daily active users (dashboard_view unique by user/session)",
+      "Task completion: run_analysis_click, export_odoo_click, push_to_crm_click per session",
+      "Filter usage: filter_change count by filter_type",
+      "RTL vs LTR: dashboard_view and tender_detail_view by locale"
+    ]
+  },
+  "personas_and_flows": {
+    "personas": [
+      { "name": "Omar (Procurement Manager)", "goals": "Quickly see which tenders to invest in, export shortlist to CRM, meet deadlines.", "pain_points": "Too many tenders; hard to share filtered view with team; mobile use on the go." },
+      { "name": "Sara (Analyst)", "goals": "Run AI evaluation on new tenders, compare scores, upload historical files.", "pain_points": "Waiting for analysis; unclear what changed after re-run; RTL layout glitches." },
+      { "name": "Khalid (Executive)", "goals": "High-level KPIs and pipeline health; occasional drill-down.", "pain_points": "Needs at-a-glance numbers; charts must work on tablet; no time for complex filters." }
+    ],
+    "flows": [
+      {
+        "persona": "Omar",
+        "task": "Find closing-soon tenders and export to CRM",
+        "steps": ["Open dashboard", "Set deadline filter to Closing soon", "Scan table for INVEST", "Click Export to Odoo", "Confirm export"],
+        "success_criteria": "Export completes; filtered list is reflected in export."
+      },
+      {
+        "persona": "Omar",
+        "task": "Share current filtered list with colleague",
+        "steps": ["Apply filters (e.g. INVEST + Closing soon)", "Copy URL or share link"],
+        "success_criteria": "Colleague opens URL and sees same filtered list (requires URL sync)."
+      },
+      {
+        "persona": "Omar",
+        "task": "Open tender detail on mobile",
+        "steps": ["Tap row in table", "View detail with score and breakdown", "Optionally Push to CRM"],
+        "success_criteria": "Detail loads <2.5s LCP; tap targets ≥44px; RTL correct."
+      },
+      {
+        "persona": "Sara",
+        "task": "Run analysis on all pending tenders",
+        "steps": ["Open dashboard", "Click Run analysis (or select pending rows)", "Wait for completion", "See updated scores in table"],
+        "success_criteria": "Clear loading state; table updates without full reload; no PII in logs."
+      },
+      {
+        "persona": "Sara",
+        "task": "Upload CSV and see new tenders in list",
+        "steps": ["Click Upload", "Select file", "Submit", "Return to list", "See new rows"],
+        "success_criteria": "Upload success feedback; list includes new tenders; errors shown inline."
+      },
+      {
+        "persona": "Khalid",
+        "task": "Check pipeline KPIs at a glance",
+        "steps": ["Open dashboard", "Read KPI row (total, qualified, conditional, excluded, deadlines)"],
+        "success_criteria": "KPIs visible without scroll on desktop and mobile; numbers match table."
+      }
+    ]
+  },
+  "component_inventory": {
+    "components": [
+      {
+        "name": "KPI card",
+        "source": "components/dashboard/dashboard-kpi-row.tsx (Card + kpi-card class)",
+        "props_contract": "interface DashboardKpiRowProps { stats: DashboardKpiStats; locale?: string; labels: Record<keyof DashboardKpiStats, string> }",
+        "accessibility": "Section aria-label='Tender statistics'; each card data-testid kpi-{key}; add aria-describedby linking value to label for screen readers.",
+        "responsive": "dashboard-kpi-grid: repeat(auto-fill, minmax(160px, 1fr)); gap var(--space-4).",
+        "rtl": "Accent border uses border-inline-start; no flip needed.",
+        "tailwind_example": "kpi-card rounded-[var(--radius-card)] p-[18px_20px] border hover:shadow-md transition-transform"
+      },
+      {
+        "name": "Table (tenders list)",
+        "source": "components/dashboard/tenders-list-client.tsx (Radix Table)",
+        "props_contract": "TendersListClient receives tenders, locale; internal state for filter/sort/pagination.",
+        "accessibility": "Use <table>, <th scope='col'>; sticky thead; focus trap in modal if any; sort buttons announce state.",
+        "responsive": "Horizontal scroll wrapper dashboard-table-scroll max-height min(70vh, 640px); consider card layout for small screens.",
+        "rtl": "dashboard-table-scroll direction: rtl; table direction: rtl; .dashboard-table-numeric text-align: end (left in RTL).",
+        "tailwind_example": "dashboard-table-scroll overflow-auto; thead sticky top-0 bg-[var(--surface-card)]"
+      },
+      {
+        "name": "Filters",
+        "source": "components/dashboard/tenders-list-client.tsx (TextField, Select, Button)",
+        "props_contract": "Internal: search string, recommendation filter, deadline filter, sort key.",
+        "accessibility": "Label every input; group with fieldset/legend for recommendation and deadline; live region for result count.",
+        "responsive": "Stack filters vertically on narrow; wrap with gap.",
+        "rtl": "Search icon position; Select chevron flip (Radix handles dir).",
+        "tailwind_example": "flex flex-wrap gap-3 items-center"
+      },
+      {
+        "name": "Charts",
+        "source": "components/dashboard/tenders-list-client.tsx (BarChart from @tremor/react)",
+        "props_contract": "Data array { name: string, [key]: number }; category key; index key.",
+        "accessibility": "Add role='img', aria-label='Bar chart: tenders by deadline window'; optional <table> summary or ApexCharts accessibility options.",
+        "responsive": "Container width 100%; height fixed or aspect ratio.",
+        "rtl": "Flip category axis and bar direction when dir=rtl (ApexCharts xaxis.inverted / plotOptions).",
+        "tailwind_example": "w-full min-h-[200px]"
+      },
+      {
+        "name": "Sidebar",
+        "source": "None (dashboard uses top header only)",
+        "notes": "AuthenticatedShell + DashboardHeader provide top nav; no sidebar. If adding: use Radix NavigationMenu or custom; collapse with Framer Motion animate.",
+        "rtl": "If added: sidebar on right in RTL; use logical properties (margin-inline-start, etc.)."
+      },
+      {
+        "name": "Header",
+        "source": "components/dashboard/dashboard-header.tsx",
+        "props_contract": "interface DashboardHeaderProps { locale: string }",
+        "accessibility": "Banner landmark; nav links; skip target above.",
+        "responsive": "Flex wrap; locale toggle and logout in overflow menu on small.",
+        "rtl": "Logo and nav order flip with dir.",
+        "tailwind_example": "h-16 border-b flex items-center justify-between px-4"
+      },
+      {
+        "name": "Modals",
+        "source": "UploadTenderForm likely in Radix Dialog; push success in route",
+        "notes": "Use Radix Dialog; focus trap and return focus; aria-labelledby, aria-describedby.",
+        "rtl": "Dialog position same; content alignment start/end."
+      },
+      {
+        "name": "Forms",
+        "source": "components/dashboard/upload-tender-form.tsx, components/settings/odoo-integration-form.tsx",
+        "props_contract": "Vary by form; use react-hook-form + zod if present.",
+        "accessibility": "Label, error message id, aria-invalid, aria-describedby.",
+        "rtl": "Label alignment start; button group order."
+      }
+    ]
+  },
+  "design_system_tokens": {
+    "color_tokens": {
+      "light": "Primary (emerald) --color-primary-50..950; Neutral --color-neutral-50..950; Semantic success/warning/error/info; Status qualified/conditional/excluded/pending/evaluating; Surfaces surface-ground, surface-card, surface-page, surface-muted.",
+      "dark": "Same names; overrides in .dark in styles/tokens.css (e.g. surface-ground #0f172a, text-primary #f8fafc)."
+    },
+    "spacing_scale": "4px base: --space-1..24 (0.25rem..6rem); semantic --space-page-x, --space-card, etc.",
+    "typography_scale": "--text-xs (0.75rem)..--text-6xl (3.75rem); --leading-none..loose; --font-normal..black.",
+    "arabic_font_pairing": "--font-arabic: 'Noto Kufi Arabic'; --font-latin: 'Cairo'; body uses --font-arabic; [lang='en'] body uses --font-latin.",
+    "elevation_shadows": "--shadow-xs, sm, md, lg, xl, 2xl; --shadow-glass; --shadow-card; --shadow-primary (colored).",
+    "motion_tokens": "--duration-instant 50ms, fast 150ms, normal 200ms, slow 300ms; --ease-out, ease-in-out, ease-bounce; --transition-colors, transition-transform, transition-all.",
+    "css_variables_snippet": ":root { --color-primary-500: #10b981; --space-4: 1rem; --radius-card: 0.875rem; --duration-normal: 200ms; --ease-out: cubic-bezier(0, 0, 0.2, 1); }",
+    "tailwind_config_snippet": "@theme { --font-family-arabic: var(--font-arabic); --font-family-sans: var(--font-latin); } Use arbitrary values: bg-[var(--surface-card)], rounded-[var(--radius-card)], transition-[transform_var(--duration-normal)_var(--ease-out)]."
+  },
+  "UI_patterns_and_interactions": {
+    "kpi_change": "Framer Motion: wrap value in motion.span; animate when stats change: initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}. Optional number count-up with useMotionValue + useTransform.",
+    "row_hover": "CSS already: .dashboard-tender-row transition background. Framer: motion.tr whileHover={{ backgroundColor: 'var(--surface-muted)' }} transition={{ duration: 0.15 }}.",
+    "sidebar_collapse": "If adding sidebar: motion.aside layout width={open ? 220 : 64}; AnimatePresence for overlay. Use transform: translateX for RTL (translateX(100%) when closed in RTL).",
+    "chart_hover": "ApexCharts: dataLabels off or minimal; tooltip enabled; custom tooltip with formatted value and label. Framer: wrap chart in motion.div whileHover={{ scale: 1.01 }} for subtle lift.",
+    "loading_skeletons": "Framer: motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }} for shimmer; or CSS .animate-shimmer. Stagger children: transition={{ delay: index * 0.05 }}.",
+    "framer_motion_snippets": [
+      "KPI reveal: `const controls = useAnimation(); useEffect(() => { controls.start({ opacity: 1, y: 0 }); }, [value]); return <motion.span initial={{ opacity: 0, y: 4 }} animate={controls} transition={{ duration: 0.25 }}>{value}</motion.span>`",
+      "Stagger list: `const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }; const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }; <motion.div variants={container} initial=\"hidden\" animate=\"show\"><motion.div variants={item} />...</motion.div>`",
+      "Lottie empty state: `import Lottie from 'lottie-react'; <Lottie animationData={emptyJson} loop={false} className=\"w-48 h-48\" />` (add lottie-react if approved)."
+    ]
+  },
+  "charts_and_data_contracts": {
+    "line_chart": {
+      "data_contract": "{ series: [{ name: string, data: number[] }], categories: string[] }",
+      "apex_config_snippet": "chart: { type: 'line', toolbar: { show: false } }, stroke: { curve: 'smooth', width: 2 }, xaxis: { categories }, yaxis: { labels: { formatter: (v) => v.toLocaleString(locale) } }, tooltip: { y: { formatter: (v) => v.toLocaleString(locale) } }",
+      "performance": "Decimate: keep last N points on small width; use chart.animations.enabled: true but duration 300ms."
+    },
+    "bar_chart": {
+      "data_contract": "{ series: [{ name: string, data: number[] }], categories: string[] }",
+      "apex_config_snippet": "chart: { type: 'bar', toolbar: { show: false } }, plotOptions: { bar: { horizontal: false, columnWidth: '60%', borderRadius: 4 } }, xaxis: { categories }, dataLabels: { enabled: false }, tooltip: { shared: true }",
+      "performance": "Limit categories (e.g. top 10); avoid huge datasets without sampling."
+    },
+    "stacked_bar": {
+      "data_contract": "{ series: [{ name: string, data: number[] }][], categories: string[] }",
+      "apex_config_snippet": "chart: { type: 'bar', stacked: true }, plotOptions: { bar: { horizontal: false } }, xaxis: { categories }, legend: { position: 'top' }",
+      "performance": "Same as bar; stack only when series count is small (2-5)."
+    },
+    "donut": {
+      "data_contract": "{ series: number[], labels: string[] }",
+      "apex_config_snippet": "chart: { type: 'donut' }, labels, legend: { position: 'bottom' }, dataLabels: { formatter: (v, opts) => opts.w.config.series[opts.seriesIndex] }, colors: [semantic colors]",
+      "performance": "Donut is cheap; limit segments to ≤7."
+    },
+    "mock_payload_example": "{ categories: ['Closing in 7d', '8–30 days', '30+ days', 'Past'], series: [{ name: 'Tenders', data: [12, 28, 45, 8] }] }"
+  },
+  "RTL_localization_plan": {
+    "file_structure": "messages/ar.json, messages/en.json; i18n/config.ts (locales ar, en); next-intl with app router (middleware or routing in i18n/routing.ts).",
+    "direction_handling": "Set dir and lang on html or body from locale (ar → rtl, en → ltr). Use components/locale-html-attributes.tsx or layout.",
+    "arabic_typography_rules": "Already: [dir='rtl'] { --leading-normal: 1.7; letter-spacing: 0.01em; } Headings use --font-arabic in RTL. Avoid fixed widths for text; use min-width and overflow-hidden text-ellipsis where needed.",
+    "line_length_truncation": "Max width for long titles ~40ch or 100%; truncate with overflow-hidden text-ellipsis whitespace-nowrap; ensure tooltips or title attribute for full text.",
+    "date_time_saudi": "Use date-fns with ar locale for ar; format with PP or PPP; for Saudi prefer 'Asia/Riyadh' for any time (Intl.DateTimeFormat(undefined, { timeZone: 'Asia/Riyadh', dateStyle: 'medium' })).",
+    "qa_checklist_rtl": [
+      "All layouts flip: header, table columns, cards, form labels.",
+      "Numeric columns stay end-aligned (left in RTL).",
+      "Icons with direction (chevron, arrow) flip where meaningful (flip-rtl or RTL-specific icon).",
+      "Modal/dialog position correct; drawer from correct side (right in RTL).",
+      "Chart category axis and legend order RTL.",
+      "No overflow or clipping of Arabic text; line-break acceptable for long words."
+    ]
+  },
+  "accessibility_plan": {
+    "checklist_wcag_aa_dashboards": [
+      "Keyboard: All actions (filter, sort, open row, export, run analysis) reachable and activatable by keyboard.",
+      "Focus: Visible focus ring (already :focus-visible); no focus trap except inside modal; skip link to main content.",
+      "Tables: <table>, <th scope='col'>, <td>; id/headers if complex; caption or aria-label for table purpose.",
+      "Charts: role='img' + aria-label describing chart; or link to data table; ensure color not sole differentiator (labels/patterns).",
+      "Color contrast: Text and UI components meet 4.5:1 (normal), 3:1 (large); badges and status text checked.",
+      "Forms: Every input has visible label; errors associated with aria-describedby and aria-invalid.",
+      "Motion: prefers-reduced-motion respected (already in animations.css); no auto-play > 5s or provide pause."
+    ],
+    "automated_tests": "axe-core in Playwright: await expect(page).toHaveNoViolations() or inject axe and run; run on dashboard and tender detail.",
+    "manual_steps": "Full keyboard nav (Tab, Enter, Space, Arrow); Screen reader (NVDA/JAWS or VoiceOver) through dashboard and detail; Zoom 200% layout; RTL and LTR both."
+  },
+  "performance_plan": {
+    "critical_rendering_path": "Server-render dashboard page; stream or suspense for heavy client; preload critical font files; defer non-critical CSS if any.",
+    "lazy_loading": "Dynamic import TendersListClient or at least chart: const BarChart = dynamic(() => import('@/components/charts/BarChart'), { ssr: false }); Lottie: dynamic import lottie-react and JSON.",
+    "bundle_splitting": "Code-split by route (Next.js default); ensure chart library in separate chunk; consider next/dynamic for below-fold tools card or chart section.",
+    "lighthouse_targets": "Performance ≥90, LCP <2.5s, TBT minimal, CLS <0.1; Accessibility ≥95.",
+    "ci_checks": "Lighthouse CI on preview URL (mobile); bundle size budget (e.g. first-load JS <200KB); optional Playwright LCP measurement."
+  },
+  "testing_and_validation": {
+    "usability_test_plan": {
+      "script_intro": "Explain goal: evaluate dashboard redesign for procurement workflow. Say we observe; no wrong answers.",
+      "tasks": ["Find tenders closing in the next 7 days", "Export the current list to CRM", "Open one tender and tell us what you see", "Change language to Arabic and confirm layout"],
+      "success_metrics": "Task completion rate; time on task; SUS or single ease question after each task."
+    },
+    "ab_rollout": "Feature flag or route prefix (e.g. /v2/dashboard) for new UI; 10% traffic for 1 week; compare analytics (dashboard_view, filter_change, export_odoo_click) and support tickets; then 50%, then 100%.",
+    "telemetry_post_release": "Track dashboard_view, tender_detail_view, run_analysis_click, export_odoo_click, push_to_crm_click; error boundary logs (no PII); LCP and TBT from RUM if available."
+  },
+  "acceptance_criteria_major_deliverables": [
+    "Dashboard: KPIs visible; filters and sort work; URL reflects filters; table accessible; chart has aria-label; RTL correct.",
+    "Tender detail: Score gauge and breakdown visible; Push to CRM works; back navigation and breadcrumb clear.",
+    "Motion: Framer Motion on KPI change and list stagger; reduced-motion respected.",
+    "Charts: ApexCharts integrated; donut/bar configs; RTL axis/legend.",
+    "i18n: ar/en messages complete; dates Asia/Riyadh where relevant; no hardcoded strings."
+  ],
+  "rollout_backlog": {
+    "weeks": [
+      {
+        "week": 1,
+        "theme": "Foundation: Motion + URL state",
+        "tasks": [
+          { "name": "Add Framer Motion and Lottie (dependency approval)", "points": 3, "owner": "Developer", "acceptance": "Package added; one KPI and one list stagger demo in Storybook or dashboard." },
+          { "name": "Sync filters and sort to URL (searchParams)", "points": 5, "owner": "Cursor", "acceptance": "Changing filter/sort updates URL; reload and share URL restores state." },
+          { "name": "Document analytics events and add 3 core events", "points": 3, "owner": "Cursor", "acceptance": "dashboard_view, filter_change, tender_detail_view sent to placeholder or analytics endpoint." }
+        ]
+      },
+      {
+        "week": 2,
+        "theme": "Charts and accessibility",
+        "tasks": [
+          { "name": "Migrate BarChart from Tremor to ApexCharts", "points": 5, "owner": "Cursor", "acceptance": "Same data and labels; bar chart matches current; bundle size checked." },
+          { "name": "Chart accessibility (aria-label, optional data table)", "points": 3, "owner": "Cursor", "acceptance": "Screen reader announces chart purpose; no critical axe violations." },
+          { "name": "RTL chart axis/legend", "points": 3, "owner": "Cursor", "acceptance": "In ar locale, category axis and legend order RTL." }
+        ]
+      },
+      {
+        "week": 3,
+        "theme": "UI polish and skeletons",
+        "tasks": [
+          { "name": "Framer Motion on KPI value change and list mount stagger", "points": 3, "owner": "Cursor", "acceptance": "KPI numbers animate on change; list rows stagger in; prefers-reduced-motion disables." },
+          { "name": "Unify loading skeletons (tenders + detail) with tokens", "points": 2, "owner": "Cursor", "acceptance": "Same duration and shimmer; no layout shift." },
+          { "name": "Lottie empty state for no tenders", "points": 2, "owner": "Cursor", "acceptance": "Empty state shows Lottie animation (or SVG fallback); accessible." }
+        ]
+      },
+      {
+        "week": 4,
+        "theme": "Mobile and performance",
+        "tasks": [
+          { "name": "Mobile tools strip and tap targets (≥44px)", "points": 2, "owner": "Cursor", "acceptance": "All buttons/links pass touch target size; strip stacks cleanly." },
+          { "name": "Font loading: preload or self-host Cairo + Noto Kufi Arabic", "points": 3, "owner": "Developer/Cursor", "acceptance": "LCP improved; font-display swap or optional." },
+          { "name": "Lazy load chart (dynamic import)", "points": 2, "owner": "Cursor", "acceptance": "Chart in separate chunk; dashboard first-load JS reduced." }
+        ]
+      },
+      {
+        "week": 5,
+        "theme": "Analytics and QA",
+        "tasks": [
+          { "name": "Remaining analytics events (export, run analysis, upload, push to CRM)", "points": 3, "owner": "Cursor", "acceptance": "All events from analytics_requirements implemented." },
+          { "name": "Accessibility audit (axe + manual keyboard/screen reader)", "points": 5, "owner": "Developer/MCP", "acceptance": "No critical/serious axe issues; keyboard and SR pass." },
+          { "name": "RTL QA checklist pass", "points": 2, "owner": "Cursor", "acceptance": "All RTL checklist items verified." }
+        ]
+      },
+      {
+        "week": 6,
+        "theme": "Documentation and handoff",
+        "tasks": [
+          { "name": "Storybook entries for KPI, table, chart, header (if Storybook present)", "points": 5, "owner": "Cursor", "acceptance": "At least 4 components with props and RTL variant." },
+          { "name": "Update docs: tokens, i18n, rollout checklist", "points": 2, "owner": "Cursor", "acceptance": "docs/ux-ui-upgrade-plan.json and README or DESIGN.md updated." },
+          { "name": "Lighthouse CI or manual run; fix regressions", "points": 3, "owner": "Developer", "acceptance": "LCP <2.5s, Performance ≥90, Accessibility ≥95 on mobile." }
+        ]
+      }
+    ],
+    "mvp_scope": "Weeks 1–3: URL state, ApexCharts + a11y, Framer Motion + skeletons + Lottie empty.",
+    "stretch_scope": "Weeks 4–6: Mobile polish, font optimization, full analytics, Storybook, Lighthouse CI."
+  },
+  "MCP_and_agent_mapping": {
+    "dashboard_design_skill": "Use for: layout and hierarchy review, KPI/table/chart placement, density and scannability. Output: recommendations and code snippets for components; handoff: updated component or PR.",
+    "frontend_design_skill": "Use for: visual polish, typography and color consistency, motion and empty states. Output: distinctive UI code; handoff: TSX/CSS and token usage.",
+    "webapp_testing_skill": "Use for: Playwright tests, LCP/performance checks, accessibility (axe). Output: test files and reports; handoff: test PR and screenshot/logs.",
+    "supabase_postgres_skill": "Use for: any query or schema change for dashboard data; not UI. Output: SQL or query code; handoff: migration or query PR.",
+    "playwright_cli_skill": "Use for: browser automation, form fill, screenshots for QA. Output: scripts or one-off runs; handoff: screenshots and steps.",
+    "cursor_browser_extension_mcp": "Use for: live testing of dashboard in browser, visual checks. Output: screenshots and interaction logs; handoff: bug list or confirmation.",
+    "mapping_to_backlog": [
+      { "task": "Sync filters to URL", "primary": "Cursor", "support": "dashboard_design_skill for state/URL pattern" },
+      { "task": "Migrate to ApexCharts", "primary": "Cursor", "support": "dashboard_design_skill for chart placement" },
+      { "task": "Framer Motion KPI and stagger", "primary": "Cursor", "support": "frontend_design_skill for motion tokens" },
+      { "task": "Accessibility audit", "primary": "webapp_testing_skill / Playwright", "support": "Cursor for fixes" },
+      { "task": "Storybook entries", "primary": "Cursor", "support": "frontend_design_skill for variants" }
+    ]
+  },
+  "deliverables_and_handoff": {
+    "artifacts_for_developers": [
+      "docs/ux-ui-upgrade-plan.json (this file)",
+      "styles/tokens.css and styles/animations.css (existing; extend if needed)",
+      "messages/ar.json, messages/en.json (complete keys for dashboard and tender)",
+      "Component props and TypeScript interfaces in codebase",
+      "Playwright e2e and accessibility test reports"
+    ],
+    "artifacts_for_design_specialists": [
+      "Figma: optional component library reflecting tokens (colors, type, spacing); RTL and LTR key screens.",
+      "Storybook: KPI card, table row, chart, header, empty state with RTL toggle and reduced-motion.",
+      "Token file: styles/tokens.css or exported JSON for design-dev sync."
+    ],
+    "pr_checklist_example": [
+      "[ ] No new critical axe violations",
+      "[ ] RTL layout verified for changed components",
+      "[ ] Filters (if changed) sync to URL",
+      "[ ] Framer Motion respects prefers-reduced-motion",
+      "[ ] Bundle size or Lighthouse score not regressed"
+    ],
+    "storybook_entry_template": "Title: Dashboard/KpiCard. Args: stats (object), locale (ar|en), labels (object). Story: Default, RTL (parameters.rtl=true), Loading (skeleton)."
+  },
+  "deeper_analysis_inputs": "Optional files to paste for deeper analysis if not auto-inspected: package.json, app/globals.css, styles/tokens.css, components/dashboard/tenders-list-client.tsx (full), components/dashboard/dashboard-kpi-row.tsx, i18n/config.ts, messages/en.json (dashboard + tender keys), docs/dashboard/DASHBOARD_SPEC.md if present, current analytics snippet or event schema.",
+  "risks_and_mitigations": [
+    { "risk": "Framer Motion / ApexCharts increase bundle size", "mitigation": "Dynamic import chart; use Framer Motion only where needed; set bundle budget in CI." },
+    { "risk": "URL state breaks existing bookmarks", "mitigation": "Default params when no query; redirect or graceful fallback for old URLs." },
+    { "risk": "RTL chart bugs in ApexCharts", "mitigation": "Test early with dir=rtl; fallback to mirrored container or documented limitation." },
+    { "risk": "Font loading blocks LCP", "mitigation": "Preload critical font; font-display: swap; consider subset for Arabic/Latin." },
+    { "risk": "Analytics PII leakage", "mitigation": "Events contain only locale, ids, and action types; no user name or tender title in events." },
+    { "risk": "Regression on existing e2e tests", "mitigation": "Update selectors if structure changes; run tests/e2e after each major PR." },
+    { "risk": "Scope creep (e.g. new 3D or heavy libs)", "mitigation": "Stick to signature stack; no Three.js; Lottie only for small JSON animations." },
+    { "risk": "Single developer bottleneck", "mitigation": "Backlog is Cursor-first; engineer reviews and runs tests; MCPs for focused tasks (testing, browser check)." }
+  ]
+}

@@ -48,6 +48,12 @@ export async function upsertEvaluation(evaluation: EvaluationInsert): Promise<Ev
       predicted_budget_min: evaluation.predicted_budget_min,
       predicted_budget_max: evaluation.predicted_budget_max,
       routing_decision: evaluation.routing_decision,
+      // Dual-track / Booklet (Phase 4.2)
+      predicted_value_sar: evaluation.predicted_value_sar,
+      value_method: evaluation.value_method,
+      infratech_score: evaluation.infratech_score,
+      exotech_score: evaluation.exotech_score,
+      work_type: evaluation.work_type,
     }
     const updateQuery = supabase
       .from('evaluations') as any

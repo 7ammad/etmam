@@ -21,7 +21,10 @@ import {
 import {
   classifyTender,
   calculateCompanyFit,
+  detectWorkType,
+  calculateDualScore,
   type TenderClassification,
+  type WorkTypeCommodityOrPro,
 } from './classifier'
 
 /** Editable config shape (matches config/scoring.config.json). */
@@ -99,7 +102,7 @@ export interface ScoredTender {
   budget_estimation_confidence: number | null
 }
 
-/** V2 Scored tender with 6-dimension breakdown */
+/** V2 Scored tender with 6-dimension breakdown + Dual-Track fields */
 export interface ScoredTenderV2 extends Omit<ScoredTender, 'breakdown' | 'budget_estimation_method'> {
   /** V2 Score breakdown (0-100 for each dimension) */
   breakdown: {
@@ -114,6 +117,12 @@ export interface ScoredTenderV2 extends Omit<ScoredTender, 'breakdown' | 'budget
   classification: TenderClassification
   /** Method used for value estimation (V2 methods) */
   budget_estimation_method: ValueEstimateV2['method'] | null
+  /** Dual-Track: Infratech score 0–100 */
+  infratech_score: number
+  /** Dual-Track: Exotech score 0–100 */
+  exotech_score: number
+  /** Work type from classifier (Commodity → score forced to 0) */
+  work_type: WorkTypeCommodityOrPro
 }
 
 function recommendationFromScore(
@@ -360,7 +369,12 @@ const DEFAULT_WEIGHTS_V2 = {
 }
 
 /**
- * V2 Scoring: 6-dimension scoring with service fit + historical calibration
+ * V2 Scoring: 6-dimension scoring + Dual-Track engine (Infratech/Exotech, work type).
+ *
+ * Dual-Track:
+ * - detectWorkType(text) → Commodity | Professional Services (Commodity → final score 0).
+ * - calculateDualScore(text, entity) → infratech_score, exotech_score (0–100).
+ * - Direct Purchase Bonus: if value ≤ 100k SAR → Infra +10, Exo −15, Risk = 0.
  *
  * Dimensions:
  * 1. SERVICE_FIT (25%) - Does tender match company capabilities?
@@ -368,7 +382,7 @@ const DEFAULT_WEIGHTS_V2 = {
  * 3. TIMELINE_FIT (20%) - Enough prep time?
  * 4. COMPLEXITY_FIT (15%) - Right complexity for your team?
  * 5. STRATEGIC_FIT (10%) - Entity relationship + geography
- * 6. RISK_SCORE (10%) - Missing fields, short timeline
+ * 6. RISK_SCORE (10%) - Missing fields, short timeline (or 0 if Direct Purchase Bonus)
  */
 export function scoreTenderV2(
   tender: ScrapedTender,
@@ -376,9 +390,8 @@ export function scoreTenderV2(
 ): ScoredTenderV2 {
   const w = config.weights_v2 ?? DEFAULT_WEIGHTS_V2
 
-  // Validate weights sum to ~1.0
   const weightsSum = w.service_fit + w.budget_fit + w.timeline_fit +
-                     w.complexity_fit + w.strategic_fit + w.risk_score
+                    w.complexity_fit + w.strategic_fit + w.risk_score
   if (Math.abs(weightsSum - 1.0) > 0.01) {
     throw new Error(`V2 weights must sum to 1.0 (got ${weightsSum.toFixed(3)})`)
   }
@@ -386,19 +399,34 @@ export function scoreTenderV2(
   const reasons: string[] = []
   const r = config.rules
 
-  // Get tender classification and V2 value estimate
+  // Text and entity for Dual-Track
+  const text = `${tender.title ?? ''} ${tender.description ?? ''}`.trim()
+  const entity = tender.entity ?? ''
+
+  // Dual-Track: work type and Infratech/Exotech scores
+  const work_type = detectWorkType(text)
+  const dual = calculateDualScore(text, entity)
+
+  // Get classification and value estimate
   const classification = classifyTender(tender)
   const valueEstimate = needsValueEstimation(tender)
     ? estimateValueV2(tender, config)
     : null
   const effectiveValue = valueEstimate?.midpoint ?? tender.estimated_value ?? 0
 
+  // Direct Purchase Bonus: value ≤ 100k SAR → Infra +10, Exo −15, Risk = 0
+  const directPurchaseBonus = effectiveValue > 0 && effectiveValue <= 100_000
+  let infratech_score = Math.min(100, dual.infratech_score + (directPurchaseBonus ? 10 : 0))
+  let exotech_score = Math.max(0, dual.exotech_score - (directPurchaseBonus ? 15 : 0))
+  if (directPurchaseBonus) {
+    reasons.push('Direct Purchase Bonus applied (value ≤ 100k SAR): Infra +10, Exo −15, Risk = 0')
+  }
+
   // -------------------------------------------------------------------------
-  // 1. SERVICE FIT (0-100): Does tender match company capabilities?
+  // 1. SERVICE FIT (0-100)
   // -------------------------------------------------------------------------
   const companyFit = calculateCompanyFit(tender.title, tender.description)
   const serviceFitScore = companyFit.score
-
   if (companyFit.category === 'core') {
     reasons.push(`Core service match: ${classification.serviceTypeLabel}`)
   } else if (companyFit.category === 'adjacent') {
@@ -408,19 +436,14 @@ export function scoreTenderV2(
   }
 
   // -------------------------------------------------------------------------
-  // 2. BUDGET FIT (0-100): Is value in target range?
+  // 2. BUDGET FIT (0-100)
   // -------------------------------------------------------------------------
   let budgetScore = 0
   if (effectiveValue > 0) {
-    // Base score for having a value
     budgetScore = 50
-
-    // Apply confidence penalty for estimated values
     if (valueEstimate) {
       budgetScore = Math.round(budgetScore * (valueEstimate.confidence / 100))
     }
-
-    // Check if value is in preferred range
     if (effectiveValue >= r.budget_fit.min_value_sar &&
         effectiveValue <= r.budget_fit.max_value_sar) {
       let rangeBonus = 50
@@ -428,11 +451,9 @@ export function scoreTenderV2(
         rangeBonus = Math.round(rangeBonus * (valueEstimate.confidence / 100))
       }
       budgetScore += rangeBonus
-
       const formatted = effectiveValue >= 1000000
         ? `${(effectiveValue / 1000000).toFixed(1)}M SAR`
         : `${Math.round(effectiveValue / 1000)}K SAR`
-
       if (valueEstimate) {
         reasons.push(`Est. value ~${formatted} (${valueEstimate.method}, ${valueEstimate.confidence}% conf)`)
       } else {
@@ -447,7 +468,7 @@ export function scoreTenderV2(
   budgetScore = Math.min(100, Math.max(0, budgetScore))
 
   // -------------------------------------------------------------------------
-  // 3. TIMELINE FIT (0-100): Enough prep time?
+  // 3. TIMELINE FIT (0-100)
   // -------------------------------------------------------------------------
   let timelineScore = 0
   const days = daysUntilDeadline(tender.deadline)
@@ -469,83 +490,77 @@ export function scoreTenderV2(
       reasons.push(`${days} days - good prep time`)
     }
   } else {
-    timelineScore = 30 // Unknown deadline is risky
+    timelineScore = 30
     reasons.push('Deadline unknown')
   }
 
   // -------------------------------------------------------------------------
-  // 4. COMPLEXITY FIT (0-100): Right complexity for team?
+  // 4. COMPLEXITY FIT (0-100)
   // -------------------------------------------------------------------------
-  // Assuming team can handle medium-high complexity best
   let complexityScore = 50
   const complexityLevel = classification.complexity
-  const complexityValue = classification.complexityScore
-
   if (complexityLevel === 'low') {
-    complexityScore = 70 // Easy but maybe not interesting
+    complexityScore = 70
   } else if (complexityLevel === 'medium') {
-    complexityScore = 100 // Sweet spot
+    complexityScore = 100
   } else if (complexityLevel === 'high') {
-    complexityScore = 80 // Challenging but doable
+    complexityScore = 80
   } else if (complexityLevel === 'very_high') {
-    complexityScore = 50 // May be too complex
+    complexityScore = 50
     reasons.push('High complexity project')
   }
 
   // -------------------------------------------------------------------------
-  // 5. STRATEGIC FIT (0-100): Entity relationship + geography
+  // 5. STRATEGIC FIT (0-100)
   // -------------------------------------------------------------------------
-  let strategicScore = 50 // Base neutral score
-
-  // Entity category adjustments
+  let strategicScore = 50
   const entityCategory = classification.entityCategory
   if (entityCategory === 'authority' || entityCategory === 'royal_authority') {
-    strategicScore = 80 // High-value relationships
+    strategicScore = 80
     reasons.push(`Strategic entity: ${classification.entityCategoryLabel}`)
   } else if (entityCategory === 'ministry') {
-    strategicScore = 70 // Good steady clients
+    strategicScore = 70
   } else if (entityCategory === 'municipality') {
-    strategicScore = 60 // Regional presence
+    strategicScore = 60
   } else if (entityCategory === 'healthcare' || entityCategory === 'education') {
-    strategicScore = 55 // Sector expertise building
+    strategicScore = 55
   }
 
   // -------------------------------------------------------------------------
-  // 6. RISK SCORE (0-100): Missing fields, short timeline, red flags
+  // 6. RISK SCORE (0-100) — Direct Purchase Bonus: value ≤ 100k → Risk = 0
   // -------------------------------------------------------------------------
-  let riskScore = 100
-
-  // Missing critical fields
-  if (!tender.deadline || tender.deadline.trim() === '') {
-    riskScore -= 40
-    reasons.push('Missing deadline (high risk)')
+  let riskScore: number
+  if (directPurchaseBonus) {
+    riskScore = 0
+    reasons.push('Risk set to 0 (Direct Purchase Bonus)')
+  } else {
+    riskScore = 100
+    if (!tender.deadline || tender.deadline.trim() === '') {
+      riskScore -= 40
+      reasons.push('Missing deadline (high risk)')
+    }
+    if (!tender.entity || tender.entity.trim() === '') {
+      riskScore -= 20
+      reasons.push('Missing entity')
+    }
+    if (!tender.reference_no || tender.reference_no.trim() === '') {
+      riskScore -= 30
+      reasons.push('Missing reference number')
+    }
+    if (valueEstimate && valueEstimate.confidence < 60) {
+      riskScore -= 15
+      reasons.push('Low confidence in value estimate')
+    }
+    if (days !== null && days < 7 && days >= 0) {
+      riskScore -= 20
+    }
+    riskScore = Math.max(0, riskScore)
   }
-  if (!tender.entity || tender.entity.trim() === '') {
-    riskScore -= 20
-    reasons.push('Missing entity')
-  }
-  if (!tender.reference_no || tender.reference_no.trim() === '') {
-    riskScore -= 30
-    reasons.push('Missing reference number')
-  }
-
-  // Value estimation uncertainty
-  if (valueEstimate && valueEstimate.confidence < 60) {
-    riskScore -= 15
-    reasons.push('Low confidence in value estimate')
-  }
-
-  // Very short timeline is risky
-  if (days !== null && days < 7 && days >= 0) {
-    riskScore -= 20
-  }
-
-  riskScore = Math.max(0, riskScore)
 
   // -------------------------------------------------------------------------
-  // WEIGHTED TOTAL
+  // WEIGHTED TOTAL (then override if Commodity)
   // -------------------------------------------------------------------------
-  const total =
+  let total =
     serviceFitScore * w.service_fit +
     budgetScore * w.budget_fit +
     timelineScore * w.timeline_fit +
@@ -553,7 +568,14 @@ export function scoreTenderV2(
     strategicScore * w.strategic_fit +
     riskScore * w.risk_score
 
-  const score = Math.round(Math.max(0, Math.min(100, total)))
+  let score = Math.round(Math.max(0, Math.min(100, total)))
+
+  // Commodity → force final score to 0
+  if (work_type === 'Commodity') {
+    score = 0
+    reasons.push('Work type Commodity: score forced to 0')
+  }
+
   const recommendation = recommendationFromScore(score, config.thresholds)
 
   return {
@@ -575,6 +597,9 @@ export function scoreTenderV2(
     predicted_budget_max: valueEstimate?.max ?? null,
     budget_estimation_method: valueEstimate?.method ?? null,
     budget_estimation_confidence: valueEstimate?.confidence ?? null,
+    infratech_score,
+    exotech_score,
+    work_type,
   }
 }
 

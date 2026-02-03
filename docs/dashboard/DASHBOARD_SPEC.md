@@ -94,24 +94,24 @@ Recommendation values:
 
 ### Section A: KPI cards row
 KPI set (full spec):
-- Total tenders
+- Total Tenders
 - Qualified
 - Conditional
 - Excluded
 - Total estimated value
-- Pending evaluation (Not evaluated)
+- Pending evaluation (Not Evaluated)
 - Pushed to CRM
 
-Phase 7D implemented subset (per docs/implementation.md): Total tenders, Qualified, Conditional, Excluded, Not evaluated, Due in 7 days, Due in 30 days. Total estimated value and Pushed to CRM are planned for a later phase.
+Phase 7D implemented subset (per docs/implementation.md): Total Tenders, Qualified, Conditional, Excluded, Not Evaluated, Due in 7 Days, Due in 30 Days. Total estimated value and Pushed to CRM are planned for a later phase.
 
 Data requirements
-- Compute KPIs from tender records and joined evaluation recommendation where present. If evaluation missing for a tender, it counts as Not evaluated. KPIs and chart are derived from the same filtered list as the table so widgets match list filters.
+- Compute KPIs from tender records and joined evaluation recommendation where present. If evaluation missing for a tender, it counts as Not Evaluated. KPIs and chart are derived from the same filtered list as the table so widgets match list filters.
 
 ### Section B: Filters row
 - Search input
   - Searches across: title, entity, reference number
 - Recommendation filter
-  - All, Qualified, Conditional, Excluded, Not evaluated
+  - All, Qualified, Conditional, Excluded, Not Evaluated
 - Deadline status filter
   - All, Closing soon, Open, Past deadline
 - Sort control
@@ -139,7 +139,7 @@ Formatting rules
   - Past deadline if deadline < today
 - Estimated value: SAR currency with compact formatting
 - Score: integer 0–100, display as compact visual plus text
-- Recommendation: badge, if missing evaluation show "Not evaluated"
+- Recommendation: badge, if missing evaluation show "Not Evaluated"
 
 ---
 
@@ -158,7 +158,7 @@ Formatting rules
   - Message: "Failed to load tenders."
   - Action: "Retry"
 - Partial data state
-  - If evaluation missing: Score = "—" and Recommendation = "Not evaluated"
+  - If evaluation missing: Score = "—" and Recommendation = "Not Evaluated"
 
 ### Acceptance criteria: Dashboard page
 - Logged-out users cannot view `/[locale]/dashboard`.
@@ -195,7 +195,7 @@ Formatting rules
   - Message: "Tender not found."
 - Error state
 - Partial data
-  - If evaluation missing: show "Not evaluated" and hide evaluation detail lists
+  - If evaluation missing: show "Not Evaluated" and hide evaluation detail lists
 
 ### Missing fields handled
 - Optional evaluation blocks only render when arrays exist and have length; list items stringify with fallback to avoid "undefined".

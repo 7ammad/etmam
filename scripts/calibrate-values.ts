@@ -15,6 +15,7 @@
 
 import * as fs from 'fs/promises'
 import * as path from 'path'
+import { normalizeTenderMoneyFields } from '../lib/currency'
 import {
   calibrateFromHistorical,
   getEstimationRange,
@@ -159,7 +160,8 @@ async function main(): Promise<void> {
   // Load all tenders
   const allTenders: ScrapedTender[] = []
   for (const file of inputFiles) {
-    const tenders = await loadTendersFromFile(file)
+    const raw = await loadTendersFromFile(file)
+    const tenders = raw.map((t) => normalizeTenderMoneyFields(t) as ScrapedTender)
     console.log(`  📄 ${file}: ${tenders.length} tenders`)
     allTenders.push(...tenders)
   }

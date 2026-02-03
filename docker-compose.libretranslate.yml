@@ -1,0 +1,27 @@
+# LibreTranslate: self-hosted, offline-capable translation (no AI, no API key).
+# Run: docker compose -f docker-compose.libretranslate.yml up -d
+# Then set LIBRE_TRANSLATE_URL=http://localhost:5000 (or leave default).
+# Load only Arabic and English to reduce memory and startup time.
+
+services:
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: etmam-libretranslate
+    ports:
+      - "5000:5000"
+    environment:
+      # Load only ar and en; other languages are not loaded (saves RAM).
+      LT_LOAD_ONLY: "ar,en"
+    # Optional: persist models so they are not re-downloaded on restart.
+    volumes:
+      - libretranslate_data:/home/libretranslate/.local
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/languages"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  libretranslate_data:

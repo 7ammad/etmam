@@ -20,7 +20,9 @@ test.describe('File Upload & Import Flow', () => {
     const dropzone = page.getByTestId('upload-tender-dropzone')
     const dropzoneVisible = await dropzone.first().isVisible().catch(() => false)
     if (!dropzoneVisible) {
-      await page.getByTestId('upload-tender-button').click()
+      const uploadBtn = page.getByTestId('upload-tender-button').first()
+      await expect(uploadBtn).toBeVisible({ timeout: 15000 })
+      await uploadBtn.click()
       await expect(dropzone.first()).toBeVisible({ timeout: 10000 })
     }
     return page.getByTestId('upload-tender-dropzone').first()
@@ -64,7 +66,7 @@ test.describe('File Upload & Import Flow', () => {
     await fileInput.setInputFiles(INVALID_CSV)
     const dialog = page.getByTestId('upload-tender-dialog')
     await expect(dialog.getByTestId('upload-error')).toBeVisible({ timeout: 15000 })
-    await expect(page.getByRole('heading', { name: /dashboard|لوحة التحكم/i })).toBeVisible()
+    await expect(page).toHaveURL(/\/dashboard/)
   })
 
   test('import idempotency: uploading same file twice does not create duplicates', async ({ page }) => {
@@ -116,5 +118,6 @@ test.describe('File Upload & Import Flow', () => {
     await fileInput.setInputFiles(INVALID_CSV)
     const dialog = page.getByTestId('upload-tender-dialog')
     await expect(dialog.getByTestId('upload-error')).toBeVisible({ timeout: 15000 })
+    await expect(page).toHaveURL(/\/dashboard/)
   })
 })

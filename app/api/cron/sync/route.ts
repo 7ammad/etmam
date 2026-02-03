@@ -16,6 +16,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
+import { toSar } from '@/lib/currency'
+import { runFeedDashboardTranslations } from '@/lib/feed-dashboard-translations'
+import { recalculateCalibration } from '@/lib/evaluation/calibration-service'
 import { scrapedTenderSchema } from '@/types/scraper'
 import type { SyncPayload, SyncResponse, ScrapedTender } from '@/types/scraper'
 import type { Database, Json } from '@/types/database'
@@ -68,20 +71,28 @@ function verifyCronSecret(request: NextRequest): boolean {
  * All scraped information (including every tab and award fields) is stored in raw_data under this tender.
  */
 function tenderToDbFormat(tender: ScrapedTender): TenderInsert {
+  // Normalize money fields from halala to SAR at ingest (100x bug fix)
+  const estimated_value =
+    tender.estimated_value != null ? toSar(tender.estimated_value, 'estimated_value') : null
+  const booklet_price_sar =
+    tender.booklet_price != null ? toSar(tender.booklet_price, 'booklet_price') : null
+  const award_amount_sar =
+    tender.award_amount_sar != null ? toSar(tender.award_amount_sar, 'award_amount_sar') : null
+
   return {
     user_id: SYSTEM_USER_ID,
     reference_no: tender.reference_no,
     title: tender.title,
     entity: tender.entity,
     deadline: tender.deadline,
-    estimated_value: tender.estimated_value ?? null,
+    estimated_value,
     description: tender.description ?? null,
     source: 'etimad',
     status: 'pending',
-    booklet_price_sar: tender.booklet_price ?? null,
+    booklet_price_sar,
     initial_guarantee_sar: tender.initial_guarantee ?? null,
     project_duration: tender.contract_duration ?? null,
-    award_amount_sar: tender.award_amount_sar ?? null,
+    award_amount_sar,
     award_date: tender.award_date ?? null,
     winning_bidder: tender.winning_bidder ?? null,
     raw_data: {
@@ -217,9 +228,30 @@ export async function POST(request: NextRequest) {
       results.upserted = 0
     } else {
       // Success: all tenders upserted atomically
-      // Note: For batch upsert, Supabase doesn't return individual row counts
-      // Using array length is acceptable (all-or-nothing operation)
       results.upserted = validatedTenders.length
+
+      // Automated feeder: fill phrase_translations so dashboard reads from cache (no translation on refresh)
+      const feed = await runFeedDashboardTranslations()
+      if (!feed.ok) {
+        console.warn('[Sync API] Feed translations failed (non-fatal):', feed.error)
+      } else {
+        console.log(
+          `[Sync API] Feed translations: ${feed.entitySummarized} entities, ${feed.titleSummarized} titles, ${feed.translated} translated`
+        )
+      }
+      Object.assign(results, { feed })
+
+      // Auto-calibration: recalculate V2 engine calibration from historic tenders (zero-touch)
+      try {
+        const calibration = await recalculateCalibration()
+        if (calibration) {
+          console.log(
+            `[Auto-Calibration] Updated engine stats based on ${calibration.sample_size} historic records.`
+          )
+        }
+      } catch (calErr) {
+        console.warn('[Sync API] Auto-calibration failed (non-fatal):', calErr)
+      }
     }
 
     console.log(

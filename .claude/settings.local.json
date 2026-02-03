@@ -32,7 +32,9 @@
       "Bash(powershell -Command:*)",
       "Bash(pnpm export:odoo-excel:*)",
       "Bash(node -e:*)",
-      "Bash(pnpm test)"
+      "Bash(pnpm test)",
+      "Bash(pnpm scrape:run:*)",
+      "WebFetch(domain:dribbble.com)"
     ]
   }
 }

@@ -13,6 +13,15 @@ export function getMVPRecommendationFromScore(score: number): MVPRecommendation 
   return 'SKIP'
 }
 
+/** DB enum is qualified | conditional | excluded. Map MVP display values for persistence. */
+export function mvpRecommendationToDb(
+  rec: MVPRecommendation
+): 'qualified' | 'conditional' | 'excluded' {
+  if (rec === 'INVEST') return 'qualified'
+  if (rec === 'REVIEW') return 'conditional'
+  return 'excluded'
+}
+
 // Score breakdown schema
 export const scoreBreakdownSchema = z.object({
   budget_fit: z.number().min(0).max(100),
@@ -34,6 +43,24 @@ export const routingDecisionSchema = z.enum([
 
 export type RoutingDecision = z.infer<typeof routingDecisionSchema>
 
+// Work type classification (Dual-Track / Booklet)
+export const workTypeSchema = z.enum([
+  'Commodity',
+  'General IT',
+  'Core Infra',
+  'Emerging Tech',
+])
+export type WorkType = z.infer<typeof workTypeSchema>
+
+// Value/track fields for ScoredTender and EvaluationResult (Phase 1 skeleton)
+export interface EvaluationValueFields {
+  predicted_value_sar: number | null
+  value_method: string
+  infratech_score: number
+  exotech_score: number
+  work_type: WorkType
+}
+
 // Full evaluation schema
 export const evaluationSchema = z.object({
   id: z.string().uuid().optional(),
@@ -52,6 +79,12 @@ export const evaluationSchema = z.object({
   predicted_budget_min: z.number().int().positive().nullable().optional(),
   predicted_budget_max: z.number().int().positive().nullable().optional(),
   routing_decision: routingDecisionSchema.nullable().optional(),
+  // Dual-Track / Booklet (Phase 1)
+  predicted_value_sar: z.number().nullable().optional(),
+  value_method: z.string().optional(),
+  infratech_score: z.number().min(0).max(100).optional(),
+  exotech_score: z.number().min(0).max(100).optional(),
+  work_type: workTypeSchema.optional(),
   created_at: z.coerce.date().optional(),
   updated_at: z.coerce.date().optional(),
 })
@@ -98,6 +131,12 @@ export interface EvaluationDisplay {
   predictedBudgetMin?: number | null
   predictedBudgetMax?: number | null
   routingDecision?: RoutingDecision | null
+  // Dual-Track / Booklet (Phase 1)
+  predictedValueSar?: number | null
+  valueMethod?: string
+  infratechScore?: number
+  exotechScore?: number
+  workType?: WorkType
   createdAt: Date
 }
 

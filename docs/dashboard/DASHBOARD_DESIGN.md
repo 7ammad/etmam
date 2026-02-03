@@ -30,7 +30,7 @@
 
 - **Top:** Header row — left: page title **“Dashboard”**; right: existing session/user menu (DashboardHeader).
 - **Content stack:**
-  1. **Section A — KPI cards row:** Total tenders, Qualified, Conditional, Excluded, Not evaluated, Due 7d, Due 30d. Use StatCards with optional icon + semantic accent (e.g. qualified = primary green, excluded = error tint).
+  1. **Section A — KPI cards row:** Total Tenders, Qualified, Conditional, Excluded, Not Evaluated, Due in 7 Days, Due in 30 Days. Use StatCards with optional icon + semantic accent (e.g. qualified = primary green, excluded = error tint).
   2. **Section B — Filters row:** Search, Recommendation filter, Status filter, Sort. Clear grouping, adequate spacing.
   3. **Section C — Tenders table:** Contained in a single card-style block (e.g. `--surface-card`, `--shadow-card`, `--radius-card`). Columns per spec; row = link to detail; subtle row hover (e.g. `--transition-colors`, light background change).
 - **Export:** Compact strip or card above Section A, using design tokens (not raw gray-a2).

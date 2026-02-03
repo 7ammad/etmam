@@ -126,6 +126,7 @@ export default function LoginPage() {
             <Crown size={36} color="white" />
           </Flex>
           <Heading 
+            as="h1"
             size="7" 
             weight="bold" 
             style={{ 

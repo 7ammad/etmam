@@ -1,19 +1,21 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import dynamic from 'next/dynamic'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import NextLink from 'next/link'
 import { useTranslations } from '@/components/providers/i18n-provider'
 import type { TenderWithEvaluation } from '@/lib/queries/tender'
-import { runEvaluationAction, evaluateAllPendingAction } from '@/actions/evaluation'
-import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox, Card } from '@radix-ui/themes'
-import { BarChart } from '@tremor/react'
-import { Sparkles, Search, Filter, ArrowUpDown, X } from 'lucide-react'
+import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox } from '@radix-ui/themes'
+import { Search, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import { DashboardKpiRow, type DashboardKpiStats } from './dashboard-kpi-row'
+import { TenderDataBlock } from './tender-data-block'
+import { UploadTenderTrigger } from './upload-tender-trigger'
 import { getDisplayText } from '@/lib/translate-display'
 import { getEffectiveValueDisplay } from '@/lib/display-ev'
+import { trackFilterChange } from '@/lib/analytics'
 
 const localeMap = { ar, en: enUS } as const
 const PAGE_SIZE = 10
@@ -66,6 +68,51 @@ function normalizeRecommendation(rec: string | null | undefined): Recommendation
 /** Per DASHBOARD_SPEC Section B: Deadline status filter */
 type DeadlineFilter = '' | 'closing_soon' | 'open' | 'past'
 
+/** URL searchParam keys for filter/sort state (shareable, reload-safe). */
+const PARAM_Q = 'q'
+const PARAM_REC = 'rec'
+const PARAM_DEADLINE = 'deadline'
+const PARAM_SORT = 'sort'
+const PARAM_PAGE = 'page'
+
+const VALID_REC: RecommendationFilter[] = ['', 'INVEST', 'REVIEW', 'SKIP', 'not_evaluated']
+const VALID_DEADLINE: DeadlineFilter[] = ['', 'closing_soon', 'open', 'past']
+const VALID_SORT: SortKey[] = ['newest_first', 'oldest_first', 'deadline_soonest', 'deadline_latest', 'score_low_high', 'score_high_low']
+
+type UrlState = {
+  search: string
+  recommendationFilter: RecommendationFilter
+  deadlineFilter: DeadlineFilter
+  sortKey: SortKey
+  page: number
+}
+
+function parseStateFromSearchParams(sp: URLSearchParams | { get: (key: string) => string | null }): UrlState {
+  const q = sp.get(PARAM_Q) ?? ''
+  const rec = sp.get(PARAM_REC) ?? ''
+  const deadline = sp.get(PARAM_DEADLINE) ?? ''
+  const sort = sp.get(PARAM_SORT) ?? 'newest_first'
+  const pageStr = sp.get(PARAM_PAGE) ?? '1'
+  const page = Math.max(1, parseInt(pageStr, 10) || 1)
+  return {
+    search: typeof q === 'string' ? q : '',
+    recommendationFilter: VALID_REC.includes(rec as RecommendationFilter) ? (rec as RecommendationFilter) : '',
+    deadlineFilter: VALID_DEADLINE.includes(deadline as DeadlineFilter) ? (deadline as DeadlineFilter) : '',
+    sortKey: VALID_SORT.includes(sort as SortKey) ? (sort as SortKey) : 'newest_first',
+    page,
+  }
+}
+
+function buildSearchParams(state: UrlState): URLSearchParams {
+  const params = new URLSearchParams()
+  if (state.search.trim()) params.set(PARAM_Q, state.search.trim())
+  if (state.recommendationFilter) params.set(PARAM_REC, state.recommendationFilter)
+  if (state.deadlineFilter) params.set(PARAM_DEADLINE, state.deadlineFilter)
+  if (state.sortKey !== 'newest_first') params.set(PARAM_SORT, state.sortKey)
+  if (state.page > 1) params.set(PARAM_PAGE, String(state.page))
+  return params
+}
+
 function formatDeadline(deadline: string | null, locale: string) {
   if (!deadline) return '—'
   try {
@@ -87,6 +134,15 @@ function formatValue(value: number | null, locale: string): string {
       maximumFractionDigits: 0,
     }).format(value) + ' SAR'
   )
+}
+
+/** Enforce max words for title summary display (5-word rule). */
+function maxWords(text: string, limit: number): string {
+  const t = text.trim()
+  if (!t) return t
+  const words = t.split(/\s+/).filter(Boolean)
+  if (words.length <= limit) return t
+  return words.slice(0, limit).join(' ')
 }
 
 /** Score color for progress indicator: qualified green, conditional amber, excluded red */
@@ -117,34 +173,148 @@ function parseSortKey(key: SortKey): { by: 'created_at' | 'deadline' | 'score'; 
 interface TendersListClientProps {
   tenders: TenderWithEvaluation[]
   locale: string
-  /** When locale is 'en', server provides AI-translated entity/title map. */
+  /** When locale is 'en', server may provide translation or summary maps. */
   translationMap?: Record<string, string> | null
+  /** AI-summarized entity names (e.g. "Ministry of Health"). Used for entity column when present. */
+  entitySummaryMap?: Record<string, string> | null
+  /** AI-summarized titles (e.g. "Subscription renewal"). Used for title column when present. */
+  titleSummaryMap?: Record<string, string> | null
 }
 
-export function TendersListClient({ tenders, locale, translationMap = null }: TendersListClientProps) {
+const SEARCH_DEBOUNCE_MS = 400
+
+export function TendersListClient({
+  tenders,
+  locale,
+  translationMap = null,
+  entitySummaryMap = null,
+  titleSummaryMap = null,
+}: TendersListClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const t = useTranslations('tendersList')
   const tDashboard = useTranslations('dashboard')
   const tStatuses = useTranslations('tender.statuses')
   const tTender = useTranslations('tender')
   const tEval = useTranslations('evaluation')
 
-  const [search, setSearch] = useState('')
+  const [search, setSearchState] = useState(() => parseStateFromSearchParams(searchParams).search)
   const [statusFilter, setStatusFilter] = useState<TenderStatus | ''>('')
-  const [recommendationFilter, setRecommendationFilter] = useState<RecommendationFilter>('')
-  const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>('')
-  const [sortKey, setSortKey] = useState<SortKey>('newest_first')
-  const [page, setPage] = useState(1)
+  const [recommendationFilter, setRecommendationFilter] = useState<RecommendationFilter>(
+    () => parseStateFromSearchParams(searchParams).recommendationFilter
+  )
+  const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>(
+    () => parseStateFromSearchParams(searchParams).deadlineFilter
+  )
+  const [sortKey, setSortKey] = useState<SortKey>(() => parseStateFromSearchParams(searchParams).sortKey)
+  const [page, setPageState] = useState(() => parseStateFromSearchParams(searchParams).page)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [evaluating, setEvaluating] = useState(false)
-  const [evaluateProgress, setEvaluateProgress] = useState<{ current: number; total: number } | null>(null)
+
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const updateUrl = useCallback(
+    (state: UrlState) => {
+      const params = buildSearchParams(state)
+      const query = params.toString()
+      const url = query ? `${pathname}?${query}` : pathname
+      router.replace(url, { scroll: false })
+    },
+    [pathname, router]
+  )
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current)
+      searchDebounceRef.current = null
+    }
+    const next = parseStateFromSearchParams(searchParams)
+    setSearchState(next.search)
+    setRecommendationFilter(next.recommendationFilter)
+    setDeadlineFilter(next.deadlineFilter)
+    setSortKey(next.sortKey)
+    setPageState(next.page)
+  }, [searchParams])
+
+  const setSearch = useCallback(
+    (value: string) => {
+      setSearchState(value)
+      setPageState(1)
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+      searchDebounceRef.current = setTimeout(() => {
+        searchDebounceRef.current = null
+        updateUrl({
+          search: value,
+          recommendationFilter,
+          deadlineFilter,
+          sortKey,
+          page: 1,
+        })
+        trackFilterChange({ filter_type: 'search', value: value.trim() || '(empty)' })
+      }, SEARCH_DEBOUNCE_MS)
+    },
+    [recommendationFilter, deadlineFilter, sortKey, updateUrl]
+  )
+
+  const setPage = useCallback(
+    (value: number | ((prev: number) => number)) => {
+      setPageState((prev) => {
+        const next = typeof value === 'function' ? value(prev) : value
+        updateUrl({ search, recommendationFilter, deadlineFilter, sortKey, page: next })
+        return next
+      })
+    },
+    [search, recommendationFilter, deadlineFilter, sortKey, updateUrl]
+  )
+
+  const setRecommendationFilterAndUrl = useCallback(
+    (v: RecommendationFilter) => {
+      setRecommendationFilter(v)
+      setPageState(1)
+      updateUrl({ search, recommendationFilter: v, deadlineFilter, sortKey, page: 1 })
+      trackFilterChange({ filter_type: 'recommendation', value: v || 'all' })
+    },
+    [search, deadlineFilter, sortKey, updateUrl]
+  )
+
+  const setDeadlineFilterAndUrl = useCallback(
+    (v: DeadlineFilter) => {
+      setDeadlineFilter(v)
+      setPageState(1)
+      updateUrl({ search, recommendationFilter, deadlineFilter: v, sortKey, page: 1 })
+      trackFilterChange({ filter_type: 'deadline', value: v || 'all' })
+    },
+    [search, recommendationFilter, sortKey, updateUrl]
+  )
+
+  const setSortKeyAndUrl = useCallback(
+    (v: SortKey) => {
+      setSortKey(v)
+      updateUrl({ search, recommendationFilter, deadlineFilter, sortKey: v, page })
+      trackFilterChange({ filter_type: 'sort', value: v })
+    },
+    [search, recommendationFilter, deadlineFilter, page, updateUrl]
+  )
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [])
 
   const clearAllFilters = () => {
-    setSearch('')
+    setSearchState('')
     setStatusFilter('')
     setRecommendationFilter('')
     setDeadlineFilter('')
-    setPage(1)
+    setPageState(1)
+    updateUrl({
+      search: '',
+      recommendationFilter: '',
+      deadlineFilter: '',
+      sortKey: 'newest_first',
+      page: 1,
+    })
   }
   const hasActiveFilters = Boolean(search.trim() || statusFilter || recommendationFilter || deadlineFilter)
 
@@ -160,26 +330,6 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
     setSelectedIds(new Set(pageItems.map((t) => t.id)))
   }
   const clearSelection = () => setSelectedIds(new Set())
-  const handleEvaluateSelected = async () => {
-    const ids = Array.from(selectedIds)
-    if (ids.length === 0) return
-    setEvaluating(true)
-    setEvaluateProgress({ current: 0, total: ids.length })
-    for (let i = 0; i < ids.length; i++) {
-      setEvaluateProgress({ current: i + 1, total: ids.length })
-      await runEvaluationAction(ids[i])
-    }
-    setEvaluating(false)
-    setEvaluateProgress(null)
-    setSelectedIds(new Set())
-    router.refresh()
-  }
-  const handleEvaluateAllPending = async () => {
-    setEvaluating(true)
-    const result = await evaluateAllPendingAction()
-    setEvaluating(false)
-    if (result.success) router.refresh()
-  }
 
   const filteredAndSorted = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -247,23 +397,6 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
     }
   }, [filteredAndSorted])
 
-  /** Phase 7D: Chart data — tenders by deadline window (mutually exclusive). Labels applied in render. */
-  const chartCounts = useMemo(() => {
-    let past = 0
-    let next7 = 0
-    let next8to30 = 0
-    let later = 0
-    for (const tender of filteredAndSorted) {
-      const days = getDaysFromToday(tender.deadline)
-      if (days == null) continue
-      if (days < 0) past++
-      else if (days <= CLOSING_SOON_DAYS) next7++
-      else if (days <= DEADLINE_30_DAYS) next8to30++
-      else later++
-    }
-    return { past, next7, next8to30, later }
-  }, [filteredAndSorted])
-
   const statusOptions: { value: '' | TenderStatus; labelKey: string }[] = [
     { value: '', labelKey: 'allStatuses' },
     { value: 'pending', labelKey: 'pending' },
@@ -298,17 +431,10 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
     { value: 'score_high_low', labelKey: 'sortScoreHighLow' },
   ]
 
-  const chartData = [
-    { window: t('chartWindowPast'), count: chartCounts.past },
-    { window: t('chartWindowNext7'), count: chartCounts.next7 },
-    { window: t('chartWindowNext30'), count: chartCounts.next8to30 },
-    { window: t('chartWindowLater'), count: chartCounts.later },
-  ]
-
   return (
-    <Flex direction="column" gap="6">
+    <Flex direction="column" gap="3">
       {/* Section A: KPI row — derived from filtered list per DASHBOARD_DESIGN */}
-      <DashboardKpiRow
+        <DashboardKpiRow
           stats={kpiStats}
           locale={locale}
           labels={{
@@ -322,173 +448,128 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
           }}
         />
 
-        {/* Section B: Filters — card with grouped controls */}
-        <Card className="filters-container">
-          <Flex direction="column" gap="4">
-            <TextField.Root
-              size="3"
-              className="search-input"
-              aria-label={t('searchPlaceholder')}
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(1)
-              }}
-              style={{ minWidth: 200, maxWidth: 400 }}
-            >
-              <TextField.Slot>
-                <Search size={18} className="filter-icon" />
-              </TextField.Slot>
-            </TextField.Root>
-            <Flex gap="3" wrap="wrap" align="center">
-              <Flex gap="2" align="center" className="filter-group">
-                <Filter size={14} className="filter-icon" />
-                <Select.Root
-                  value={recommendationFilter || 'all'}
-                  onValueChange={(v) => {
-                    setRecommendationFilter((v === 'all' ? '' : v) as RecommendationFilter)
-                    setPage(1)
-                  }}
-                >
-                  <Select.Trigger aria-label={t('recommendation')} placeholder={t('recommendation')} style={{ minWidth: 160 }} />
-                  <Select.Content>
-                    {recommendationOptions.map((opt) => (
-                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
-                        {opt.value === '' ? t('allRecommendations') : opt.labelKey === 'notEvaluated' ? tEval('notEvaluated') : tEval(opt.labelKey as 'invest' | 'review' | 'skip')}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-                <Select.Root
-                  value={deadlineFilter || 'all'}
-                  onValueChange={(v) => {
-                    setDeadlineFilter((v === 'all' ? '' : v) as DeadlineFilter)
-                    setPage(1)
-                  }}
-                >
-                  <Select.Trigger aria-label={t('deadline')} placeholder={t('deadline')} style={{ minWidth: 140 }} />
-                  <Select.Content>
-                    {deadlineOptions.map((opt) => (
-                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
-                        {t(opt.labelKey)}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-                <Select.Root
-                  value={statusFilter || 'all'}
-                  onValueChange={(v) => {
-                    setStatusFilter((v === 'all' ? '' : v) as TenderStatus | '')
-                    setPage(1)
-                  }}
-                >
-                  <Select.Trigger aria-label={t('status')} placeholder={t('status')} style={{ minWidth: 120 }} />
-                  <Select.Content>
-                    {statusOptions.map((opt) => (
-                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
-                        {opt.value === '' ? t('allStatuses') : tStatuses(opt.labelKey as TenderStatus)}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Flex>
-              <Box className="filter-divider" />
-              <Flex gap="2" align="center" className="filter-group">
-                <ArrowUpDown size={14} className="filter-icon" />
-                <Select.Root value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-                  <Select.Trigger aria-label={t('sortBy')} style={{ minWidth: 180 }} />
-                  <Select.Content>
-                    {sortOptions.map((opt) => (
-                      <Select.Item key={opt.value} value={opt.value}>
-                        {t(opt.labelKey)}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Flex>
-              {hasActiveFilters && (
-                <Button variant="ghost" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
-                  <X size={14} style={{ marginInlineEnd: 4 }} />
-                  {t('clearFilters')}
-                </Button>
-              )}
-            </Flex>
-          </Flex>
-        </Card>
+        {/* Tender data only: ingestion (Get Active / Historic, Stop, Upload). Opportunities live on Opportunities page. */}
+        <TenderDataBlock locale={locale} />
 
-        {/* Bulk actions bar — sticky when items selected */}
-        {selectedIds.size > 0 && (
-          <Card className="bulk-actions-bar">
-            <Flex justify="between" align="center">
-              <Flex gap="3" align="center">
-                <Checkbox
-                  checked={pageItems.length > 0 && pageItems.every((t) => selectedIds.has(t.id))}
-                  onCheckedChange={(checked) => {
-                    if (checked) selectAllOnPage()
-                    else clearSelection()
-                  }}
-                  aria-label={t('selectAllOnPage')}
-                />
-                <Text size="2" weight="medium">
-                  {t('selectedCount', { count: selectedIds.size })}
-                </Text>
-                <Button variant="ghost" size="1" onClick={clearSelection} aria-label={t('clearSelection')}>
-                  {t('clearSelection')}
-                </Button>
-              </Flex>
-              <Flex gap="2">
-                <Button
-                  size="2"
-                  disabled={evaluating}
-                  onClick={handleEvaluateSelected}
-                  className="evaluate-btn"
-                  aria-label={tDashboard('evaluateSelected')}
-                >
-                  <Sparkles size={16} style={{ marginInlineEnd: 6 }} />
-                  {evaluateProgress
-                    ? tDashboard('evaluatingCount', { current: evaluateProgress.current, total: evaluateProgress.total })
-                    : tDashboard('evaluateSelected')}
-                </Button>
-              </Flex>
-            </Flex>
-          </Card>
-        )}
-
-        {/* Evaluation actions: select all, evaluate all (when no selection) */}
-        {selectedIds.size === 0 && (
-          <Flex gap="3" align="center" wrap="wrap">
-            <Button
-              size="2"
-              variant="soft"
-              disabled={evaluating || pageItems.length === 0}
-              onClick={selectAllOnPage}
-              aria-label={t('selectAllOnPage')}
-            >
-              {t('selectAllOnPage')}
-            </Button>
-            <Button
-              size="2"
-              variant="soft"
-              disabled={evaluating}
-              onClick={handleEvaluateAllPending}
-              aria-label={tDashboard('evaluateAll')}
-            >
-              {evaluating ? tDashboard('evaluating') : tDashboard('evaluateAll')}
-            </Button>
-          </Flex>
-        )}
-
-        {/* Section C: Tenders table — sticky header, numeric right-align per DASHBOARD_DESIGN */}
-        <Box
-          className="dashboard-table-scroll"
+        {/* Section B: Filters — single horizontal bar in light container (Figma) */}
+        <section
+          className="filters-section-figma"
+          aria-label={t('filtersLabel')}
           style={{
             background: 'var(--surface-card)',
-            borderRadius: 'var(--radius-card)',
-            boxShadow: 'var(--shadow-card)',
             border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-card)',
+            padding: 'var(--space-2) var(--space-3)',
+            marginBottom: 'var(--space-3)',
           }}
         >
+        <Flex gap="3" wrap="wrap" align="center" className="filters-bar">
+          <TextField.Root
+            size="2"
+            className="search-input"
+            aria-label={t('searchPlaceholder')}
+            placeholder={t('searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ minWidth: 180, maxWidth: 320 }}
+          >
+            <TextField.Slot>
+              <Search size={16} className="filter-icon" />
+            </TextField.Slot>
+          </TextField.Root>
+          <Select.Root
+            value={recommendationFilter || 'all'}
+            onValueChange={(v) => setRecommendationFilterAndUrl((v === 'all' ? '' : v) as RecommendationFilter)}
+          >
+            <Select.Trigger aria-label={t('recommendation')} placeholder={t('recommendation')} style={{ minWidth: 140 }} />
+            <Select.Content>
+              {recommendationOptions.map((opt) => (
+                <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+                  {opt.value === '' ? t('allRecommendations') : opt.labelKey === 'notEvaluated' ? tEval('notEvaluated') : tEval(opt.labelKey as 'invest' | 'review' | 'skip')}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          <Select.Root
+            value={deadlineFilter || 'all'}
+            onValueChange={(v) => setDeadlineFilterAndUrl((v === 'all' ? '' : v) as DeadlineFilter)}
+          >
+            <Select.Trigger aria-label={t('deadline')} placeholder={t('deadline')} style={{ minWidth: 120 }} />
+            <Select.Content>
+              {deadlineOptions.map((opt) => (
+                <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+                  {t(opt.labelKey)}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          <Select.Root
+            value={statusFilter || 'all'}
+            onValueChange={(v) => {
+              setStatusFilter((v === 'all' ? '' : v) as TenderStatus | '')
+              setPage(1)
+            }}
+          >
+            <Select.Trigger aria-label={t('status')} placeholder={t('status')} style={{ minWidth: 100 }} />
+            <Select.Content>
+              {statusOptions.map((opt) => (
+                <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+                  {opt.value === '' ? t('allStatuses') : tStatuses(opt.labelKey as TenderStatus)}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          <Select.Root value={sortKey} onValueChange={(v) => setSortKeyAndUrl(v as SortKey)}>
+            <Select.Trigger aria-label={t('sortBy')} style={{ minWidth: 160 }} />
+            <Select.Content>
+              {sortOptions.map((opt) => (
+                <Select.Item key={opt.value} value={opt.value}>
+                  {t(opt.labelKey)}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
+              <X size={14} style={{ marginInlineEnd: 4 }} />
+              {t('clearFilters')}
+            </Button>
+          )}
+        </Flex>
+        </section>
+
+        {/* Section C: Tender Opportunities — thin container: title bar (with select-all) + table + pagination */}
+        <section
+          className="table-section-figma"
+          aria-label={t('tableTitle')}
+          style={{
+            background: 'var(--surface-card)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-card)',
+            overflow: 'hidden',
+          }}
+        >
+          <Flex
+            align="center"
+            gap="2"
+            style={{
+              padding: 'var(--space-2) var(--space-3)',
+              borderBottom: '1px solid var(--border-default)',
+            }}
+          >
+            <Checkbox
+              checked={pageItems.length > 0 && pageItems.every((t) => selectedIds.has(t.id))}
+              onCheckedChange={(checked) => {
+                if (checked) selectAllOnPage()
+                else clearSelection()
+              }}
+              aria-label={t('selectAllOnPage')}
+            />
+            <Text size="3" weight="bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              {t('tableTitle')}
+            </Text>
+          </Flex>
+          <Box className="dashboard-table-scroll" style={{ background: 'transparent' }}>
           <Table.Root variant="surface" size="2" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
             <Table.Header>
               <Table.Row>
@@ -502,35 +583,39 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
                     aria-label={t('selectAllOnPage')}
                   />
                 </Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col">{t('entity')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col">{t('tenderTitle')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col">{t('tenderNumber')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col">{t('deadline')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col" className="dashboard-table-numeric">{t('estimatedValue')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col" className="dashboard-table-numeric">{t('score')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col">{t('recommendation')}</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell scope="col">{t('status')}</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell scope="col" className="dashboard-th-title">{t('tableTenderName')}</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell scope="col" className="dashboard-th-entity">{t('entity')}</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell scope="col" className="dashboard-th-deadline">{t('deadline')}</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell scope="col" className="dashboard-table-numeric dashboard-th-value">{t('tableEstValue')}</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell scope="col" className="dashboard-table-numeric dashboard-th-score">{t('score')}</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell scope="col" className="dashboard-th-rec">{t('status')}</Table.ColumnHeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {pageItems.length === 0 ? (
+              {              pageItems.length === 0 ? (
                 <Table.Row>
-                  <Table.Cell colSpan={9}>
-                    <Flex direction="column" align="center" gap="3" style={{ padding: 32 }}>
+                  <Table.Cell colSpan={7}>
+                    <Flex direction="column" align="center" gap="4" style={{ padding: 32 }}>
                       <Text size="2" style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
-                        {t('noMatchingTenders')}
+                        {tenders.length === 0 ? tDashboard('noTendersFound') : t('noMatchingTenders')}
                       </Text>
-                      {hasActiveFilters && (
+                      {tenders.length === 0 && (
+                        <Text size="1" style={{ color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                          {tDashboard('emptyGuidance')}
+                        </Text>
+                      )}
+                      {tenders.length === 0 ? (
+                        <UploadTenderTrigger locale={locale} />
+                      ) : hasActiveFilters ? (
                         <Button variant="soft" color="gray" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
                           {t('clearFilters')}
                         </Button>
-                      )}
+                      ) : null}
                     </Flex>
                   </Table.Cell>
                 </Table.Row>
               ) : (
               pageItems.map((tender) => {
-                const deadlineStatus = getDeadlineStatus(tender.deadline)
                 const detailHref = `/${locale}/dashboard/${tender.id}`
                 return (
                 <Table.Row
@@ -546,95 +631,49 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
                       aria-label={t('selectTender', { ref: tender.reference_no ?? tender.id })}
                     />
                   </Table.Cell>
-                  <Table.Cell style={{ minWidth: 0, maxWidth: 160 }}>
-                    <Text size="2" style={{ color: 'var(--gray-11)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                      {getDisplayText(tender.entity, locale, translationMap) || '—'}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell style={{ minWidth: 0, maxWidth: 240 }}>
+                  <Table.Cell className="dashboard-td-title">
                     <NextLink href={detailHref} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none' }}>
-                      <Text size="2" weight="medium" style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                        {getDisplayText(tender.title, locale, translationMap) || '—'}
+                      <Text size="2" weight="medium" style={{ color: 'var(--text-primary)', display: 'block' }}>
+                        {maxWords(getDisplayText(tender.title ?? '', locale, titleSummaryMap ?? translationMap) || '—', 5)}
                       </Text>
                     </NextLink>
                   </Table.Cell>
-                  <Table.Cell>
-                    <Text size="1" style={{ color: 'var(--text-tertiary)' }}>
-                      {tender.reference_no ?? '—'}
+                  <Table.Cell className="dashboard-td-entity">
+                    <Text size="2" style={{ color: 'var(--gray-11)', display: 'block' }}>
+                      {getDisplayText(tender.entity ?? '', locale, entitySummaryMap ?? translationMap) || '—'}
                     </Text>
                   </Table.Cell>
-                  <Table.Cell>
-                    <Flex gap="2" align="center" wrap="wrap">
-                      <Text size="2" style={{ color: 'var(--text-secondary)' }}>
-                        {formatDeadline(tender.deadline, locale)}
-                      </Text>
-                      {deadlineStatus && (
-                        <Badge
-                          size="1"
-                          variant="soft"
-                          color={deadlineStatus === 'past' ? 'red' : deadlineStatus === 'closing_soon' ? 'amber' : 'green'}
-                        >
-                          {deadlineStatus === 'past' ? t('deadlinePast') : deadlineStatus === 'closing_soon' ? t('deadlineClosingSoon') : t('deadlineOpen')}
-                        </Badge>
-                      )}
-                    </Flex>
+                  <Table.Cell className="dashboard-td-deadline">
+                    <Text size="2" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      {formatDeadline(tender.deadline, locale)}
+                    </Text>
                   </Table.Cell>
-                  <Table.Cell className="dashboard-table-numeric">
+                  <Table.Cell className="dashboard-table-numeric dashboard-td-value">
                     {(() => {
                       const effectiveValue = getEffectiveValueDisplay(
                         tender.estimated_value,
                         tender.evaluation?.predicted_budget_min,
                         tender.evaluation?.predicted_budget_max
                       )
-                      const hasValue = effectiveValue.value != null && formatValue(effectiveValue.value, locale) !== '—'
                       return (
-                        <Flex gap="2" align="center" wrap="wrap">
-                          {effectiveValue.isEstimated ? (
-                            <Text size="2" style={{ color: 'var(--amber-11)' }}>
-                              ~{formatValue(effectiveValue.value, locale)}
-                            </Text>
-                          ) : (
-                            <Text size="2" style={{ color: 'var(--text-secondary)' }}>
-                              {formatValue(effectiveValue.value, locale)}
-                            </Text>
-                          )}
-                          {effectiveValue.isEstimated && (
-                            <Badge size="1" variant="soft" color="amber" style={{ fontWeight: 500, fontSize: '0.65rem' }}>
-                              {tTender('estimated')}
-                            </Badge>
-                          )}
-                          {!effectiveValue.isEstimated && hasValue && (
-                            <Badge size="1" variant="soft" color="green" style={{ fontWeight: 500, fontSize: '0.65rem' }}>
-                              {tTender('provided')}
-                            </Badge>
-                          )}
-                        </Flex>
+                        <Text size="2" style={{ color: effectiveValue.isEstimated ? 'var(--amber-11)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                          {effectiveValue.value != null
+                            ? (effectiveValue.isEstimated ? '~' : '') + formatValue(effectiveValue.value, locale)
+                            : '—'}
+                        </Text>
                       )
                     })()}
                   </Table.Cell>
-                  <Table.Cell className="dashboard-table-numeric score-cell">
+                  <Table.Cell className="dashboard-table-numeric score-cell dashboard-td-score">
                     {tender.evaluation != null ? (
-                      <Flex direction="column" gap="1" align="end">
-                        <Flex gap="2" align="center" style={{ width: '100%', minWidth: 64 }}>
-                          <Box className="score-indicator" style={{ flex: 1 }}>
-                            <Box
-                              className="score-indicator-fill"
-                              style={{
-                                width: `${Math.min(100, Math.max(0, Number(tender.evaluation.score)))}%`,
-                                backgroundColor: getScoreColor(tender.evaluation?.score ?? null),
-                              }}
-                            />
-                          </Box>
-                          <Text size="2" className="score-value" style={{ color: getScoreColor(tender.evaluation?.score ?? null), minWidth: 24 }}>
-                            {Math.round(Math.min(100, Math.max(0, Number(tender.evaluation.score))))}
-                          </Text>
-                        </Flex>
-                      </Flex>
+                      <Text size="2" className="score-value" style={{ color: getScoreColor(tender.evaluation?.score ?? null) }}>
+                        {Math.round(Math.min(100, Math.max(0, Number(tender.evaluation.score))))}%
+                      </Text>
                     ) : (
                       <Text size="2" style={{ color: 'var(--text-tertiary)' }}>—</Text>
                     )}
                   </Table.Cell>
-                    <Table.Cell>
+                    <Table.Cell className="dashboard-td-rec">
                       {(() => {
                         const recNorm = normalizeRecommendation(tender.evaluation?.recommendation)
                         const isInvest = recNorm === 'INVEST'
@@ -644,6 +683,7 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
                           <Badge
                             size="1"
                             style={{
+                              fontSize: '0.6875rem',
                               backgroundColor: tender.evaluation
                                 ? isInvest ? 'var(--color-qualified-bg)' : isReview ? 'var(--color-conditional-bg)' : isSkip ? 'var(--color-excluded-bg)' : 'var(--gray-a3)'
                                 : 'var(--gray-a3)',
@@ -657,40 +697,26 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
                         )
                       })()}
                     </Table.Cell>
-                    <Table.Cell>
-                      <Badge size="1" color="gray" variant="soft">
-                        {tStatuses(tender.status)}
-                      </Badge>
-                    </Table.Cell>
                 </Table.Row>
                 )
               })
               )}
             </Table.Body>
           </Table.Root>
-        </Box>
-
-        {/* Chart: progressive disclosure below table per DASHBOARD_DESIGN */}
-        <Box style={{ minHeight: 200 }}>
-          <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
-            {t('chartTitleDeadlineWindow')}
-          </Text>
-          <BarChart
-            data={chartData}
-            index="window"
-            categories={['count']}
-            colors={['blue']}
-            valueFormatter={(v) => String(v)}
-            yAxisWidth={32}
-          />
-        </Box>
-
-        {/* Pagination */}
-        <Flex justify="between" align="center" wrap="wrap" gap="4">
-          <Text size="2" style={{ color: 'var(--text-secondary)' }}>
-            {t('showingXToYOfZ', { from: filteredAndSorted.length === 0 ? 0 : from + 1, to, total: filteredAndSorted.length })}
-          </Text>
-          <Flex gap="2">
+          </Box>
+          {/* Pagination at bottom right of table (Figma spec) — inside same container */}
+          <Flex
+            justify="end"
+            align="center"
+            gap="2"
+            style={{
+              padding: 'var(--space-2) var(--space-3)',
+              borderTop: '1px solid var(--border-default)',
+            }}
+          >
+            <Text size="2" style={{ color: 'var(--text-secondary)', marginInlineEnd: 'var(--space-2)' }}>
+              {t('showingXToYOfZ', { from: filteredAndSorted.length === 0 ? 0 : from + 1, to, total: filteredAndSorted.length })}
+            </Text>
             <Button
               variant="soft"
               color="gray"
@@ -712,7 +738,8 @@ export function TendersListClient({ tenders, locale, translationMap = null }: Te
               {t('next')}
             </Button>
           </Flex>
-        </Flex>
+        </section>
+
       </Flex>
   )
 }

@@ -8,7 +8,7 @@ import { ScoreGauge } from '@/components/dashboard/score-gauge'
 import { ScoreBreakdownList } from '@/components/dashboard/score-breakdown'
 import { EvaluationListCard } from '@/components/dashboard/evaluation-list-card'
 import { Container, Flex, Box, Text, Card, Link } from '@radix-ui/themes'
-import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, ListChecks, Sparkles, ArrowRight } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, ListChecks, Sparkles, ArrowRight, Briefcase } from 'lucide-react'
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import type { TenderWithEvaluation } from '@/lib/queries/tender'
@@ -82,19 +82,34 @@ export function TenderDetailView({
   const tEval = getServerT(locale as Locale, 'evaluation')
   const tTender = getServerT(locale as Locale, 'tender')
   const tList = getServerT(locale as Locale, 'tendersList')
+  const tCrm = getServerT(locale as Locale, 'crm')
+
+  const isOpportunityReady =
+    hasEvaluation &&
+    ev?.recommendation != null &&
+    ['INVEST', 'REVIEW', 'qualified'].includes(ev.recommendation)
+  const opportunitiesHref = `/${locale}/dashboard/opportunities`
 
   return (
     <Container size="4" py="6">
       <Flex direction="column" gap="6">
-        {/* Back link */}
-        <Link asChild size="2" color="gray" underline="hover">
-          <NextLink href={`/${locale}/dashboard`}>
-            <Flex align="center" gap="2">
-              <ArrowLeft size={16} className="flip-rtl" />
-              {t('backToList')}
-            </Flex>
-          </NextLink>
-        </Link>
+        {/* Breadcrumb and back navigation */}
+        <nav aria-label="Breadcrumb">
+          <Flex align="center" gap="2" wrap="wrap">
+            <Link asChild size="2" color="gray" underline="hover">
+              <NextLink href={`/${locale}/dashboard`}>
+                <Flex align="center" gap="2">
+                  <ArrowLeft size={16} className="flip-rtl" />
+                  {t('backToList')}
+                </Flex>
+              </NextLink>
+            </Link>
+            <Text size="1" style={{ color: 'var(--text-tertiary)' }}>/</Text>
+            <Text size="2" style={{ color: 'var(--text-secondary)', maxWidth: '40ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {titleDisplay}
+            </Text>
+          </Flex>
+        </nav>
 
         {/* Hero section */}
         <TenderHero
@@ -109,6 +124,27 @@ export function TenderDetailView({
           actions={
             <Flex direction="column" gap="3" align="end">
               <RunAnalysisButton tenderId={tender.id} hasEvaluation={hasEvaluation} />
+              {isOpportunityReady && (
+                <Link asChild size="2" color="gray" underline="hover">
+                  <NextLink
+                    href={opportunitiesHref}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: 'var(--space-1) var(--space-2)',
+                      borderRadius: 'var(--radius-2)',
+                      background: 'var(--gray-a2)',
+                      color: 'var(--text-primary)',
+                      textDecoration: 'none',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <Briefcase size={16} />
+                    {tCrm('createOpportunity')}
+                  </NextLink>
+                </Link>
+              )}
               <PushToCRMButton
                 tenderId={tender.id}
                 tenderTitle={tender.title ?? ''}
@@ -178,6 +214,50 @@ export function TenderDetailView({
                       size={140}
                     />
                   </Flex>
+
+                  {/* Strategic Analysis & Dual-Track Scores */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 p-4 border rounded-lg bg-muted/20">
+                    {/* Infratech Score (Cyber/Infra) */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm font-medium">
+                        <span>Infratech Fit (Cyber/Infra)</span>
+                        <span>{ev.infratech_score ?? 0}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600"
+                          style={{ width: `${ev.infratech_score ?? 0}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Exotech Score (AI/Data) */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm font-medium">
+                        <span>Exotech Fit (AI/Data)</span>
+                        <span>{ev.exotech_score ?? 0}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-600"
+                          style={{ width: `${ev.exotech_score ?? 0}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Financial Prediction */}
+                    <div className="md:col-span-2 flex items-center justify-between pt-2 border-t mt-2">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-muted-foreground">Predicted Value (AI Model):</span>
+                        <span className="text-xs text-muted-foreground/70">Method: {ev.value_method ?? 'N/A'}</span>
+                      </div>
+                      <span className="text-lg font-bold font-mono">
+                        {ev.predicted_value_sar
+                          ? new Intl.NumberFormat('en-SA', { style: 'currency', currency: 'SAR' }).format(ev.predicted_value_sar)
+                          : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
 
                   {/* Score breakdown */}
                   {breakdownItems.length > 0 && (
@@ -294,8 +374,30 @@ export function TenderDetailView({
                   </Text>
                 </Flex>
                 <Text size="2" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  {hasEvaluation ? t('exportToOdooHint') : t('runEvaluationHint')}
+                  {hasEvaluation
+                    ? (isOpportunityReady
+                        ? t('nextStepsOpportunityHint')
+                        : t('exportToOdooHint'))
+                    : t('runEvaluationHint')}
                 </Text>
+                {isOpportunityReady && (
+                  <Link asChild size="2" style={{ marginTop: 'var(--space-2)' }}>
+                    <NextLink
+                      href={opportunitiesHref}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        color: 'var(--color-primary-600)',
+                        textDecoration: 'none',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <Briefcase size={14} />
+                      {t('goToOpportunities')}
+                    </NextLink>
+                  </Link>
+                )}
               </Flex>
             </Card>
           </Flex>

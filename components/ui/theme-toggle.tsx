@@ -7,37 +7,42 @@ import { IconButton } from '@radix-ui/themes'
 
 type Props = {
   className?: string
+  /** Use on dark backgrounds (e.g. sidebar) for white icon */
+  inverted?: boolean
 }
 
-export function ThemeToggle({ className }: Props) {
+export function ThemeToggle({ className, inverted }: Props) {
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
 
-  // Avoid hydration mismatch
   useEffect(() => {
-    setMounted(true)
+    queueMicrotask(() => setMounted(true))
   }, [])
+
+  const iconColor = inverted ? 'white' : undefined
+  const style = inverted ? { color: 'white' } : undefined
 
   if (!mounted) {
     return (
-      <IconButton variant="ghost" color="gray" className={className} disabled>
-        <Sun size={20} />
+      <IconButton variant="ghost" color="gray" className={className} disabled style={style}>
+        <Sun size={20} color={iconColor} />
       </IconButton>
     )
   }
 
   return (
-    <IconButton 
-      variant="ghost" 
-      color="gray" 
+    <IconButton
+      variant="ghost"
+      color="gray"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       className={className}
       aria-label="Toggle theme"
+      style={style}
     >
       {theme === 'dark' ? (
-        <Sun size={20} />
+        <Sun size={20} color={iconColor} />
       ) : (
-        <Moon size={20} />
+        <Moon size={20} color={iconColor} />
       )}
     </IconButton>
   )

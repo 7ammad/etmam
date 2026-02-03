@@ -32,12 +32,14 @@ export function OdooIntegrationForm({ initial }: OdooIntegrationFormProps) {
 
   useEffect(() => {
     if (initial) {
-      setForm((prev) => ({
-        ...prev,
-        base_url: initial.base_url,
-        db: initial.db,
-        username: initial.username,
-      }))
+      queueMicrotask(() =>
+        setForm((prev) => ({
+          ...prev,
+          base_url: initial.base_url,
+          db: initial.db,
+          username: initial.username,
+        }))
+      )
     }
   }, [initial])
 

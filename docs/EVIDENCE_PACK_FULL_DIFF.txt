@@ -1,0 +1,531 @@
+﻿diff --git a/actions/evaluation.ts b/actions/evaluation.ts
+index 62fea58..0a98c13 100644
+--- a/actions/evaluation.ts
++++ b/actions/evaluation.ts
+@@ -3,9 +3,63 @@
+ import { revalidatePath } from 'next/cache'
+ import { evaluateTender } from '@/lib/ai'
+ import { getTenderById, updateTender } from '@/lib/queries/tender'
+-import { upsertEvaluation, getPendingTenders } from '@/lib/queries/evaluation'
+-import { loadScoringConfig, scoreTender, tenderRowToScraped } from '@/lib/evaluation'
++import {
++  upsertEvaluation,
++  getPendingTenders,
++  getEvaluationByTenderId,
++} from '@/lib/queries/evaluation'
++import {
++  loadScoringConfig,
++  scoreTenderV2,
++  tenderRowToScraped,
++  getEffectiveEstimatedValueSar,
++} from '@/lib/evaluation'
+ import type { Json } from '@/types/database'
++import type { Recommendation } from '@/types/evaluation'
++
++/**
++ * Generate a human-readable summary explaining WHY the score is what it is.
++ * Based on the breakdown dimensions - highlights strongest and weakest areas.
++ */
++function generateScoreSummary(
++  score: number,
++  breakdown: { budget_fit: number; technical_fit: number; timeline_fit: number; strategic_fit: number; risk_score: number },
++  recommendation: Recommendation
++): string {
++  const dims = [
++    { key: 'budget_fit', label: 'Budget Fit', value: breakdown.budget_fit },
++    { key: 'technical_fit', label: 'Technical Fit', value: breakdown.technical_fit },
++    { key: 'timeline_fit', label: 'Timeline', value: breakdown.timeline_fit },
++    { key: 'strategic_fit', label: 'Strategic Fit', value: breakdown.strategic_fit },
++    { key: 'risk_score', label: 'Risk', value: breakdown.risk_score },
++  ].sort((a, b) => b.value - a.value)
++
++  const strongest = dims[0]
++  const weakest = dims[dims.length - 1]
++
++  // Build summary explaining the score
++  const parts: string[] = []
++
++  if (recommendation === 'qualified') {
++    parts.push(`Strong overall score of ${score}.`)
++  } else if (recommendation === 'conditional') {
++    parts.push(`Moderate score of ${score}.`)
++  } else {
++    parts.push(`Low score of ${score}.`)
++  }
++
++  // Explain strongest dimension
++  if (strongest.value >= 70) {
++    parts.push(`${strongest.label} is strong (${strongest.value}).`)
++  }
++
++  // Explain weakest dimension if it's dragging the score down
++  if (weakest.value < 50) {
++    parts.push(`${weakest.label} is a concern (${weakest.value}).`)
++  }
++
++  return parts.join(' ')
++}
+ 
+ // Types for action responses
+ export type ActionResponse<T = void> =
+@@ -30,32 +84,49 @@ export async function runEvaluationAction(
+     await updateTender(tenderId, { status: 'evaluating' })
+ 
+     const config = loadScoringConfig()
++    const existingEval = await getEvaluationByTenderId(tenderId)
++    const effectiveEv = getEffectiveEstimatedValueSar(
++      tender,
++      existingEval,
++      config ?? undefined
++    )
++
+     if (config) {
+-      // Rule-based: deterministic, config-driven, no AI
+-      // Includes value estimation when estimated_value is missing
++      // V2 Rule-based: 6-dimension scoring with service fit + historical calibration
+       const scraped = tenderRowToScraped(tender)
+-      const scored = scoreTender(scraped, config)
++      const scored = scoreTenderV2(scraped, config)
++
++      // Build oracle_metadata with classification and estimation details
++      const oracleMetadata: Record<string, unknown> = {
++        classification: scored.classification,
++        budget_estimation_method: scored.budget_estimation_method,
++        budget_estimation_confidence: scored.budget_estimation_confidence,
++      }
++
++      // Map V2 breakdown to DB schema (V2 has different fields)
++      // DB expects: budget_fit, technical_fit, timeline_fit, strategic_fit, risk_score
++      const dbBreakdown = {
++        budget_fit: scored.breakdown.budget_fit,
++        technical_fit: scored.breakdown.service_fit, // service_fit -> technical_fit
++        timeline_fit: scored.breakdown.timeline_fit,
++        strategic_fit: scored.breakdown.strategic_fit,
++        risk_score: scored.breakdown.risk_score,
++      }
+ 
+-      // Build oracle_metadata with estimation details if value was estimated
+-      const oracleMetadata: Record<string, unknown> | null = scored.budget_estimation_method
+-        ? {
+-            budget_estimation_method: scored.budget_estimation_method,
+-            budget_estimation_confidence: scored.budget_estimation_confidence,
+-          }
+-        : null
++      // Generate summary that explains the score based on breakdown
++      const summary = generateScoreSummary(scored.score, dbBreakdown, scored.recommendation)
+ 
+       await upsertEvaluation({
+         tender_id: tenderId,
+         score: scored.score,
+         recommendation: scored.recommendation,
+-        summary: scored.reasons.length ? scored.reasons.join('. ') : 'Rule-based evaluation.',
++        summary,
+         strengths: null,
+-        risks: scored.reasons.length ? scored.reasons : null,
++        risks: null,
+         missing_requirements: null,
+         action_items: null,
+-        breakdown: {} as Json,
+-        model_used: 'rule-based',
+-        // Value estimation results
++        breakdown: dbBreakdown as unknown as Json,
++        model_used: 'rule-based-v2',
+         predicted_budget_min: scored.predicted_budget_min,
+         predicted_budget_max: scored.predicted_budget_max,
+         oracle_metadata: oracleMetadata as Json,
+@@ -69,8 +140,10 @@ export async function runEvaluationAction(
+       }
+     }
+ 
+-    // Fallback: AI evaluation when config not available
+-    const result = await evaluateTender(tender)
++    // Fallback: AI evaluation when config not available. Pass canonical EV so AI never sets it.
++    const result = await evaluateTender(tender, {
++      effectiveValueSar: effectiveEv.evSar,
++    })
+     if (!result.success) {
+       await updateTender(tenderId, { status: 'pending' })
+       return { success: false, error: result.error }
+@@ -87,6 +160,8 @@ export async function runEvaluationAction(
+       action_items: result.data.action_items,
+       breakdown: result.data.breakdown as unknown as Json,
+       model_used: result.data.model_used,
++      predicted_budget_min: effectiveEv.predictedMin,
++      predicted_budget_max: effectiveEv.predictedMax,
+     })
+ 
+     await updateTender(tenderId, { status: 'evaluated' })
+diff --git a/app/api/cron/sync/route.ts b/app/api/cron/sync/route.ts
+index 6a3c32c..5f96507 100644
+--- a/app/api/cron/sync/route.ts
++++ b/app/api/cron/sync/route.ts
+@@ -16,6 +16,7 @@
+ import { NextRequest, NextResponse } from 'next/server'
+ import { z } from 'zod'
+ import { createServiceClient } from '@/lib/supabase/server'
++import { toSar } from '@/lib/currency'
+ import { scrapedTenderSchema } from '@/types/scraper'
+ import type { SyncPayload, SyncResponse, ScrapedTender } from '@/types/scraper'
+ import type { Database, Json } from '@/types/database'
+@@ -68,20 +69,28 @@ function verifyCronSecret(request: NextRequest): boolean {
+  * All scraped information (including every tab and award fields) is stored in raw_data under this tender.
+  */
+ function tenderToDbFormat(tender: ScrapedTender): TenderInsert {
++  // Normalize money fields from halala to SAR at ingest (100x bug fix)
++  const estimated_value =
++    tender.estimated_value != null ? toSar(tender.estimated_value, 'estimated_value') : null
++  const booklet_price_sar =
++    tender.booklet_price != null ? toSar(tender.booklet_price, 'booklet_price') : null
++  const award_amount_sar =
++    tender.award_amount_sar != null ? toSar(tender.award_amount_sar, 'award_amount_sar') : null
++
+   return {
+     user_id: SYSTEM_USER_ID,
+     reference_no: tender.reference_no,
+     title: tender.title,
+     entity: tender.entity,
+     deadline: tender.deadline,
+-    estimated_value: tender.estimated_value ?? null,
++    estimated_value,
+     description: tender.description ?? null,
+     source: 'etimad',
+     status: 'pending',
+-    booklet_price_sar: tender.booklet_price ?? null,
++    booklet_price_sar,
+     initial_guarantee_sar: tender.initial_guarantee ?? null,
+     project_duration: tender.contract_duration ?? null,
+-    award_amount_sar: tender.award_amount_sar ?? null,
++    award_amount_sar,
+     award_date: tender.award_date ?? null,
+     winning_bidder: tender.winning_bidder ?? null,
+     raw_data: {
+diff --git a/lib/ai/evaluator.ts b/lib/ai/evaluator.ts
+index d42afc2..a23a9a0 100644
+--- a/lib/ai/evaluator.ts
++++ b/lib/ai/evaluator.ts
+@@ -1,6 +1,11 @@
+ import { generateText } from 'ai'
+ import { getAIModel, getModelName, isAIConfigured } from './client'
+-import { buildEvaluationPrompt, EVALUATOR_SYSTEM_PROMPT, BREAKDOWN_WEIGHTS } from './prompts'
++import {
++  buildEvaluationPrompt,
++  EVALUATOR_SYSTEM_PROMPT,
++  BREAKDOWN_WEIGHTS,
++  type BuildEvaluationPromptOptions,
++} from './prompts'
+ import { aiEvaluationResponseSchema, getRecommendationFromScore, type AIEvaluationResponse } from '@/types/evaluation'
+ import type { Tables } from '@/types/database'
+ 
+@@ -18,8 +23,37 @@ export interface EvaluationError {
+ 
+ export type EvaluateResult = EvaluationResult | EvaluationError
+ 
++const MAX_ARABIC_RETRIES = 2
++
++/** Check if text is predominantly Arabic (e.g. at least ~30% Arabic Unicode chars). */
++function isArabicText(text: string): boolean {
++  if (!text || text.length === 0) return true
++  const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length
++  return arabicChars / text.length >= 0.3
++}
++
++/** Validate that all user-facing evaluation text fields are Arabic. */
++function validateArabicOutput(data: AIEvaluationResponse): boolean {
++  const texts: string[] = [
++    data.summary,
++    ...(data.strengths || []),
++    ...(data.risks || []),
++    ...(data.missing_requirements || []),
++    ...(data.action_items || []),
++  ].filter(Boolean) as string[]
++  return texts.every((t) => isArabicText(t))
++}
++
++/** Options for evaluateTender: pass canonical EV so AI never invents or modifies it */
++export interface EvaluateTenderOptions {
++  effectiveValueSar?: number | null
++}
++
+ // Evaluate a single tender using AI
+-export async function evaluateTender(tender: Tender): Promise<EvaluateResult> {
++export async function evaluateTender(
++  tender: Tender,
++  options?: EvaluateTenderOptions
++): Promise<EvaluateResult> {
+   // Check if AI is configured
+   if (!isAIConfigured()) {
+     return {
+@@ -28,73 +62,89 @@ export async function evaluateTender(tender: Tender): Promise<EvaluateResult> {
+     }
+   }
+ 
+-  try {
+-    const model = getAIModel()
+-    const prompt = buildEvaluationPrompt(tender)
+-
+-    const { text } = await generateText({
+-      model,
+-      system: EVALUATOR_SYSTEM_PROMPT,
+-      prompt,
+-      temperature: 0.3, // Lower temperature for more consistent evaluations
+-      maxTokens: 1500,
+-    })
+-
+-    // Parse the JSON response
+-    const jsonMatch = text.match(/\{[\s\S]*\}/)
+-    if (!jsonMatch) {
+-      return {
+-        success: false,
+-        error: 'AI response is not valid JSON',
++  const promptOptions: BuildEvaluationPromptOptions | undefined =
++    options?.effectiveValueSar != null
++      ? { effectiveValueSar: options.effectiveValueSar }
++      : undefined
++  const model = getAIModel()
++  const prompt = buildEvaluationPrompt(tender, promptOptions)
++  let lastError: string | null = null
++
++  for (let attempt = 0; attempt <= MAX_ARABIC_RETRIES; attempt++) {
++    try {
++      const { text } = await generateText({
++        model,
++        system: EVALUATOR_SYSTEM_PROMPT,
++        prompt,
++        temperature: attempt === 0 ? 0.3 : 0.2,
++        maxTokens: 1500,
++      })
++
++      // Parse the JSON response
++      const jsonMatch = text.match(/\{[\s\S]*\}/)
++      if (!jsonMatch) {
++        lastError = 'AI response is not valid JSON'
++        continue
+       }
+-    }
+ 
+-    const parsed = JSON.parse(jsonMatch[0])
++      const parsed = JSON.parse(jsonMatch[0])
+ 
+-    // Validate against schema
+-    const validated = aiEvaluationResponseSchema.safeParse(parsed)
+-    if (!validated.success) {
+-      console.error('Validation errors:', validated.error.errors)
+-      return {
+-        success: false,
+-        error: `Invalid AI response: ${validated.error.errors.map(e => e.message).join(', ')}`,
++      // Validate against schema
++      const validated = aiEvaluationResponseSchema.safeParse(parsed)
++      if (!validated.success) {
++        lastError = `Invalid AI response: ${validated.error.errors.map((e) => e.message).join(', ')}`
++        continue
+       }
+-    }
+ 
+-    // Enforce score = weighted average of breakdown (logic must be consistent)
+-    const b = validated.data.breakdown
+-    const weightedScore =
+-      b.budget_fit * BREAKDOWN_WEIGHTS.budget_fit +
+-      b.technical_fit * BREAKDOWN_WEIGHTS.technical_fit +
+-      b.timeline_fit * BREAKDOWN_WEIGHTS.timeline_fit +
+-      b.strategic_fit * BREAKDOWN_WEIGHTS.strategic_fit +
+-      b.risk_score * BREAKDOWN_WEIGHTS.risk_score
+-    const computedScore = Math.round(Math.max(0, Math.min(100, weightedScore)))
+-    const score = computedScore
+-    const recommendation = getRecommendationFromScore(score)
++      // Require Arabic for user-facing text
++      if (!validateArabicOutput(validated.data)) {
++        lastError = 'AI response contained non-Arabic text; retrying.'
++        if (attempt < MAX_ARABIC_RETRIES) continue
++        return {
++          success: false,
++          error: 'Evaluation output was not in Arabic after retries. Please try again.',
++        }
++      }
+ 
+-    return {
+-      success: true,
+-      data: {
+-        ...validated.data,
+-        score,
+-        recommendation,
+-        model_used: getModelName(),
+-      },
+-    }
+-  } catch (error) {
+-    console.error('AI evaluation error:', error)
++      // Enforce score = weighted average of breakdown (logic must be consistent)
++      const b = validated.data.breakdown
++      const weightedScore =
++        b.budget_fit * BREAKDOWN_WEIGHTS.budget_fit +
++        b.technical_fit * BREAKDOWN_WEIGHTS.technical_fit +
++        b.timeline_fit * BREAKDOWN_WEIGHTS.timeline_fit +
++        b.strategic_fit * BREAKDOWN_WEIGHTS.strategic_fit +
++        b.risk_score * BREAKDOWN_WEIGHTS.risk_score
++      const computedScore = Math.round(Math.max(0, Math.min(100, weightedScore)))
++      const score = computedScore
++      const recommendation = getRecommendationFromScore(score)
+ 
+-    if (error instanceof SyntaxError) {
+       return {
+-        success: false,
+-        error: 'Failed to parse AI response as JSON',
++        success: true,
++        data: {
++          ...validated.data,
++          score,
++          recommendation,
++          model_used: getModelName(),
++        },
++      }
++    } catch (error) {
++      console.error('AI evaluation error:', error)
++      if (error instanceof SyntaxError) {
++        lastError = 'Failed to parse AI response as JSON'
++      } else {
++        lastError = error instanceof Error ? error.message : 'AI evaluation failed'
++      }
++      if (attempt === MAX_ARABIC_RETRIES) {
++        return {
++          success: false,
++          error: lastError ?? 'AI evaluation failed',
++        }
+       }
+     }
++  }
+ 
+-    return {
+-      success: false,
+-      error: error instanceof Error ? error.message : 'AI evaluation failed',
+-    }
++  return {
++    success: false,
++    error: lastError ?? 'AI evaluation failed',
+   }
+ }
+diff --git a/lib/ai/prompts.ts b/lib/ai/prompts.ts
+index 4c11556..75bd45a 100644
+--- a/lib/ai/prompts.ts
++++ b/lib/ai/prompts.ts
+@@ -42,15 +42,26 @@ const BREAKDOWN_WEIGHTS = {
+   risk_score: 0.2,
+ } as const
+ 
++/** Options for buildEvaluationPrompt: pass canonical EV so AI never invents or modifies it */
++export interface BuildEvaluationPromptOptions {
++  /** Canonical estimated value in SAR (from getEffectiveEstimatedValueSar). When set, AI must use this and must NOT output predicted_budget. */
++  effectiveValueSar?: number | null
++}
++
+ // Build the evaluation prompt for a tender ΓÇö strict logic: breakdown first, then score = weighted average
+-export function buildEvaluationPrompt(tender: Tender): string {
+-  const valueFormatted = tender.estimated_value
+-    ? new Intl.NumberFormat('ar-SA', {
+-        style: 'currency',
+-        currency: 'SAR',
+-        maximumFractionDigits: 0,
+-      }).format(tender.estimated_value)
+-    : '╪║┘è╪▒ ┘à╪¡╪»╪»'
++export function buildEvaluationPrompt(
++  tender: Tender,
++  options?: BuildEvaluationPromptOptions
++): string {
++  const evSar = options?.effectiveValueSar ?? tender.estimated_value
++  const valueFormatted =
++    evSar != null && evSar > 0
++      ? new Intl.NumberFormat('ar-SA', {
++          style: 'currency',
++          currency: 'SAR',
++          maximumFractionDigits: 0,
++        }).format(evSar)
++      : '╪║┘è╪▒ ┘à╪¡╪»╪»'
+ 
+   const deadlineFormatted = new Intl.DateTimeFormat('ar-SA', {
+     dateStyle: 'long',
+@@ -91,7 +102,7 @@ ${tender.description ? `- ╪º┘ä┘ê╪╡┘ü: ${tender.description}` : ''}
+   },
+   "score": <╪╣╪»╪» ╪╡╪¡┘è╪¡ = ┘à╪¬┘ê╪│╪╖ ╪º┘ä╪«┘à╪│╪⌐ ╪ú╪╣┘ä╪º┘ç>,
+   "recommendation": "<qualified ╪ú┘ê conditional ╪ú┘ê excluded ╪¡╪│╪¿ score>",
+-  "summary": "<┘à┘ä╪«╪╡ ╪╣╪▒╪¿┘è 2-3 ╪¼┘à┘ä>",
++  "summary": "<╪¬╪¿╪▒┘è╪▒ ╪º┘ä╪»╪▒╪¼╪⌐: ╪º╪┤╪▒╪¡ ┘ä┘à╪º╪░╪º ╪¡╪╡┘ä╪¬ ╪º┘ä┘à┘å╪º┘ü╪│╪⌐ ╪╣┘ä┘ë ┘ç╪░┘ç ╪º┘ä┘å╪¬┘è╪¼╪⌐ ╪¿┘å╪º╪í┘ï ╪╣┘ä┘ë ╪ú╪╣┘ä┘ë ┘ê╪ú╪»┘å┘ë ╪»╪▒╪¼╪º╪¬ ╪º┘ä┘Ç breakdown. ┘à╪½╪º┘ä: ┘à┘ä╪º╪í┘à╪⌐ ┘à╪º┘ä┘è╪⌐ ┘à┘à╪¬╪º╪▓╪⌐ ┘ä┘â┘å ╪º┘ä┘à╪»╪⌐ ╪º┘ä╪▓┘à┘å┘è╪⌐ ╪╢┘è┘é╪⌐ ╪¼╪»╪º┘ï>",
+   "strengths": ["<┘å┘é╪╖╪⌐ ┘é┘ê╪⌐ 1>", "<┘å┘é╪╖╪⌐ ┘é┘ê╪⌐ 2>"],
+   "risks": ["<┘à╪«╪º╪╖╪▒ 1>", "<┘à╪«╪º╪╖╪▒ 2>"],
+   "missing_requirements": ["<┘à╪¬╪╖┘ä╪¿ ┘å╪º┘é╪╡ ╪Ñ┘å ┘ê╪¼╪»>"],
+@@ -101,20 +112,30 @@ ${tender.description ? `- ╪º┘ä┘ê╪╡┘ü: ${tender.description}` : ''}
+ 
+ export { BREAKDOWN_WEIGHTS }
+ 
+-// System prompt for the AI evaluator ΓÇö strict logic and output
+-export const EVALUATOR_SYSTEM_PROMPT = `╪ú┘å╪¬ ╪«╪¿┘è╪▒ ╪¬┘é┘è┘è┘à ┘à┘å╪º┘ü╪│╪º╪¬ ╪¡┘â┘ê┘à┘è╪⌐ ╪│╪╣┘ê╪»┘è╪⌐. ┘é┘ê╪º╪╣╪» ╪½╪º╪¿╪¬╪⌐:
++// System prompt for the AI evaluator ΓÇö strict logic and Arabic-only output
++export const EVALUATOR_SYSTEM_PROMPT = `[LANGUAGE: ARABIC ONLY - ┘ç╪░╪º ╪Ñ┘ä╪▓╪º┘à┘è]
++
++╪ú┘å╪¬ ╪«╪¿┘è╪▒ ╪¬┘é┘è┘è┘à ┘à┘å╪º┘ü╪│╪º╪¬ ╪¡┘â┘ê┘à┘è╪⌐ ╪│╪╣┘ê╪»┘è╪⌐.
++
++ΓÜá∩╕Å ╪¬╪╣┘ä┘è┘à╪º╪¬ ╪º┘ä┘ä╪║╪⌐ ╪º┘ä╪Ñ┘ä╪▓╪º┘à┘è╪⌐ ΓÜá∩╕Å
++┘â┘ä ╪º┘ä┘å╪╡┘ê╪╡ ┘ü┘è ╪º┘ä╪Ñ╪«╪▒╪º╪¼ ┘è╪¼╪¿ ╪ú┘å ╪¬┘â┘ê┘å ╪¿╪º┘ä┘ä╪║╪⌐ ╪º┘ä╪╣╪▒╪¿┘è╪⌐ ┘ü┘é╪╖.
++┘à┘à┘å┘ê╪╣ ┘à┘å╪╣╪º┘ï ╪¿╪º╪¬╪º┘ï ╪º╪│╪¬╪«╪»╪º┘à ╪ú┘è ┘â┘ä┘à╪⌐ ╪Ñ┘å╪¼┘ä┘è╪▓┘è╪⌐.
++╪Ñ╪░╪º ┘â╪¬╪¿╪¬ ╪ú┘è ┘å╪╡ ╪¿╪º┘ä╪Ñ┘å╪¼┘ä┘è╪▓┘è╪⌐╪î ╪│┘è╪¬┘à ╪▒┘ü╪╢ ╪º┘ä╪Ñ╪«╪▒╪º╪¼.
++
++┘é┘ê╪º╪╣╪» ╪º┘ä╪¬┘é┘è┘è┘à:
+ 1. ╪º╪¡╪│╪¿ ╪ú┘ê┘ä╪º┘ï breakdown (╪«┘à╪│ ╪ú╪╣╪»╪º╪» ╪╡╪¡┘è╪¡╪⌐ 0ΓÇô100): budget_fit, technical_fit, timeline_fit, strategic_fit, risk_score.
+ 2. score = ┘à╪¬┘ê╪│╪╖ ╪º┘ä╪«┘à╪│╪⌐ (╪¼┘à╪╣┘ç┘à ├╖ 5)╪î ╪¬┘é╪▒┘è╪¿ ┘ä╪ú┘é╪▒╪¿ ╪╣╪»╪» ╪╡╪¡┘è╪¡.
+ 3. recommendation ┘à┘å score ┘ü┘é╪╖: qualified ╪Ñ╪░╪º >= 70╪î conditional ╪Ñ╪░╪º 40ΓÇô69╪î excluded ╪Ñ╪░╪º < 40.
+ 4. ╪ú╪▒╪¼╪╣ JSON ┘ü┘é╪╖ ╪¿╪»┘ê┘å ╪ú┘è ┘å╪╡ ┘é╪¿┘ä┘ç ╪ú┘ê ╪¿╪╣╪»┘ç.
+ 
+-**┘à┘ç┘à ╪¼╪»╪º┘ï - ╪º┘ä┘ä╪║╪⌐ ╪º┘ä╪╣╪▒╪¿┘è╪⌐ ╪Ñ┘ä╪▓╪º┘à┘è╪⌐:**
+-┘è╪¼╪¿ ╪ú┘å ╪¬┘â┘ê┘å ╪¼┘à┘è╪╣ ╪º┘ä┘å╪╡┘ê╪╡ ╪º┘ä╪¬╪º┘ä┘è╪⌐ ╪¿╪º┘ä┘ä╪║╪⌐ ╪º┘ä╪╣╪▒╪¿┘è╪⌐ ┘ü┘é╪╖ (┘ä╪º ╪¬╪│╪¬╪«╪»┘à ╪º┘ä╪Ñ┘å╪¼┘ä┘è╪▓┘è╪⌐ ╪ú╪¿╪»╪º┘ï):
+-- summary: ┘à┘ä╪«╪╡ ╪╣╪▒╪¿┘è ┘â╪º┘à┘ä
+-- strengths: ┘å┘é╪º╪╖ ╪º┘ä┘é┘ê╪⌐ ╪¿╪º┘ä╪╣╪▒╪¿┘è╪⌐
+-- risks: ╪º┘ä┘à╪«╪º╪╖╪▒ ╪¿╪º┘ä╪╣╪▒╪¿┘è╪⌐
+-- missing_requirements: ╪º┘ä┘à╪¬╪╖┘ä╪¿╪º╪¬ ╪º┘ä┘å╪º┘é╪╡╪⌐ ╪¿╪º┘ä╪╣╪▒╪¿┘è╪⌐
+-- action_items: ╪º┘ä╪«╪╖┘ê╪º╪¬ ╪º┘ä┘à┘é╪¬╪▒╪¡╪⌐ ╪¿╪º┘ä╪╣╪▒╪¿┘è╪⌐`
++┘à╪½╪º┘ä ╪╣┘ä┘ë ╪º┘ä╪Ñ╪«╪▒╪º╪¼ ╪º┘ä┘à╪╖┘ä┘ê╪¿ (╪¿╪º┘ä╪╣╪▒╪¿┘è╪⌐ ┘ü┘é╪╖):
++{
++  "summary": "╪»╪▒╪¼╪⌐ 65 ╪¿╪│╪¿╪¿ ┘à┘ä╪º╪í┘à╪⌐ ┘à╪º┘ä┘è╪⌐ ╪╣╪º┘ä┘è╪⌐ (85) ┘ê╪¬┘ê╪º┘ü┘é ┘ü┘å┘è ╪¼┘è╪» (70)╪î ┘ä┘â┘å ╪º┘ä┘à╪»╪⌐ ╪º┘ä╪▓┘à┘å┘è╪⌐ ╪╢┘è┘é╪⌐ (40) ┘à┘à╪º ┘è╪┤┘â┘ä ╪¬╪¡╪»┘è╪º┘ï ┘ä┘ä╪¬┘å┘ü┘è╪░",
++  "strengths": ["╪«╪¿╪▒╪⌐ ╪│╪º╪¿┘é╪⌐ ┘à╪╣ ╪º┘ä╪¼┘ç╪⌐", "╪º┘ä┘à╪¬╪╖┘ä╪¿╪º╪¬ ╪º┘ä┘ü┘å┘è╪⌐ ┘à╪¬┘ê╪º┘ü┘é╪⌐"],
++  "risks": ["╪º┘ä┘à╪»╪⌐ ╪º┘ä╪▓┘à┘å┘è╪⌐ ┘é╪╡┘è╪▒╪⌐", "╪º┘ä┘à┘å╪º┘ü╪│╪⌐ ╪╣╪º┘ä┘è╪⌐"],
++  "missing_requirements": ["╪┤┘ç╪º╪»╪⌐ ISO ╪║┘è╪▒ ┘à╪¬┘ê┘ü╪▒╪⌐"],
++  "action_items": ["┘à╪▒╪º╪¼╪╣╪⌐ ╪º┘ä┘â╪▒╪º╪│╪⌐", "╪¬╪¼┘ç┘è╪▓ ┘ü╪▒┘è┘é ╪º┘ä╪╣┘à┘ä"]
++}`
+ 
+ /**
+  * System prompt for the Oracle (3-Stage Chain-of-Thought Reasoning Pipeline)
+diff --git a/lib/evaluation/index.ts b/lib/evaluation/index.ts
+index 64182ca..8f235d6 100644
+--- a/lib/evaluation/index.ts
++++ b/lib/evaluation/index.ts
+@@ -1,6 +1,11 @@
+-export { scoreTender, type ScoringConfig, type ScoredTender } from './rules'
++export { scoreTender, scoreTenderV2, type ScoringConfig, type ScoredTender, type ScoredTenderV2 } from './rules'
+ export { loadScoringConfig } from './config-loader'
+ export { tenderRowToScraped } from './db-adapter'
++export {
++  getEffectiveEstimatedValueSar,
++  type EffectiveEstimatedValueResult,
++  type EffectiveValueSource,
++} from './effective-value'
+ export {
+   estimateValue,
+   needsValueEstimation,
+diff --git a/scripts/calibrate-values.ts b/scripts/calibrate-values.ts
+index 528855c..43ee3cc 100644
+--- a/scripts/calibrate-values.ts
++++ b/scripts/calibrate-values.ts
+@@ -15,6 +15,7 @@
+ 
+ import * as fs from 'fs/promises'
+ import * as path from 'path'
++import { normalizeTenderMoneyFields } from '../lib/currency'
+ import {
+   calibrateFromHistorical,
+   getEstimationRange,
+@@ -159,7 +160,8 @@ async function main(): Promise<void> {
+   // Load all tenders
+   const allTenders: ScrapedTender[] = []
+   for (const file of inputFiles) {
+-    const tenders = await loadTendersFromFile(file)
++    const raw = await loadTendersFromFile(file)
++    const tenders = raw.map((t) => normalizeTenderMoneyFields(t) as ScrapedTender)
+     console.log(`  ≡ƒôä ${file}: ${tenders.length} tenders`)
+     allTenders.push(...tenders)
+   }

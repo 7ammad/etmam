@@ -1,5 +1,8 @@
+export { CommandCenter } from './command-center'
+export { TenderDataBlock } from './tender-data-block'
 export { DashboardHeader } from './dashboard-header'
 export { DashboardKpiRow, type DashboardKpiStats } from './dashboard-kpi-row'
 export { ErrorState } from './error-state'
+export { OpportunitiesListClient } from './opportunities-list-client'
 export { StatCard } from './stat-card'
 export { TendersListClient } from './tenders-list-client'

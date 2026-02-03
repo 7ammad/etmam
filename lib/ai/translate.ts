@@ -4,10 +4,18 @@
  *
  * RULE: When UI locale is English, all Arabic content from the scraper is translated
  * automatically via AI. No manual glossary — one system for all Arabic text.
+ *
+ * CACHE: We check phrase_translations (DB) first; only phrases not in the cache hit the AI.
+ * After AI translates, we save to DB so the next page load uses cache only (no AI).
  */
 
 import { generateText } from 'ai'
 import { getAIModel, isAIConfigured } from './client'
+import {
+  getCachedTranslations,
+  saveTranslations,
+  TARGET_LANG_EN,
+} from '@/lib/translation-cache'
 
 const TRANSLATION_SYSTEM = `You are a professional translator. Translate Arabic text to clear, natural English.
 - Output ONLY the translation(s). No explanations, numbering, or extra text.
@@ -16,6 +24,9 @@ const TRANSLATION_SYSTEM = `You are a professional translator. Translate Arabic 
 
 /** In-memory cache: normalized Arabic key → English. Survives per-request; reduces duplicate AI calls. */
 const translationCache = new Map<string, string>()
+
+/** Max phrases per AI call to avoid huge prompts and truncation; chunked sequentially. */
+const TRANSLATION_CHUNK_SIZE = 25
 
 function normalizeKey(s: string): string {
   return s.trim().replace(/\s+/g, ' ').normalize('NFC')
@@ -66,46 +77,59 @@ export async function translateArabicToEnglishBatch(
 
   if (toTranslate.length === 0) return result
 
+  // Persistent cache: only phrases not in DB hit the AI (dual-language best practice).
+  const dbCached = await getCachedTranslations(toTranslate, TARGET_LANG_EN)
+  for (const [phrase, translated] of Object.entries(dbCached)) {
+    result[phrase] = translated
+    translationCache.set(normalizeKey(phrase), translated)
+  }
+  const stillToTranslate = toTranslate.filter((p) => dbCached[p] === undefined)
+  if (stillToTranslate.length === 0) return result
+
   if (!isAIConfigured()) {
-    for (const s of toTranslate) result[s] = s
+    for (const s of stillToTranslate) result[s] = s
     return result
   }
 
-  const prompt =
-    toTranslate.length === 1
-      ? `Translate this Arabic phrase to English. Output only the English translation.\n\n${toTranslate[0]}`
-      : `Translate each of the following Arabic phrases to English. Output exactly one English line per phrase, in the same order. No numbering or labels.\n\n${toTranslate.join('\n')}`
+  const model = getAIModel()
+  for (let start = 0; start < stillToTranslate.length; start += TRANSLATION_CHUNK_SIZE) {
+    const chunk = stillToTranslate.slice(start, start + TRANSLATION_CHUNK_SIZE)
+    const prompt =
+      chunk.length === 1
+        ? `Translate this Arabic phrase to English. Output only the English translation.\n\n${chunk[0]}`
+        : `Translate each of the following Arabic phrases to English. Output exactly one English line per phrase, in the same order. No numbering or labels.\n\n${chunk.join('\n')}`
 
-  try {
-    const model = getAIModel()
-    const { text } = await generateText({
-      model,
-      system: TRANSLATION_SYSTEM,
-      prompt,
-      temperature: 0.2,
-      maxTokens: 2048,
-    })
+    try {
+      const { text } = await generateText({
+        model,
+        system: TRANSLATION_SYSTEM,
+        prompt,
+        temperature: 0.2,
+        maxTokens: 1024,
+      })
 
-    const lines = text
-      .split(/\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
+      const lines = text
+        .split(/\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
 
-    if (lines.length >= toTranslate.length) {
-      for (let i = 0; i < toTranslate.length; i++) {
-        const orig = toTranslate[i]
-        const translated = lines[i] ?? orig
-        result[orig] = translated
-        translationCache.set(normalizeKey(orig), translated)
+      const chunkResult: Record<string, string> = {}
+      if (lines.length >= chunk.length) {
+        for (let i = 0; i < chunk.length; i++) {
+          const orig = chunk[i]
+          const translated = lines[i] ?? orig
+          result[orig] = translated
+          chunkResult[orig] = translated
+          translationCache.set(normalizeKey(orig), translated)
+        }
+        await saveTranslations(chunkResult, TARGET_LANG_EN)
+      } else {
+        for (const orig of chunk) result[orig] = orig
       }
-    } else {
-      for (const orig of toTranslate) {
-        result[orig] = orig
-      }
+    } catch (err) {
+      console.warn('[translate] AI translation failed for chunk:', err)
+      for (const orig of chunk) result[orig] = orig
     }
-  } catch (err) {
-    console.warn('[translate] AI translation failed:', err)
-    for (const orig of toTranslate) result[orig] = orig
   }
 
   return result

@@ -42,15 +42,26 @@ const BREAKDOWN_WEIGHTS = {
   risk_score: 0.2,
 } as const
 
+/** Options for buildEvaluationPrompt: pass canonical EV so AI never invents or modifies it */
+export interface BuildEvaluationPromptOptions {
+  /** Canonical estimated value in SAR (from getEffectiveEstimatedValueSar). When set, AI must use this and must NOT output predicted_budget. */
+  effectiveValueSar?: number | null
+}
+
 // Build the evaluation prompt for a tender — strict logic: breakdown first, then score = weighted average
-export function buildEvaluationPrompt(tender: Tender): string {
-  const valueFormatted = tender.estimated_value
-    ? new Intl.NumberFormat('ar-SA', {
-        style: 'currency',
-        currency: 'SAR',
-        maximumFractionDigits: 0,
-      }).format(tender.estimated_value)
-    : 'غير محدد'
+export function buildEvaluationPrompt(
+  tender: Tender,
+  options?: BuildEvaluationPromptOptions
+): string {
+  const evSar = options?.effectiveValueSar ?? tender.estimated_value
+  const valueFormatted =
+    evSar != null && evSar > 0
+      ? new Intl.NumberFormat('ar-SA', {
+          style: 'currency',
+          currency: 'SAR',
+          maximumFractionDigits: 0,
+        }).format(evSar)
+      : 'غير محدد'
 
   const deadlineFormatted = new Intl.DateTimeFormat('ar-SA', {
     dateStyle: 'long',
@@ -91,7 +102,7 @@ ${tender.description ? `- الوصف: ${tender.description}` : ''}
   },
   "score": <عدد صحيح = متوسط الخمسة أعلاه>,
   "recommendation": "<qualified أو conditional أو excluded حسب score>",
-  "summary": "<ملخص عربي 2-3 جمل>",
+  "summary": "<تبرير الدرجة: اشرح لماذا حصلت المنافسة على هذه النتيجة بناءً على أعلى وأدنى درجات الـ breakdown. مثال: ملاءمة مالية ممتازة لكن المدة الزمنية ضيقة جداً>",
   "strengths": ["<نقطة قوة 1>", "<نقطة قوة 2>"],
   "risks": ["<مخاطر 1>", "<مخاطر 2>"],
   "missing_requirements": ["<متطلب ناقص إن وجد>"],
@@ -101,20 +112,30 @@ ${tender.description ? `- الوصف: ${tender.description}` : ''}
 
 export { BREAKDOWN_WEIGHTS }
 
-// System prompt for the AI evaluator — strict logic and output
-export const EVALUATOR_SYSTEM_PROMPT = `أنت خبير تقييم منافسات حكومية سعودية. قواعد ثابتة:
+// System prompt for the AI evaluator — strict logic and Arabic-only output
+export const EVALUATOR_SYSTEM_PROMPT = `[LANGUAGE: ARABIC ONLY - هذا إلزامي]
+
+أنت خبير تقييم منافسات حكومية سعودية.
+
+⚠️ تعليمات اللغة الإلزامية ⚠️
+كل النصوص في الإخراج يجب أن تكون باللغة العربية فقط.
+ممنوع منعاً باتاً استخدام أي كلمة إنجليزية.
+إذا كتبت أي نص بالإنجليزية، سيتم رفض الإخراج.
+
+قواعد التقييم:
 1. احسب أولاً breakdown (خمس أعداد صحيحة 0–100): budget_fit, technical_fit, timeline_fit, strategic_fit, risk_score.
 2. score = متوسط الخمسة (جمعهم ÷ 5)، تقريب لأقرب عدد صحيح.
 3. recommendation من score فقط: qualified إذا >= 70، conditional إذا 40–69، excluded إذا < 40.
 4. أرجع JSON فقط بدون أي نص قبله أو بعده.
 
-**مهم جداً - اللغة العربية إلزامية:**
-يجب أن تكون جميع النصوص التالية باللغة العربية فقط (لا تستخدم الإنجليزية أبداً):
-- summary: ملخص عربي كامل
-- strengths: نقاط القوة بالعربية
-- risks: المخاطر بالعربية
-- missing_requirements: المتطلبات الناقصة بالعربية
-- action_items: الخطوات المقترحة بالعربية`
+مثال على الإخراج المطلوب (بالعربية فقط):
+{
+  "summary": "درجة 65 بسبب ملاءمة مالية عالية (85) وتوافق فني جيد (70)، لكن المدة الزمنية ضيقة (40) مما يشكل تحدياً للتنفيذ",
+  "strengths": ["خبرة سابقة مع الجهة", "المتطلبات الفنية متوافقة"],
+  "risks": ["المدة الزمنية قصيرة", "المنافسة عالية"],
+  "missing_requirements": ["شهادة ISO غير متوفرة"],
+  "action_items": ["مراجعة الكراسة", "تجهيز فريق العمل"]
+}`
 
 /**
  * System prompt for the Oracle (3-Stage Chain-of-Thought Reasoning Pipeline)

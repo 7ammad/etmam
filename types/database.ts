@@ -94,6 +94,11 @@ export interface Database {
           predicted_budget_min: number | null
           predicted_budget_max: number | null
           routing_decision: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID' | null
+          predicted_value_sar: number | null
+          value_method: string | null
+          infratech_score: number | null
+          exotech_score: number | null
+          work_type: string | null
         }
         Insert: {
           id?: string
@@ -113,6 +118,11 @@ export interface Database {
           predicted_budget_min?: number | null
           predicted_budget_max?: number | null
           routing_decision?: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID' | null
+          predicted_value_sar?: number | null
+          value_method?: string | null
+          infratech_score?: number | null
+          exotech_score?: number | null
+          work_type?: string | null
         }
         Update: {
           id?: string
@@ -132,6 +142,11 @@ export interface Database {
           predicted_budget_min?: number | null
           predicted_budget_max?: number | null
           routing_decision?: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID' | null
+          predicted_value_sar?: number | null
+          value_method?: string | null
+          infratech_score?: number | null
+          exotech_score?: number | null
+          work_type?: string | null
         }
         Relationships: [
           {
@@ -250,6 +265,48 @@ export interface Database {
           company?: string | null
           role?: string | null
           created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      phrase_translations: {
+        Row: {
+          id: string
+          source_normalized: string
+          target_lang: string
+          translated_text: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          source_normalized: string
+          target_lang?: string
+          translated_text: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          source_normalized?: string
+          target_lang?: string
+          translated_text?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      system_settings: {
+        Row: {
+          key: string
+          value: Json
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: Json
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: Json
           updated_at?: string
         }
         Relationships: []

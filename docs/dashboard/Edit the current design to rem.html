@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html dir="ltr">
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>window.FontAwesomeConfig = { autoReplaceSvg: 'nest'};</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.plot.ly/plotly-3.1.1.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&family=Noto+Kufi+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      ::-webkit-scrollbar { display: none;}
+      body, html { 
+        width: 1440px; 
+        height: 1024px; 
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+      }
+      #dashboard-frame {
+        width: 1440px;
+        height: 1024px;
+        overflow: hidden;
+      }
+      .dark {
+        --tw-bg-opacity: 1;
+        background-color: rgb(15 23 42 / var(--tw-bg-opacity));
+        color: rgb(241 245 249 / var(--tw-text-opacity));
+      }
+      .dark .bg-white { background-color: #1e293b; }
+      .dark .text-slate-900 { color: #f1f5f9; }
+      .dark .border-border { border-color: #334155; }
+      .dark .bg-surface-50 { background-color: #0f172a; }
+      .dark .bg-surface-100 { background-color: #1e293b; }
+      .dark .text-muted { color: #94a3b8; }
+      .dark .hover\:bg-surface-50:hover { background-color: #1e293b; }
+      .dark #deadline-chart { filter: brightness(0.9); }
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              'cairo': ['Cairo', 'sans-serif'],
+              'kufi': ['Noto Kufi Arabic', 'sans-serif']
+            },
+            colors: {
+              primary: { 50: '#ecfdf5', 500: '#10b981', 600: '#059669', 700: '#047857' },
+              surface: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1' },
+              border: '#e2e8f0',
+              muted: '#64748b',
+              dark: { bg: '#0f172a', card: '#1e293b', border: '#334155' }
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body class="font-cairo bg-white text-slate-900">
+    <div id="dashboard-frame" class="bg-white flex">
+      <aside id="sidebar" role="navigation" aria-label="Main navigation" class="w-56 bg-slate-900 text-white flex flex-col">
+        <div class="p-5 border-b border-slate-700">
+          <div class="flex items-center gap-2">
+            <div class="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center">
+              <span class="text-white font-bold text-base">E</span>
+            </div>
+            <span class="font-bold text-lg">Etmam</span>
+          </div>
+        </div>
+        <nav aria-label="Sidebar navigation" class="flex-1 p-3">
+          <ul class="space-y-1">
+            <li><a href="#" aria-current="page" class="flex items-center gap-2 px-3 py-2.5 bg-primary-600 rounded-lg transition-colors"><i class="fa-solid fa-gauge text-base"></i><span class="font-medium text-sm">Dashboard</span></a></li>
+            <li><a href="#" class="flex items-center gap-2 px-3 py-2.5 hover:bg-slate-800 rounded-lg transition-colors"><i class="fa-solid fa-file-lines text-base"></i><span class="font-medium text-sm">Tenders</span></a></li>
+            <li><a href="#" class="flex items-center gap-2 px-3 py-2.5 hover:bg-slate-800 rounded-lg transition-colors"><i class="fa-solid fa-gear text-base"></i><span class="font-medium text-sm">Settings</span></a></li>
+          </ul>
+        </nav>
+        <div class="p-3 border-t border-slate-700">
+          <button id="theme-toggle" aria-label="Toggle theme" class="flex items-center gap-2 px-3 py-2.5 w-full hover:bg-slate-800 rounded-lg transition-colors">
+            <i class="fa-solid fa-moon text-base"></i>
+            <span class="font-medium text-sm">Dark Mode</span>
+          </button>
+        </div>
+      </aside>
+      
+      <div class="flex-1 flex flex-col w-[1216px]">
+        <header id="header" role="banner" class="h-14 bg-white border-b border-border flex items-center justify-between px-5">
+          <div class="flex items-center gap-3">
+            <button class="px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors"><i class="fa-solid fa-chart-line mr-1.5 text-xs"></i>Run Analysis</button>
+            <button class="px-3 py-1.5 bg-surface-100 text-slate-700 text-xs font-medium rounded hover:bg-surface-200 transition-colors"><i class="fa-solid fa-download mr-1.5 text-xs"></i>Export to CRM</button>
+            <button class="px-3 py-1.5 bg-surface-100 text-slate-700 text-xs font-medium rounded hover:bg-surface-200 transition-colors"><i class="fa-solid fa-upload mr-1.5 text-xs"></i>Upload Tenders</button>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center bg-surface-100 rounded p-0.5">
+              <button aria-label="Switch to English" class="px-2.5 py-1 bg-white text-slate-700 text-xs font-medium rounded shadow-sm">EN</button>
+              <button aria-label="Switch to Arabic" class="px-2.5 py-1 text-slate-500 text-xs font-medium">AR</button>
+            </div>
+            <div class="flex items-center gap-2 cursor-pointer">
+              <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" alt="User profile" class="w-7 h-7 rounded-full">
+              <i class="fa-solid fa-chevron-down text-slate-400 text-xs"></i>
+            </div>
+          </div>
+        </header>
+        
+        <main class="flex-1 overflow-y-auto p-5 bg-surface-50 h-[970px]">
+          <section id="kpi-section" class="grid grid-cols-4 gap-3 mb-5">
+            <div class="bg-white border border-border rounded-xl p-4 hover:shadow-xl transition-all duration-300 group">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="text-xs font-bold text-slate-600 mb-1.5">Total Tenders</div>
+                  <div class="text-3xl font-bold text-slate-900 transition-all duration-300">1,247</div>
+                  <div class="flex items-center mt-1.5 text-xs"><span class="text-primary-600 font-semibold">+12%</span><span class="text-muted ml-1">vs last month</span></div>
+                </div>
+                <div class="flex justify-center items-center w-14 h-14">
+                  <img class="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/07b98ecce0-a80c538653e02ad849b1.png" alt="3D document folder icon blue gradient style clean modern without background" />
+                </div>
+              </div>
+            </div>
+            <div class="bg-white border border-border rounded-xl p-4 hover:shadow-xl transition-all duration-300 group">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="text-xs font-bold text-slate-600 mb-1.5">Qualified</div>
+                  <div class="text-3xl font-bold text-slate-900 transition-all duration-300">324</div>
+                  <div class="flex items-center mt-1.5 text-xs"><span class="text-primary-600 font-semibold">+8%</span><span class="text-muted ml-1">vs last month</span></div>
+                </div>
+                <div class="flex justify-center items-center w-14 h-14">
+                  <img class="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/a641eed81f-bee62f8dbf00eda3dcdf.png" alt="3D checkmark shield icon green gradient style clean modern without background" />
+                </div>
+              </div>
+            </div>
+            <div class="bg-white border border-border rounded-xl p-4 hover:shadow-xl transition-all duration-300 group">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="text-xs font-bold text-slate-600 mb-1.5">Conditional</div>
+                  <div class="text-3xl font-bold text-slate-900 transition-all duration-300">156</div>
+                  <div class="flex items-center mt-1.5 text-xs"><span class="text-red-500 font-semibold">-3%</span><span class="text-muted ml-1">vs last month</span></div>
+                </div>
+                <div class="flex justify-center items-center w-14 h-14">
+                  <img class="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/380af74fbb-25fa7e3162ea7a51e6da.png" alt="3D warning clock icon orange yellow gradient style clean modern without background" />
+                </div>
+              </div>
+            </div>
+            <div class="bg-white border border-border rounded-xl p-4 hover:shadow-xl transition-all duration-300 group">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="text-xs font-bold text-slate-600 mb-1.5">Excluded</div>
+                  <div class="text-3xl font-bold text-slate-900 transition-all duration-300">89</div>
+                  <div class="flex items-center mt-1.5 text-xs"><span class="text-primary-600 font-semibold">-15%</span><span class="text-muted ml-1">vs last month</span></div>
+                </div>
+                <div class="flex justify-center items-center w-14 h-14">
+                  <img class="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/fa52a60bcc-a1aac58ec10a9cebb475.png" alt="3D cross x mark icon red gradient style clean modern without background" />
+                </div>
+              </div>
+            </div>
+            <div class="bg-white border border-border rounded-xl p-4 hover:shadow-xl transition-all duration-300 group">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="text-xs font-bold text-slate-600 mb-1.5">Not Evaluated</div>
+                  <div class="text-3xl font-bold text-slate-900 transition-all duration-300">678</div>
+                  <div class="flex items-center mt-1.5 text-xs"><span class="text-primary-600 font-semibold">+5%</span><span class="text-muted ml-1">vs last month</span></div>
+                </div>
+                <div class="flex justify-center items-center w-14 h-14">
+                  <img class="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/a45fe1cafc-0d5fd6d47c623fe149f8.png" alt="3D question mark icon gray blue gradient style clean modern without background" />
+                </div>
+              </div>
+            </div>
+            <div class="bg-white border border-border rounded-xl p-4 hover:shadow-xl transition-all duration-300 group">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="text-xs font-bold text-slate-600 mb-1.5">Due in 7 Days</div>
+                  <div class="text-3xl font-bold text-slate-900 transition-all duration-300">42</div>
+                  <div class="flex items-center mt-1.5 text-xs"><span class="text-red-500 font-semibold">Urgent</span><span class="text-muted ml-1">attention needed</span></div>
+                </div>
+                <div class="flex justify-center items-center w-14 h-14">
+                  <img class="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/9b65a7cb9e-4c70191a00c0b0c8eda7.png" alt="3D alarm clock icon red orange gradient style clean modern without background" />
+                </div>
+              </div>
+            </div>
+            <div class="bg-white border border-border rounded-xl p-4 hover:shadow-xl transition-all duration-300 group">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="text-xs font-bold text-slate-600 mb-1.5">Due in 30 Days</div>
+                  <div class="text-3xl font-bold text-slate-900 transition-all duration-300">127</div>
+                  <div class="flex items-center mt-1.5 text-xs"><span class="text-primary-600 font-semibold">+18%</span><span class="text-muted ml-1">vs last month</span></div>
+                </div>
+                <div class="flex justify-center items-center w-14 h-14">
+                  <img class="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/5d1527ddc0-4f01b87f240084346d99.png" alt="3D calendar icon blue green gradient style clean modern without background" />
+                </div>
+              </div>
+            </div>
+          </section><!-- Filters -->
+          <section id="filters-section" class="flex items-center justify-between bg-white border border-border rounded-lg p-3 mb-5">
+            <div class="flex items-center gap-3">
+              <div class="relative"><i class="fa-solid fa-search absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400"></i><input type="text" placeholder="Search tenders..." aria-label="Search tenders" class="pl-6 pr-3 py-1.5 border border-border rounded w-48 text-xs">
+              </div><select aria-label="Filter by recommendation" class="px-2.5 py-1.5 border border-border rounded text-xs">
+                <option>All Recommendations</option>
+                <option>Qualified</option>
+                <option>Conditional</option>
+                <option>Excluded</option>
+              </select><select aria-label="Filter by deadline" class="px-2.5 py-1.5 border border-border rounded text-xs">
+                <option>All Deadlines</option>
+                <option>Closing Soon</option>
+                <option>Open</option>
+                <option>Past</option>
+              </select>
+            </div><select aria-label="Sort by" class="px-2.5 py-1.5 border border-border rounded text-xs">
+              <option>Sort by: Score</option>
+              <option>Sort by: Deadline</option>
+              <option>Sort by: Value</option>
+            </select>
+          </section><!-- Content Grid -->
+          <div class="grid grid-cols-3 gap-4">
+            <!-- Table -->
+            <section id="table-section" class="col-span-2 bg-white border border-border rounded-lg overflow-hidden">
+              <div class="p-3 border-b border-border">
+                <h3 class="font-semibold text-base">Tender Opportunities</h3>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead class="bg-surface-50">
+                    <tr>
+                      <th class="text-left px-3 py-2 text-xs font-medium text-muted">
+                        Tender Name</th>
+                      <th class="text-left px-3 py-2 text-xs font-medium text-muted">
+                        Entity</th>
+                      <th class="text-left px-3 py-2 text-xs font-medium text-muted">
+                        Deadline</th>
+                      <th class="text-right px-3 py-2 text-xs font-medium text-muted">
+                        Est. Value</th>
+                      <th class="text-right px-3 py-2 text-xs font-medium text-muted">
+                        Score</th>
+                      <th class="text-left px-3 py-2 text-xs font-medium text-muted">
+                        Status</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    <tr class="hover:bg-surface-50 transition-colors cursor-pointer">
+                      <td class="px-3 py-2 text-xs font-medium">IT
+                        Infrastructure Upgrade</td>
+                      <td class="px-3 py-2 text-xs text-muted">Ministry of
+                        Health</td>
+                      <td class="px-3 py-2 text-xs">Dec 15, 2024</td>
+                      <td class="px-3 py-2 text-xs text-right">$2.5M</td>
+                      <td class="px-3 py-2 text-xs text-right font-medium">92
+                      </td>
+                      <td class="px-3 py-2"><span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">Qualified</span>
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-surface-50 transition-colors cursor-pointer">
+                      <td class="px-3 py-2 text-xs font-medium">Digital
+                        Transformation Project</td>
+                      <td class="px-3 py-2 text-xs text-muted">Education Sector
+                      </td>
+                      <td class="px-3 py-2 text-xs">Jan 10, 2025</td>
+                      <td class="px-3 py-2 text-xs text-right">$1.8M</td>
+                      <td class="px-3 py-2 text-xs text-right font-medium">85
+                      </td>
+                      <td class="px-3 py-2"><span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">Qualified</span>
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-surface-50 transition-colors cursor-pointer">
+                      <td class="px-3 py-2 text-xs font-medium">Cloud Migration
+                        Services</td>
+                      <td class="px-3 py-2 text-xs text-muted">Finance Ministry
+                      </td>
+                      <td class="px-3 py-2 text-xs">Dec 28, 2024</td>
+                      <td class="px-3 py-2 text-xs text-right">$3.2M</td>
+                      <td class="px-3 py-2 text-xs text-right font-medium">78
+                      </td>
+                      <td class="px-3 py-2"><span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">Conditional</span>
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-surface-50 transition-colors cursor-pointer">
+                      <td class="px-3 py-2 text-xs font-medium">Cybersecurity
+                        Assessment</td>
+                      <td class="px-3 py-2 text-xs text-muted">Defense
+                        Department</td>
+                      <td class="px-3 py-2 text-xs">Jan 20, 2025</td>
+                      <td class="px-3 py-2 text-xs text-right">$950K</td>
+                      <td class="px-3 py-2 text-xs text-right font-medium">88
+                      </td>
+                      <td class="px-3 py-2"><span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">Qualified</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section><!-- Chart Section -->
+            <section id="chart-section" class="bg-white border border-border rounded-lg p-4">
+              <h3 class="font-semibold mb-3">Tenders by Deadline Window</h3>
+              <div id="deadline-chart"></div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+    
+    <script>
+      window.addEventListener('load', function() {
+        try {
+          var data = [{
+            type: 'bar',
+            x: ['0-7 Days', '8-14 Days', '15-30 Days', '30+ Days'],
+            y: [42, 67, 127, 156],
+            marker: { color: '#10b981' }
+          }];
+          var layout = {
+            margin: { t: 20, r: 20, b: 40, l: 40 },
+            plot_bgcolor: '#ffffff',
+            paper_bgcolor: '#ffffff',
+            xaxis: { title: '' },
+            yaxis: { title: 'Count' },
+            showlegend: false
+          };
+          var config = { responsive: true, displayModeBar: false, displaylogo: false };
+          Plotly.newPlot('deadline-chart', data, layout, config);
+        } catch(e) { console.error('Chart error:', e); }
+      });
+    </script>
+  
+</body></html>

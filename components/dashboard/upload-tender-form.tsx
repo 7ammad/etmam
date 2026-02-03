@@ -137,7 +137,7 @@ export function UploadTenderForm({ onSuccess, locale = 'en' }: UploadTenderFormP
 
         {/* Error state */}
         {state === 'error' && (
-          <Flex direction="column" gap="3" align="center" py="4">
+          <Flex direction="column" gap="3" align="center" py="4" data-testid="upload-error">
             <AlertCircle style={{ width: 40, height: 40, color: 'var(--red-11)' }} />
             <Text size="3" weight="bold" style={{ color: 'var(--red-11)' }}>
               {t('error')}

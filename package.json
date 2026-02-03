@@ -8,10 +8,11 @@
     "dev:force": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
+    "test:unit": "tsx tests/unit/classifier-dual-track.test.ts",
     "scrape:recon": "tsx scripts/etimad-recon.ts",
     "scrape:test": "tsx scripts/test-scraper.ts",
     "scrape:smoke": "tsx scripts/test-scraper.ts -- --smoke",
@@ -27,7 +28,10 @@
     "sync:evaluations": "tsx scripts/sync-evaluations.ts",
     "pipeline:full": "tsx scripts/pipeline-full.ts",
     "generate:cron-secret": "tsx scripts/generate-cron-secret.ts",
-    "export:odoo-excel": "tsx scripts/export-odoo-excel.ts"
+    "export:odoo-excel": "tsx scripts/export-odoo-excel.ts",
+    "feed:translations": "tsx scripts/feed-translations.ts",
+    "load:historic": "tsx scripts/load-historic-to-db.ts",
+    "calibrate:from-db": "tsx scripts/calibrate-from-db.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",
@@ -38,6 +42,8 @@
     "ai": "^4.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "framer-motion": "^11.18.2",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.460.0",
     "next": "^16.1.4",
     "next-intl": "^3.25.0",

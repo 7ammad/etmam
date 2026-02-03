@@ -132,7 +132,7 @@ Inputs required:
 
 Source selection:
 - Preferred: Fetch tenders and evaluation data from Supabase in server context behind auth.
-- Required fallback behavior: If evaluation data is not present for a tender, show Score = "—" and Recommendation = "Not evaluated".
+- Required fallback behavior: If evaluation data is not present for a tender, show Score = "—" and Recommendation = "Not Evaluated".
 
 ### Tender detail: `/[locale]/dashboard/[tenderId]`
 Inputs required:
@@ -141,7 +141,7 @@ Inputs required:
 - Optional rawData viewer
 
 Fallback behavior:
-- If evaluation missing: show "Not evaluated" and hide evaluation detail lists.
+- If evaluation missing: show "Not Evaluated" and hide evaluation detail lists.
 
 ---
 

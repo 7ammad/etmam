@@ -80,15 +80,17 @@ export function ExportOdooCard({ locale: localeProp = 'en' }: ExportOdooCardProp
   const locale = localeProp === 'ar' ? ar : enUS
 
   return (
-    <Box className="fancy-card fancy-card-accent-blue">
+    <Box className="fancy-card fancy-card-accent-blue dashboard-tool-card">
       <Flex direction="column" gap="3">
         <Flex align="center" gap="2">
-          <FileSpreadsheet size={20} style={{ color: 'var(--color-info-600)' }} />
-          <Text size="3" weight="bold" style={{ color: 'var(--text-primary)' }}>
+          <Box className="dashboard-tool-icon dashboard-tool-icon-blue" aria-hidden>
+            <FileSpreadsheet size={18} />
+          </Box>
+          <Text size="2" weight="bold" style={{ color: 'var(--text-primary)' }}>
             {t('exportToOdoo')}
           </Text>
         </Flex>
-        <Flex gap="4" wrap="wrap" align="center">
+        <Flex gap="3" wrap="wrap" align="center">
           <Button
             size="2"
             onClick={handleExport}

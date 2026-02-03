@@ -1,7 +1,7 @@
 # For detailed configuration reference documentation, visit:
 # https://supabase.com/docs/guides/local-development/cli/config
-# A string used to distinguish different Supabase projects on the same host. Defaults to the
-# working directory name when running `supabase init`.
+# Local-only project: do not run `supabase link`. Use only local DB (supabase start).
+# project_id distinguishes local containers; not a remote project ID.
 project_id = "etmam-app"
 
 [api]

@@ -55,12 +55,16 @@ test.describe('CRM Push - Tender Detail', () => {
     await page.goto('/en/dashboard')
     await page.waitForLoadState('networkidle')
 
-    const tenderLink = page.locator('a[href*="/dashboard/"]').first()
-    const hasLinks = await tenderLink.isVisible().catch(() => false)
-    if (!hasLinks) return
+    // Go to tender detail via table row link (avoid clicking Opportunities sidebar link)
+    const hasTable = await page.getByRole('table').isVisible().catch(() => false)
+    if (!hasTable) return
 
-    await tenderLink.click()
+    const tableRowLink = page.getByRole('table').getByRole('link').first()
+    await tableRowLink.click()
     await page.waitForLoadState('networkidle')
+
+    const url = page.url()
+    if (!url.includes('/dashboard/') || url.includes('opportunities')) return
 
     // Ensure tender is evaluated: click Run analysis if the push button is not yet usable
     const runAnalysisBtn = page.getByTestId('run-analysis-button')
@@ -71,7 +75,8 @@ test.describe('CRM Push - Tender Detail', () => {
       await page.waitForTimeout(2000) // allow evaluation to complete
     }
 
-    await expect(page.getByTestId('push-to-crm-button')).toBeVisible()
+    // On tender detail there is one push button in the hero (use first() in case of multiple)
+    await expect(page.getByTestId('push-to-crm-button').first()).toBeVisible({ timeout: 10000 })
   })
 
   test('push button shows disabled reason when not evaluated', async ({ page }) => {

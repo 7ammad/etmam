@@ -1,17 +1,34 @@
 /**
  * Value Estimator Module
  *
+ * V1: Basic estimation from signals (initial guarantee, booklet price, title)
+ * V2: Historical-calibrated estimation using service type + entity + duration
+ *
  * Estimates missing `estimated_value` from available tender signals:
  * 1. Initial Guarantee (highest confidence) - divide by 5% to get total
  * 2. Booklet Price Heuristics (medium confidence) - tier-based estimation
  * 3. Title Keyword Analysis (lower confidence) - category-based multipliers
  * 4. Entity Type Multiplier (adjustment) - government entity size factor
  *
+ * V2 adds:
+ * - Service-type-specific calibration from historical data
+ * - Tender type constraints (direct purchase ≤ 500K SAR)
+ * - Contract duration multipliers
+ * - Entity-specific adjustments
+ *
  * Config-driven via `config/scoring.config.json` → `value_estimation` section.
  */
 
 import type { ScrapedTender } from '@/types/scraper'
 import type { ScoringConfig } from './rules'
+import { BOOKLET_MULTIPLIERS } from './constants'
+import {
+  classifyTender,
+  getHistoricalCalibration,
+  getEntityCalibration,
+  parseContractDuration,
+  type TenderClassification,
+} from './classifier'
 
 /** Value estimation result */
 export interface ValueEstimate {
@@ -123,6 +140,52 @@ function formatSARAr(amount: number): string {
     return `${Math.round(amount / 1000)} ألف ر.س`
   }
   return `${amount} ر.س`
+}
+
+/** Confidence for booklet-based estimate (Phase 2.1). */
+const BOOKLET_ESTIMATE_CONFIDENCE = 90
+
+/** ±10% range around midpoint for booklet estimate min/max. */
+const BOOKLET_ESTIMATE_SPREAD = 0.1
+
+/**
+ * Estimate value from booklet price only (Phase 2.1 — Booklet Multiplier).
+ *
+ * Tier 1: price ≤ 500 SAR → BOOKLET_MULTIPLIERS.tier1 (300).
+ * Tier 2: 500 < price ≤ 20,000 SAR → BOOKLET_MULTIPLIERS.tier2 (500).
+ * Tier 3: price > 20,000 SAR → BOOKLET_MULTIPLIERS.tier3 (1500).
+ *
+ * @param bookletPrice - Booklet price in SAR
+ * @returns ValueEstimate with midpoint = price × multiplier, confidence 90
+ */
+export function estimateFromBooklet(bookletPrice: number): ValueEstimate {
+  let multiplier: number
+  let tierLabel: string
+
+  if (bookletPrice <= 500) {
+    multiplier = BOOKLET_MULTIPLIERS.tier1
+    tierLabel = 'Tier 1'
+  } else if (bookletPrice <= 20_000) {
+    multiplier = BOOKLET_MULTIPLIERS.tier2
+    tierLabel = 'Tier 2'
+  } else {
+    multiplier = BOOKLET_MULTIPLIERS.tier3
+    tierLabel = 'Tier 3'
+  }
+
+  const midpoint = Math.round(bookletPrice * multiplier)
+  const min = Math.round(midpoint * (1 - BOOKLET_ESTIMATE_SPREAD))
+  const max = Math.round(midpoint * (1 + BOOKLET_ESTIMATE_SPREAD))
+
+  return {
+    min,
+    max,
+    midpoint,
+    method: 'booklet_price',
+    confidence: BOOKLET_ESTIMATE_CONFIDENCE,
+    reasoning: `Based on booklet price ${bookletPrice.toLocaleString()} SAR (${tierLabel}, multiplier ${multiplier}×). Midpoint: ${midpoint.toLocaleString()} SAR`,
+    reasoning_ar: `بناءً على سعر الكراسة ${bookletPrice.toLocaleString()} ر.س (${tierLabel}، معامل ${multiplier}×). الوسط: ${formatSARAr(midpoint)}`,
+  }
 }
 
 /**
@@ -273,4 +336,174 @@ function getEntityMultiplier(entity: string, config: ValueEstimationConfig): num
  */
 export function needsValueEstimation(tender: ScrapedTender): boolean {
   return tender.estimated_value == null || tender.estimated_value <= 0
+}
+
+// ============================================================================
+// V2: HISTORICAL-CALIBRATED VALUE ESTIMATION
+// ============================================================================
+
+export interface ValueEstimateV2 extends Omit<ValueEstimate, 'method'> {
+  method: 'direct_purchase_cap' | 'initial_guarantee' | 'historical_calibration' | 'booklet_price' | 'title_inference' | 'fallback'
+  classification: TenderClassification
+  durationMultiplier: number
+  entityMultiplier: number
+}
+
+/**
+ * V2 Value Estimation - Uses historical calibration + service-type awareness
+ *
+ * Order of precedence:
+ * 0. Booklet price (Phase 2.2: trust booklet over text when present)
+ * 1. Tender type constraint (direct purchase ≤ 500K SAR)
+ * 2. Initial guarantee (if available, highest confidence)
+ * 3. Historical calibration by service type + entity + duration
+ * 4. Fallback to V1 estimation
+ */
+export function estimateValueV2(
+  tender: ScrapedTender,
+  config?: ScoringConfigWithEstimation
+): ValueEstimateV2 {
+  const veConfig = config?.value_estimation ?? DEFAULT_VALUE_ESTIMATION
+
+  // Classify the tender first
+  const classification = classifyTender(tender)
+
+  // Default multipliers
+  let durationMultiplier = 1.0
+  let entityMultiplier = 1.0
+
+  // If estimation is disabled, return zero estimate
+  if (!veConfig.enabled) {
+    return {
+      min: 0,
+      max: 0,
+      midpoint: 0,
+      method: 'fallback',
+      confidence: 0,
+      reasoning: 'Value estimation disabled',
+      reasoning_ar: 'تقدير القيمة معطل',
+      classification,
+      durationMultiplier,
+      entityMultiplier,
+    }
+  }
+
+  // Booklet price first (Phase 2.2): trust booklet over text description
+  if (tender.booklet_price != null && tender.booklet_price > 0) {
+    const est = estimateFromBooklet(tender.booklet_price)
+    return {
+      ...est,
+      classification,
+      durationMultiplier: 1.0,
+      entityMultiplier: 1.0,
+    }
+  }
+
+  // 1. Check tender type constraint FIRST (direct purchase = max 500K SAR)
+  if (classification.maxLegalValue !== null) {
+    return {
+      min: Math.round(classification.maxLegalValue * 0.3),
+      max: classification.maxLegalValue,
+      midpoint: Math.round(classification.maxLegalValue * 0.7),
+      method: 'direct_purchase_cap',
+      confidence: 95,
+      reasoning: `Direct purchase legal limit: max ${classification.maxLegalValue.toLocaleString()} SAR`,
+      reasoning_ar: `حد الشراء المباشر: أقصى ${classification.maxLegalValue.toLocaleString()} ر.س`,
+      classification,
+      durationMultiplier: 1.0,
+      entityMultiplier: 1.0,
+    }
+  }
+
+  // 2. Try Initial Guarantee Method (highest confidence)
+  if (tender.initial_guarantee != null && tender.initial_guarantee > 0) {
+    const pct = veConfig.initial_guarantee_pct / 100
+    const estimated = tender.initial_guarantee / pct
+    const spread = veConfig.initial_guarantee_spread ?? 0.1
+    const min = Math.round(estimated * (1 - spread))
+    const max = Math.round(estimated * (1 + spread))
+    const midpoint = Math.round(estimated)
+    const spreadPct = Math.round(spread * 100)
+
+    return {
+      min,
+      max,
+      midpoint,
+      method: 'initial_guarantee',
+      confidence: veConfig.confidence_levels.initial_guarantee,
+      reasoning: `Based on initial guarantee of ${tender.initial_guarantee.toLocaleString()} SAR (assumed ${veConfig.initial_guarantee_pct}% of total, ±${spreadPct}% range)`,
+      reasoning_ar: `بناءً على الضمان الابتدائي ${tender.initial_guarantee.toLocaleString()} ر.س (${veConfig.initial_guarantee_pct}% من القيمة، نطاق ±${spreadPct}%)`,
+      classification,
+      durationMultiplier: 1.0,
+      entityMultiplier: 1.0,
+    }
+  }
+
+  // 3. Historical Calibration by Service Type + Entity + Duration
+  const calibrationPath = veConfig.historical_calibration_path
+  const historicalData = getHistoricalCalibration(
+    classification.serviceType,
+    calibrationPath
+  )
+  const entityData = getEntityCalibration(classification.entityCategory)
+
+  // Calculate duration multiplier (longer contracts = higher value)
+  const durationMonths = parseContractDuration(tender.contract_duration)
+  if (durationMonths > 24) {
+    durationMultiplier = 2.0
+  } else if (durationMonths > 12) {
+    durationMultiplier = 1.5
+  } else if (durationMonths > 6) {
+    durationMultiplier = 1.2
+  }
+
+  // Get entity multiplier
+  entityMultiplier = entityData.multiplier
+
+  // Calculate calibrated estimate using IQR (p25-p75) from historical data
+  const baseMin = historicalData.p25
+  const baseMax = historicalData.p75
+  const baseMedian = historicalData.median
+
+  const combinedMultiplier = durationMultiplier * entityMultiplier
+
+  const min = Math.round(baseMin * combinedMultiplier)
+  const max = Math.round(baseMax * combinedMultiplier)
+  const midpoint = Math.round(baseMedian * combinedMultiplier)
+
+  // Confidence based on historical sample size
+  let confidence = 80
+  if (historicalData.count >= 20) confidence = 90
+  else if (historicalData.count >= 10) confidence = 85
+  else if (historicalData.count < 5) confidence = 70
+
+  const formatValue = (v: number) => v >= 1000000
+    ? `${(v / 1000000).toFixed(1)}M`
+    : `${Math.round(v / 1000)}K`
+
+  return {
+    min,
+    max,
+    midpoint,
+    method: 'historical_calibration',
+    confidence,
+    reasoning: `Historical calibration: ${classification.serviceTypeLabel} (n=${historicalData.count}), ${classification.entityCategoryLabel} entity, ${durationMonths || 'unknown'} months. Range: ${formatValue(min)}-${formatValue(max)} SAR`,
+    reasoning_ar: `معايرة تاريخية: ${classification.serviceTypeLabel} (ن=${historicalData.count})، جهة ${classification.entityCategoryLabel}، ${durationMonths || 'غير محدد'} شهر. النطاق: ${formatValue(min)}-${formatValue(max)} ر.س`,
+    classification,
+    durationMultiplier,
+    entityMultiplier,
+  }
+}
+
+/**
+ * Format SAR amount for display
+ */
+export function formatSARAmount(amount: number): string {
+  if (amount >= 1000000) {
+    return `${(amount / 1000000).toFixed(1)}M SAR`
+  }
+  if (amount >= 1000) {
+    return `${Math.round(amount / 1000)}K SAR`
+  }
+  return `${amount} SAR`
 }

@@ -19,13 +19,6 @@ export default async function SettingsPage({ params }: Props) {
   return (
     <Container size="3" py="8">
       <Flex direction="column" gap="6">
-        <Text size="8" weight="bold" style={{ color: 'var(--text-primary)' }}>
-          {t('title')}
-        </Text>
-        <Text size="2" style={{ color: 'var(--text-secondary)' }}>
-          {t('description')}
-        </Text>
-
         <Flex gap="6" wrap="wrap" align="stretch">
           <Box
             asChild

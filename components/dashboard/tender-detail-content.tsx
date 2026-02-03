@@ -4,6 +4,10 @@ import type { TenderWithEvaluation } from '@/lib/queries/tender'
 import type { Tables } from '@/types/database'
 import { TenderDetailView } from './tender-detail-view'
 
+function normalizeKey(s: string): string {
+  return s.trim().replace(/\s+/g, ' ').normalize('NFC')
+}
+
 export type TenderDetailContentProps = {
   tender: TenderWithEvaluation
   locale: string
@@ -53,7 +57,17 @@ export async function TenderDetailContent({
       if (ev.missing_requirements?.length) evaluationPhrases.push(...ev.missing_requirements.map(String).filter(Boolean))
       if (ev.action_items?.length) evaluationPhrases.push(...ev.action_items.map(String).filter(Boolean))
       const evalMap = evaluationPhrases.length > 0 ? await translateEnglishToArabicBatch(evaluationPhrases) : null
-      const map = (s: string) => (evalMap ? evalMap[s] ?? s : s)
+      const normalizedToTranslated: Record<string, string> = {}
+      if (evalMap) {
+        for (const [phrase, translated] of Object.entries(evalMap)) {
+          if (translated != null && translated !== '') normalizedToTranslated[normalizeKey(phrase)] = translated
+        }
+      }
+      const map = (s: string) => {
+        if (!evalMap) return s
+        const t = evalMap[s] ?? normalizedToTranslated[normalizeKey(s)]
+        return t ?? s
+      }
       summaryDisplay = ev.summary != null ? map(String(ev.summary).trim()) : null
       risksDisplay = ev.risks?.length ? ev.risks.map((r) => map(String(r))) : null
       strengthsDisplay = ev.strengths?.length ? ev.strengths.map((s) => map(String(s))) : null

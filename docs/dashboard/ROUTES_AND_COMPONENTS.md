@@ -100,7 +100,7 @@ Inputs:
 Requirements:
 - Column set matches spec.
 - Row provides a real Link to detail route for accessibility.
-- Partial evaluation supported: Score "—", Recommendation "Not evaluated".
+- Partial evaluation supported: Score "—", Recommendation "Not Evaluated".
 
 Subcomponents:
 - `DeadlineChip`
@@ -130,7 +130,7 @@ Inputs:
 - evaluation?: EvaluationUI
 
 Behavior:
-- If evaluation missing: show Not evaluated and do not render lists.
+- If evaluation missing: show Not Evaluated and do not render lists.
 
 ### 3) `EvaluationDetails`
 Purpose:

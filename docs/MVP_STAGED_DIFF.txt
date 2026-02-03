@@ -1,0 +1,3727 @@
+﻿diff --git a/.gitignore b/.gitignore
+index 7ac354e..7172d8d 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -65,3 +65,9 @@ scratchpad/
+ # Playwright
+ playwright-report/
+ test-results/
++
++# Local / generated (MVP hygiene)
++.claude/settings.local.json
++output/.last-export.json
++output/*.xlsx
++scraper-output/
+diff --git a/actions/evaluation.ts b/actions/evaluation.ts
+index 62fea58..d05096a 100644
+--- a/actions/evaluation.ts
++++ b/actions/evaluation.ts
+@@ -1,10 +1,16 @@
+ 'use server'
+ 
+ import { revalidatePath } from 'next/cache'
+-import { evaluateTender } from '@/lib/ai'
+ import { getTenderById, updateTender } from '@/lib/queries/tender'
+-import { upsertEvaluation, getPendingTenders } from '@/lib/queries/evaluation'
+-import { loadScoringConfig, scoreTender, tenderRowToScraped } from '@/lib/evaluation'
++import {
++  upsertEvaluation,
++  getPendingTenders,
++} from '@/lib/queries/evaluation'
++import {
++  tenderRowToScraped,
++  getEffectiveEstimatedValueSar,
++  scoreTenderMVP,
++} from '@/lib/evaluation'
+ import type { Json } from '@/types/database'
+ 
+ // Types for action responses
+@@ -13,10 +19,11 @@ export type ActionResponse<T = void> =
+   | { success: false; error: string }
+ 
+ /**
+- * Run evaluation for a single tender.
+- * Primary: config-driven rule-based engine (config/scoring.config.json) ΓÇö simple, adjustable, no hallucination.
+- * Fallback: AI evaluator when config is not available.
+- * Oracle (runOracleEvaluation) is not used; per requirement: "┘å┘à┘ê╪░╪¼ ╪¿╪│┘è╪╖ ┘é╪º╪¿┘ä ┘ä┘ä╪¬╪╣╪»┘è┘ä".
++ * Run evaluation for a single tender ΓÇö ONE deterministic pipeline.
++ * 1) Compute EV deterministically (award ΓåÆ etimad ΓåÆ title similarity ΓåÆ fallback).
++ * 2) Compute factor scores deterministically (5 factors, fixed weights).
++ * 3) Persist evaluation record with estimated_value_sar in oracle_metadata.
++ * No AI branch; no config branch. Same tender always yields same EV and score.
+  */
+ export async function runEvaluationAction(
+   tenderId: string
+@@ -29,79 +36,56 @@ export async function runEvaluationAction(
+ 
+     await updateTender(tenderId, { status: 'evaluating' })
+ 
+-    const config = loadScoringConfig()
+-    if (config) {
+-      // Rule-based: deterministic, config-driven, no AI
+-      // Includes value estimation when estimated_value is missing
+-      const scraped = tenderRowToScraped(tender)
+-      const scored = scoreTender(scraped, config)
+-
+-      // Build oracle_metadata with estimation details if value was estimated
+-      const oracleMetadata: Record<string, unknown> | null = scored.budget_estimation_method
+-        ? {
+-            budget_estimation_method: scored.budget_estimation_method,
+-            budget_estimation_confidence: scored.budget_estimation_confidence,
+-          }
+-        : null
+-
+-      await upsertEvaluation({
+-        tender_id: tenderId,
+-        score: scored.score,
+-        recommendation: scored.recommendation,
+-        summary: scored.reasons.length ? scored.reasons.join('. ') : 'Rule-based evaluation.',
+-        strengths: null,
+-        risks: scored.reasons.length ? scored.reasons : null,
+-        missing_requirements: null,
+-        action_items: null,
+-        breakdown: {} as Json,
+-        model_used: 'rule-based',
+-        // Value estimation results
+-        predicted_budget_min: scored.predicted_budget_min,
+-        predicted_budget_max: scored.predicted_budget_max,
+-        oracle_metadata: oracleMetadata as Json,
+-      })
+-      await updateTender(tenderId, { status: 'evaluated' })
+-      revalidatePath('/[locale]/dashboard', 'page')
+-      revalidatePath(`/[locale]/dashboard/${tenderId}`, 'page')
+-      return {
+-        success: true,
+-        data: { score: scored.score, recommendation: scored.recommendation },
+-      }
++    const effectiveEv = getEffectiveEstimatedValueSar(tender)
++    const scraped = tenderRowToScraped(tender)
++    const scored = scoreTenderMVP(scraped, effectiveEv.evSar)
++
++    const summary = scored.top_reasons.join(' ┬╖ ')
++    const dbBreakdown = {
++      budget_fit: scored.breakdown.value_fit,
++      technical_fit: scored.breakdown.scope_fit,
++      timeline_fit: scored.breakdown.time_fit,
++      strategic_fit: scored.breakdown.clarity,
++      risk_score: scored.breakdown.risk_score,
+     }
+ 
+-    // Fallback: AI evaluation when config not available
+-    const result = await evaluateTender(tender)
+-    if (!result.success) {
+-      await updateTender(tenderId, { status: 'pending' })
+-      return { success: false, error: result.error }
++    const oracleMetadata: Record<string, unknown> = {
++      estimated_value_sar: effectiveEv.evSar,
++      ev_method: effectiveEv.source,
++      ev_confidence: effectiveEv.confidence ?? null,
++      matched_examples_count: effectiveEv.matched_examples_count ?? null,
+     }
+ 
+     await upsertEvaluation({
+       tender_id: tenderId,
+-      score: result.data.score,
+-      recommendation: result.data.recommendation,
+-      summary: result.data.summary,
+-      strengths: result.data.strengths,
+-      risks: result.data.risks,
+-      missing_requirements: result.data.missing_requirements,
+-      action_items: result.data.action_items,
+-      breakdown: result.data.breakdown as unknown as Json,
+-      model_used: result.data.model_used,
++      score: scored.score,
++      recommendation: scored.recommendation,
++      summary,
++      strengths: null,
++      risks: null,
++      missing_requirements: null,
++      action_items: null,
++      breakdown: dbBreakdown as unknown as Json,
++      model_used: 'mvp-deterministic',
++      predicted_budget_min: effectiveEv.predictedMin,
++      predicted_budget_max: effectiveEv.predictedMax,
++      oracle_metadata: oracleMetadata as Json,
+     })
+-
+     await updateTender(tenderId, { status: 'evaluated' })
+     revalidatePath('/[locale]/dashboard', 'page')
+     revalidatePath(`/[locale]/dashboard/${tenderId}`, 'page')
+ 
+     return {
+       success: true,
+-      data: {
+-        score: result.data.score,
+-        recommendation: result.data.recommendation,
+-      },
++      data: { score: scored.score, recommendation: scored.recommendation },
+     }
+   } catch (error) {
+     console.error('Evaluation action error:', error)
++    try {
++      await updateTender(tenderId, { status: 'pending' })
++    } catch (_) {
++      // ignore rollback failure so we still return the evaluation error
++    }
+     return {
+       success: false,
+       error: error instanceof Error ? error.message : 'Failed to run evaluation',
+@@ -138,7 +122,6 @@ export async function evaluateAllPendingAction(): Promise<
+       }
+     }
+ 
+-    // Revalidate dashboard
+     revalidatePath('/[locale]/dashboard', 'page')
+ 
+     return {
+@@ -159,10 +142,7 @@ export async function rerunEvaluationAction(
+   tenderId: string
+ ): Promise<ActionResponse<{ score: number; recommendation: string }>> {
+   try {
+-    // Reset status to pending first
+     await updateTender(tenderId, { status: 'pending' })
+-
+-    // Run evaluation
+     return await runEvaluationAction(tenderId)
+   } catch (error) {
+     console.error('Re-evaluation action error:', error)
+diff --git a/app/[locale]/dashboard/[tenderId]/page.tsx b/app/[locale]/dashboard/[tenderId]/page.tsx
+index 58ceaa9..1336464 100644
+--- a/app/[locale]/dashboard/[tenderId]/page.tsx
++++ b/app/[locale]/dashboard/[tenderId]/page.tsx
+@@ -1,79 +1,38 @@
+ /**
+  * Tender detail page ΓÇö Phase 7C.
+  *
+- * Missing fields handled: Summary text only renders when present and non-empty.
+- * Optional evaluation blocks (strengths, risks, missing_requirements, action_items)
+- * only render when the array exists and has length; list items are stringified
+- * with a fallback so nothing shows "undefined".
++ * English: translation streams via Suspense so the page shell is not blocked.
++ * Arabic: renders immediately with original text.
+  */
++import { Suspense } from 'react'
+ import { notFound } from 'next/navigation'
+-import NextLink from 'next/link'
+ import { getTenderById } from '@/lib/queries/tender'
+ import { getServerT } from '@/lib/i18n'
+ import type { Locale } from '@/lib/i18n'
+ import { ErrorState } from '@/components/dashboard/error-state'
+-import { PushToCRMButton } from '@/components/dashboard/push-to-crm-button'
+-import { RunAnalysisButton } from '@/components/dashboard/run-analysis-button'
+-import { Container, Flex, Text, Card, Badge, Link } from '@radix-ui/themes'
+-import { ArrowLeft } from 'lucide-react'
+-import { format } from 'date-fns'
+-import { ar, enUS } from 'date-fns/locale'
++import { TenderDetailContent } from '@/components/dashboard/tender-detail-content'
++import { TenderDetailSkeleton } from '@/components/dashboard/tender-detail-skeleton'
++import type { ScoreBreakdown } from '@/types/evaluation'
++import { Container } from '@radix-ui/themes'
++import { getEffectiveValueDisplay } from '@/lib/display-ev'
+ 
+ type Props = {
+   params: Promise<{ locale: string; tenderId: string }>
+ }
+ 
+-const localeMap = { ar, en: enUS } as const
+-
+-function formatDeadline(deadline: string | null, locale: string) {
+-  if (!deadline) return 'ΓÇö'
+-  try {
+-    const d = new Date(deadline)
+-    const loc = locale === 'ar' ? localeMap.ar : localeMap.en
+-    return format(d, 'PP', { locale: loc })
+-  } catch {
+-    return deadline
+-  }
+-}
+-
+-function formatValue(value: number | null): string {
+-  if (value == null) return 'ΓÇö'
+-  return (
+-    new Intl.NumberFormat('ar-SA', {
+-      style: 'decimal',
+-      minimumFractionDigits: 0,
+-      maximumFractionDigits: 0,
+-    }).format(value) + ' SAR'
+-  )
+-}
+-
+-/** Get effective estimated value with estimation indicator */
+-function getEffectiveValue(
+-  originalValue: number | null,
+-  predictedMin: number | null | undefined,
+-  predictedMax: number | null | undefined
+-): { value: number | null; isEstimated: boolean } {
+-  if (originalValue != null) {
+-    return { value: originalValue, isEstimated: false }
+-  }
+-  if (predictedMin != null && predictedMax != null) {
+-    const midpoint = Math.round((predictedMin + predictedMax) / 2)
+-    return { value: midpoint, isEstimated: true }
+-  }
+-  return { value: null, isEstimated: false }
+-}
+-
+-/** Score 0ΓÇô100 as integer per DASHBOARD_SPEC / DATA_SOURCES */
+-function formatScore(score: number | null | undefined): string {
+-  if (score == null) return 'ΓÇö'
+-  const n = Number(score)
+-  if (Number.isNaN(n)) return 'ΓÇö'
+-  return String(Math.round(Math.min(100, Math.max(0, n))))
++/** Days from today (negative = past) for hero deadline badge */
++function getDaysUntilDeadline(deadline: string | null): number | null {
++  if (!deadline) return null
++  const d = new Date(deadline)
++  const today = new Date()
++  today.setHours(0, 0, 0, 0)
++  d.setHours(0, 0, 0, 0)
++  const msPerDay = 24 * 60 * 60 * 1000
++  return Math.ceil((d.getTime() - today.getTime()) / msPerDay)
+ }
+ 
+ export default async function TenderDetailPage({ params }: Props) {
+   const { locale, tenderId } = await params
+-  const t = getServerT(locale as Locale, 'dashboard')
+   const tEval = getServerT(locale as Locale, 'evaluation')
+ 
+   let tender: Awaited<ReturnType<typeof getTenderById>>
+@@ -94,226 +53,62 @@ export default async function TenderDetailPage({ params }: Props) {
+   const ev = tender.evaluation
+   const hasEvaluation = ev != null
+ 
+-  // Get effective estimated value (use predicted budget if original is missing)
+-  const effectiveValue = getEffectiveValue(
++  // When evaluation exists use predicted_budget_min/max only; else fallback to tender.estimated_value
++  const effectiveValue = getEffectiveValueDisplay(
+     tender.estimated_value ?? null,
+     ev?.predicted_budget_min,
+     ev?.predicted_budget_max
+   )
+ 
+-  return (
+-    <Container size="4" py="6">
+-      <Flex direction="column" gap="6">
+-        {/* Header block per DASHBOARD_SPEC ΓÇö no undefined leak */}
+-        <Card size="2" style={{ background: 'var(--surface-card)' }}>
+-          <Flex direction="column" gap="2">
+-            <Text size="5" weight="bold" style={{ color: 'var(--text-primary)' }}>
+-              {tender.title ?? 'ΓÇö'}
+-            </Text>
+-            <Text size="2" style={{ color: 'var(--gray-11)' }}>
+-              {tender.entity ?? 'ΓÇö'}
+-            </Text>
+-            <Text size="1" style={{ color: 'var(--text-tertiary)' }}>
+-              {tender.reference_no ?? 'ΓÇö'}
+-            </Text>
+-            <Flex gap="4" wrap="wrap" align="center">
+-              <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+-                {formatDeadline(tender.deadline ?? null, locale)}
+-              </Text>
+-              {effectiveValue.isEstimated ? (
+-                <Text size="2" style={{ color: 'var(--amber-11)' }}>
+-                  {formatValue(effectiveValue.value)}
+-                  <Text size="1" style={{ color: 'var(--amber-9)', marginInlineStart: 4 }}>
+-                    (┘à╪¡╪│┘ê╪¿╪⌐)
+-                  </Text>
+-                </Text>
+-              ) : (
+-                <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+-                  {formatValue(effectiveValue.value)}
+-                </Text>
+-              )}
+-            </Flex>
+-          </Flex>
+-        </Card>
+-
+-        {/* Evaluation: Run analysis button when no evaluation */}
+-        <Card size="2" style={{ background: 'var(--surface-card)' }}>
+-          <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
+-            {tEval('title')}
+-          </Text>
+-          <Flex gap="4" align="center" wrap="wrap" style={{ marginBottom: 12 }}>
+-            <RunAnalysisButton tenderId={tender.id} hasEvaluation={hasEvaluation} />
+-          </Flex>
+-
+-          {/* Score Card: prominent score + recommendation + breakdown */}
+-          {hasEvaluation && (
+-            <Card size="2" style={{ background: 'var(--gray-a2)', borderInlineStart: '4px solid var(--color-primary-500)', marginBottom: 12 }}>
+-              <Flex gap="6" wrap="wrap" align="start">
+-                <Flex direction="column" align="center" gap="1" style={{ minWidth: 80 }}>
+-                  <Text size="1" style={{ color: 'var(--text-tertiary)' }}>{tEval('score')}</Text>
+-                  <Text size="8" weight="bold" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+-                    {formatScore(ev?.score)}
+-                  </Text>
+-                </Flex>
+-                <Flex direction="column" gap="2" style={{ flex: 1, minWidth: 200 }}>
+-                  <Badge
+-                    size="2"
+-                    style={{
+-                      alignSelf: 'flex-start',
+-                      backgroundColor: ev!.recommendation === 'qualified'
+-                        ? 'var(--color-qualified-bg)'
+-                        : ev!.recommendation === 'conditional'
+-                          ? 'var(--color-conditional-bg)'
+-                          : 'var(--color-excluded-bg)',
+-                      color: ev!.recommendation === 'qualified'
+-                        ? 'var(--color-qualified-text)'
+-                        : ev!.recommendation === 'conditional'
+-                          ? 'var(--color-conditional-text)'
+-                          : 'var(--color-excluded-text)',
+-                    }}
+-                  >
+-                    {ev!.recommendation === 'qualified'
+-                      ? tEval('qualified')
+-                      : ev!.recommendation === 'conditional'
+-                        ? tEval('conditional')
+-                        : tEval('excluded')}
+-                  </Badge>
+-                  {ev!.breakdown && typeof ev.breakdown === 'object' && !Array.isArray(ev.breakdown) && (
+-                    <Flex gap="4" wrap="wrap" style={{ marginTop: 8 }}>
+-                      {'budget_fit' in ev.breakdown && (
+-                        <Text size="1" style={{ color: 'var(--text-tertiary)' }}>
+-                          {tEval('budgetFit')}: {String((ev.breakdown as Record<string, unknown>).budget_fit ?? 'ΓÇö')}
+-                        </Text>
+-                      )}
+-                      {'technical_fit' in ev.breakdown && (
+-                        <Text size="1" style={{ color: 'var(--text-tertiary)' }}>
+-                          {tEval('technicalFit')}: {String((ev.breakdown as Record<string, unknown>).technical_fit ?? 'ΓÇö')}
+-                        </Text>
+-                      )}
+-                      {'timeline_fit' in ev.breakdown && (
+-                        <Text size="1" style={{ color: 'var(--text-tertiary)' }}>
+-                          {tEval('timelineFit')}: {String((ev.breakdown as Record<string, unknown>).timeline_fit ?? 'ΓÇö')}
+-                        </Text>
+-                      )}
+-                      {'strategic_fit' in ev.breakdown && (
+-                        <Text size="1" style={{ color: 'var(--text-tertiary)' }}>
+-                          {tEval('strategicFit')}: {String((ev.breakdown as Record<string, unknown>).strategic_fit ?? 'ΓÇö')}
+-                        </Text>
+-                      )}
+-                      {'risk_score' in ev.breakdown && (
+-                        <Text size="1" style={{ color: 'var(--text-tertiary)' }}>
+-                          {tEval('riskScore')}: {String((ev.breakdown as Record<string, unknown>).risk_score ?? 'ΓÇö')}
+-                        </Text>
+-                      )}
+-                    </Flex>
+-                  )}
+-                </Flex>
+-              </Flex>
+-            </Card>
+-          )}
+-
+-          {hasEvaluation && ev.summary != null && String(ev.summary).trim() !== '' && (
+-            <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+-              {ev.summary}
+-            </Text>
+-          )}
+-        </Card>
+-
+-        {/* Detail lists: only when evaluation exists (partial data = hide when not evaluated) */}
+-        {hasEvaluation && (
+-          <>
+-            {ev!.strengths && Array.isArray(ev.strengths) && ev.strengths.length > 0 && (
+-              <Card size="2" style={{ background: 'var(--surface-card)' }}>
+-                <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
+-                  {tEval('strengths')}
+-                </Text>
+-                <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+-                    {ev.strengths.map((s, i) => (
+-                      <li key={i}>
+-                        <Text size="2" style={{ color: 'var(--text-secondary)' }}>{String(s ?? '')}</Text>
+-                      </li>
+-                    ))}
+-                  </ul>
+-              </Card>
+-            )}
+-            {ev!.risks && Array.isArray(ev.risks) && ev.risks.length > 0 && (
+-              <Card size="2" style={{ background: 'var(--surface-card)' }}>
+-                <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
+-                  {tEval('risks')}
+-                </Text>
+-                <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+-                    {ev.risks.map((r, i) => (
+-                      <li key={i}>
+-                        <Text size="2" style={{ color: 'var(--text-secondary)' }}>{String(r ?? '')}</Text>
+-                      </li>
+-                    ))}
+-                  </ul>
+-              </Card>
+-            )}
+-            {ev!.missing_requirements && Array.isArray(ev.missing_requirements) && ev.missing_requirements.length > 0 && (
+-              <Card size="2" style={{ background: 'var(--surface-card)' }}>
+-                <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
+-                  {tEval('missingRequirements')}
+-                </Text>
+-                <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+-                    {ev.missing_requirements.map((m, i) => (
+-                      <li key={i}>
+-                        <Text size="2" style={{ color: 'var(--text-secondary)' }}>{String(m ?? '')}</Text>
+-                      </li>
+-                    ))}
+-                  </ul>
+-              </Card>
+-            )}
+-            {ev!.action_items && Array.isArray(ev.action_items) && ev.action_items.length > 0 && (
+-              <Card size="2" style={{ background: 'var(--surface-card)' }}>
+-                <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
+-                  {tEval('actionItems')}
+-                </Text>
+-                <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+-                    {ev.action_items.map((a, i) => (
+-                      <li key={i}>
+-                        <Text size="2" style={{ color: 'var(--text-secondary)' }}>{String(a ?? '')}</Text>
+-                      </li>
+-                    ))}
+-                  </ul>
+-              </Card>
+-            )}
+-          </>
+-        )}
+-
+-        {/* CRM Push Button */}
+-        <Card size="2" style={{ background: 'var(--surface-card)' }}>
+-          <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
+-            {getServerT(locale as Locale, 'crm')('title')}
+-          </Text>
+-          <PushToCRMButton
+-            tenderId={tender.id}
+-            tenderTitle={tender.title ?? ''}
+-            hasEvaluation={hasEvaluation}
+-            currentStatus={tender.status ?? 'pending'}
+-          />
+-        </Card>
++  const daysUntilDeadline = getDaysUntilDeadline(tender.deadline ?? null)
++  // Normalize breakdown: DB may return snake_case or camelCase, or JSON string; support both so scores display
++  let rawBreakdown: Record<string, unknown> | null = null
++  if (ev?.breakdown != null) {
++    if (typeof ev.breakdown === 'string') {
++      try {
++        const parsed = JSON.parse(ev.breakdown) as Record<string, unknown>
++        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) rawBreakdown = parsed
++      } catch {
++        // ignore
++      }
++    } else if (typeof ev.breakdown === 'object' && !Array.isArray(ev.breakdown)) {
++      rawBreakdown = ev.breakdown as Record<string, unknown>
++    }
++  }
++  const getBreakdownValue = (raw: Record<string, unknown>, snakeKey: keyof ScoreBreakdown): number => {
++    const v = raw[snakeKey]
++    if (typeof v === 'number' && !Number.isNaN(v)) return Math.round(Math.max(0, Math.min(100, v)))
++    const camelKey = snakeKey === 'risk_score' ? 'riskScore' : (snakeKey.replace(/_([a-z])/g, (_, c) => c.toUpperCase()) as string)
++    const w = raw[camelKey]
++    if (typeof w === 'number' && !Number.isNaN(w)) return Math.round(Math.max(0, Math.min(100, w)))
++    return 0
++  }
++  const breakdownKeyToLabel: Record<keyof ScoreBreakdown, string> = {
++    budget_fit: tEval('budgetFit'),
++    technical_fit: tEval('technicalFit'),
++    timeline_fit: tEval('timelineFit'),
++    strategic_fit: tEval('strategicFit'),
++    risk_score: tEval('riskScore'),
++  }
++  const breakdownItems = rawBreakdown
++    ? (['budget_fit', 'technical_fit', 'timeline_fit', 'strategic_fit', 'risk_score'] as const).map((key) => ({
++        key,
++        label: breakdownKeyToLabel[key],
++        value: getBreakdownValue(rawBreakdown, key),
++      }))
++    : []
+ 
+-        {/* Phase 7C: Callout for what to do next */}
+-        <Card size="2" style={{ background: 'var(--surface-card)', borderInlineStart: '4px solid var(--color-primary-500)' }}>
+-          <Text size="2" weight="medium" style={{ color: 'var(--gray-11)', marginBottom: 8, display: 'block' }}>
+-            {t('nextStepsTitle')}
+-          </Text>
+-          <Flex direction="column" gap="2">
+-            <Link asChild size="2" color="iris" underline="hover">
+-              <NextLink href={`/${locale}/dashboard`}>
+-                <Flex align="center" gap="2">
+-                  <ArrowLeft size={16} className="flip-rtl" />
+-                  {t('backToList')}
+-                </Flex>
+-              </NextLink>
+-            </Link>
+-            <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+-              {hasEvaluation ? t('exportToOdooHint') : t('runEvaluationHint')}
+-            </Text>
+-          </Flex>
+-        </Card>
+-      </Flex>
+-    </Container>
++  return (
++    <Suspense fallback={<TenderDetailSkeleton />}>
++      <TenderDetailContent
++        tender={tender}
++        locale={locale}
++        ev={ev}
++        hasEvaluation={hasEvaluation}
++        effectiveValue={effectiveValue}
++        daysUntilDeadline={daysUntilDeadline}
++        breakdownItems={breakdownItems}
++      />
++    </Suspense>
+   )
+ }
+diff --git a/app/[locale]/dashboard/page.tsx b/app/[locale]/dashboard/page.tsx
+index 2b7c484..7d6a0bd 100644
+--- a/app/[locale]/dashboard/page.tsx
++++ b/app/[locale]/dashboard/page.tsx
+@@ -1,9 +1,12 @@
++import { Suspense } from 'react'
+ import { getTenders } from '@/lib/queries/tender'
+ import type { TenderWithEvaluation } from '@/lib/queries/tender'
+ import { getServerT } from '@/lib/i18n'
+ import type { Locale } from '@/lib/i18n'
+ import { ErrorState } from '@/components/dashboard/error-state'
+ import { TendersListClient } from '@/components/dashboard/tenders-list-client'
++import { TendersListTranslated } from '@/components/dashboard/tenders-list-translated'
++import { TendersListSkeleton } from '@/components/dashboard/tenders-list-skeleton'
+ import { ExportOdooCard } from '@/components/dashboard/export-odoo-card'
+ import { ScrapeActionsCard } from '@/components/dashboard/scrape-actions-card'
+ import { UploadTenderForm } from '@/components/dashboard/upload-tender-form'
+@@ -30,20 +33,25 @@ export default async function DashboardPage({ params }: Props) {
+   }
+ 
+   return (
+-    <Container size="4" py="6">
++    <Container size="4" py="6" className="dashboard-page">
+       <Flex direction="column" gap="6">
+-        {/* Top: page title ΓÇö primary task per DASHBOARD_DESIGN */}
+-        <h1 style={{ margin: 0 }}>
+-          <Text size="6" weight="bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-latin)' }}>
+-            {t('pageTitle')}
++        {/* Hero: primary task per DASHBOARD_DESIGN */}
++        <header className="dashboard-hero">
++          <h1 style={{ margin: 0 }}>
++            <Text size="8" weight="bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-latin)', letterSpacing: '-0.02em' }}>
++              {t('pageTitle')}
++            </Text>
++          </h1>
++          <Text size="2" style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
++            {t('pageSubtitle')}
+           </Text>
+-        </h1>
++        </header>
+ 
+-        {/* Tools row: scrape + export ΓÇö secondary, compact */}
+-        <Flex gap="4" wrap="wrap" align="stretch">
++        {/* Tools strip: scrape + export ΓÇö single row, compact */}
++        <section className="dashboard-tools-strip" aria-label={t('toolsLabel')}>
+           <ScrapeActionsCard locale={locale} />
+           <ExportOdooCard locale={locale} />
+-        </Flex>
++        </section>
+ 
+         {tenders.length === 0 ? (
+           <Flex
+@@ -75,8 +83,12 @@ export default async function DashboardPage({ params }: Props) {
+             </Flex>
+             <UploadTenderForm locale={locale} />
+           </Flex>
++        ) : locale === 'en' ? (
++          <Suspense fallback={<TendersListSkeleton />}>
++            <TendersListTranslated tenders={tenders} locale={locale} />
++          </Suspense>
+         ) : (
+-          <TendersListClient tenders={tenders} locale={locale} />
++          <TendersListClient tenders={tenders} locale={locale} translationMap={null} />
+         )}
+       </Flex>
+     </Container>
+diff --git a/components/dashboard/evaluation-list-card.tsx b/components/dashboard/evaluation-list-card.tsx
+new file mode 100644
+index 0000000..92bd7e4
+--- /dev/null
++++ b/components/dashboard/evaluation-list-card.tsx
+@@ -0,0 +1,97 @@
++import { Flex, Box, Text, Card } from '@radix-ui/themes'
++import type { LucideIcon } from 'lucide-react'
++
++export type EvaluationListCardVariant = 'success' | 'warning' | 'danger' | 'info'
++
++export interface EvaluationListCardProps {
++  title: string
++  items: string[]
++  icon: LucideIcon
++  variant: EvaluationListCardVariant
++}
++
++const variantStyles: Record<EvaluationListCardVariant, { iconBg: string; iconColor: string }> = {
++  success: {
++    iconBg: 'var(--color-qualified-bg)',
++    iconColor: 'var(--color-qualified-text)',
++  },
++  warning: {
++    iconBg: 'var(--color-conditional-bg)',
++    iconColor: 'var(--color-conditional-text)',
++  },
++  danger: {
++    iconBg: 'var(--color-excluded-bg)',
++    iconColor: 'var(--color-excluded-text)',
++  },
++  info: {
++    iconBg: 'var(--color-info-100, rgba(59, 130, 246, 0.1))',
++    iconColor: 'var(--color-info-600, #2563eb)',
++  },
++}
++
++export function EvaluationListCard({ title, items, icon: Icon, variant }: EvaluationListCardProps) {
++  const style = variantStyles[variant]
++
++  return (
++    <Card
++      className="evaluation-list-card"
++      data-variant={variant}
++      style={{ background: 'var(--surface-card)' }}
++    >
++      <Flex direction="column" gap="3">
++        {/* Header with icon and title */}
++        <Flex align="center" gap="3">
++          <Box
++            className="evaluation-list-card-icon"
++            style={{
++              width: 32,
++              height: 32,
++              borderRadius: 8,
++              background: style.iconBg,
++              color: style.iconColor,
++              display: 'flex',
++              alignItems: 'center',
++              justifyContent: 'center',
++            }}
++          >
++            <Icon size={16} strokeWidth={2} />
++          </Box>
++          <Text size="2" weight="medium" style={{ color: 'var(--text-primary)' }}>
++            {title}
++          </Text>
++        </Flex>
++
++        {/* Items list */}
++        <ul style={{ margin: 0, paddingInlineStart: 20, listStyle: 'none' }}>
++          {items.map((item, i) => (
++            <li
++              key={i}
++              style={{
++                position: 'relative',
++                marginBottom: i === items.length - 1 ? 0 : 8,
++                paddingInlineStart: 4,
++              }}
++            >
++              {/* Custom bullet */}
++              <Box
++                style={{
++                  position: 'absolute',
++                  insetInlineStart: -16,
++                  top: 8,
++                  width: 6,
++                  height: 6,
++                  borderRadius: '50%',
++                  background: style.iconColor,
++                  opacity: 0.6,
++                }}
++              />
++              <Text size="2" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
++                {String(item ?? '')}
++              </Text>
++            </li>
++          ))}
++        </ul>
++      </Flex>
++    </Card>
++  )
++}
+diff --git a/components/dashboard/score-breakdown.tsx b/components/dashboard/score-breakdown.tsx
+new file mode 100644
+index 0000000..80fb5f8
+--- /dev/null
++++ b/components/dashboard/score-breakdown.tsx
+@@ -0,0 +1,143 @@
++'use client'
++
++import { Flex, Box, Text } from '@radix-ui/themes'
++import {
++  Wallet,
++  Cpu,
++  Clock,
++  Target,
++  ShieldAlert,
++  type LucideIcon,
++} from 'lucide-react'
++
++// Map dimension keys to icons
++const dimensionIcons: Record<string, LucideIcon> = {
++  budget_fit: Wallet,
++  technical_fit: Cpu,
++  timeline_fit: Clock,
++  strategic_fit: Target,
++  risk_score: ShieldAlert,
++}
++
++function getScoreColor(value: number): {
++  text: string
++  bar: string
++  bg: string
++} {
++  if (value >= 70) {
++    return {
++      text: 'var(--color-qualified-text)',
++      bar: '#10b981',
++      bg: 'var(--color-qualified-bg)',
++    }
++  }
++  if (value >= 40) {
++    return {
++      text: 'var(--color-conditional-text)',
++      bar: '#f59e0b',
++      bg: 'var(--color-conditional-bg)',
++    }
++  }
++  return {
++    text: 'var(--color-excluded-text)',
++    bar: '#ef4444',
++    bg: 'var(--color-excluded-bg)',
++  }
++}
++
++export interface ScoreBreakdownItem {
++  key: string
++  label: string
++  value: number
++}
++
++export interface ScoreBreakdownProps {
++  items: ScoreBreakdownItem[]
++}
++
++function ScoreBreakdownRow({ item }: { item: ScoreBreakdownItem }) {
++  const normalized = Math.min(100, Math.max(0, Math.round(item.value)))
++  const colors = getScoreColor(normalized)
++  const Icon = dimensionIcons[item.key] || Target
++
++  return (
++    <Box className="breakdown-row">
++      <Flex align="center" gap="3">
++        {/* Icon with colored background */}
++        <Box
++          className="breakdown-icon"
++          style={{
++            width: 32,
++            height: 32,
++            borderRadius: 8,
++            background: colors.bg,
++            display: 'flex',
++            alignItems: 'center',
++            justifyContent: 'center',
++            flexShrink: 0,
++          }}
++        >
++          <Icon size={16} style={{ color: colors.text }} />
++        </Box>
++
++        {/* Label and bar */}
++        <Flex direction="column" gap="1" style={{ flex: 1, minWidth: 0 }}>
++          <Flex justify="between" align="center">
++            <Text
++              size="2"
++              weight="medium"
++              style={{ color: 'var(--text-secondary)' }}
++            >
++              {item.label}
++            </Text>
++            <Text
++              size="2"
++              weight="bold"
++              style={{
++                fontVariantNumeric: 'tabular-nums',
++                color: colors.text,
++                minWidth: 28,
++                textAlign: 'end',
++              }}
++            >
++              {normalized}
++            </Text>
++          </Flex>
++
++          {/* Progress bar with glow */}
++          <Box
++            className="breakdown-bar-track"
++            style={{
++              height: 6,
++              borderRadius: 3,
++              background: 'var(--surface-muted)',
++              overflow: 'hidden',
++              position: 'relative',
++            }}
++          >
++            <Box
++              className="breakdown-bar-fill"
++              style={{
++                width: `${normalized}%`,
++                height: '100%',
++                background: colors.bar,
++                borderRadius: 3,
++                transition: 'width 0.5s ease-out',
++              }}
++            />
++          </Box>
++        </Flex>
++      </Flex>
++    </Box>
++  )
++}
++
++export function ScoreBreakdownList({ items }: ScoreBreakdownProps) {
++  return (
++    <Flex direction="column" gap="4" className="score-breakdown-list">
++      {items.map((item) => (
++        <ScoreBreakdownRow key={item.key} item={item} />
++      ))}
++    </Flex>
++  )
++}
+diff --git a/components/dashboard/score-gauge.tsx b/components/dashboard/score-gauge.tsx
+new file mode 100644
+index 0000000..0887da5
+--- /dev/null
++++ b/components/dashboard/score-gauge.tsx
+@@ -0,0 +1,130 @@
++'use client'
++
++import { Flex, Box, Text, Badge } from '@radix-ui/themes'
++
++/** Stored recommendation: INVEST / REVIEW / SKIP or legacy qualified / conditional / excluded */
++export type RecommendationDisplay = 'INVEST' | 'REVIEW' | 'SKIP' | 'qualified' | 'conditional' | 'excluded'
++
++export interface ScoreGaugeProps {
++  score: number
++  recommendation: RecommendationDisplay
++  recommendationLabel: string
++  size?: number
++}
++
++const RADIUS = 40
++const STROKE = 6
++
++function getRecommendationColors(recommendation: RecommendationDisplay): {
++  primary: string
++  bg: string
++  stroke: string
++} {
++  const isInvest = recommendation === 'INVEST' || recommendation === 'qualified'
++  const isReview = recommendation === 'REVIEW' || recommendation === 'conditional'
++  if (isInvest) {
++    return {
++      primary: 'var(--color-qualified-text)',
++      bg: 'var(--color-qualified-bg)',
++      stroke: '#10b981',
++    }
++  }
++  if (isReview) {
++    return {
++      primary: 'var(--color-conditional-text)',
++      bg: 'var(--color-conditional-bg)',
++      stroke: '#f59e0b',
++    }
++  }
++  return {
++    primary: 'var(--color-excluded-text)',
++    bg: 'var(--color-excluded-bg)',
++    stroke: '#ef4444',
++  }
++}
++
++export function ScoreGauge({ score, recommendation, recommendationLabel, size = 140 }: ScoreGaugeProps) {
++  const normalized = Math.min(100, Math.max(0, Math.round(score)))
++  const circumference = 2 * Math.PI * RADIUS
++  const strokeDashoffset = circumference - (normalized / 100) * circumference
++  const colors = getRecommendationColors(recommendation)
++
++  const viewBoxSize = 100
++  const center = viewBoxSize / 2
++
++  return (
++    <Box className="score-gauge-container" style={{ width: size, height: size, position: 'relative' }}>
++      <svg
++        width={size}
++        height={size}
++        viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
++        aria-hidden
++      >
++        {/* Track (background ring) */}
++        <circle
++          cx={center}
++          cy={center}
++          r={RADIUS}
++          fill="none"
++          stroke="var(--surface-muted)"
++          strokeWidth={STROKE}
++        />
++
++        {/* Progress arc */}
++        <circle
++          cx={center}
++          cy={center}
++          r={RADIUS}
++          fill="none"
++          stroke={colors.stroke}
++          strokeWidth={STROKE}
++          strokeDasharray={circumference}
++          strokeDashoffset={strokeDashoffset}
++          strokeLinecap="round"
++          style={{
++            transform: 'rotate(-90deg)',
++            transformOrigin: 'center',
++            transition: 'stroke-dashoffset 0.6s ease-out',
++          }}
++        />
++      </svg>
++
++      {/* Center content */}
++      <Flex
++        direction="column"
++        align="center"
++        justify="center"
++        gap="1"
++        style={{
++          position: 'absolute',
++          inset: 0,
++        }}
++      >
++        <Text
++          style={{
++            fontSize: size * 0.22,
++            fontWeight: 700,
++            fontVariantNumeric: 'tabular-nums',
++            color: 'var(--text-primary)',
++            lineHeight: 1,
++          }}
++        >
++          {normalized}
++        </Text>
++        <Badge
++          size="1"
++          style={{
++            backgroundColor: colors.bg,
++            color: colors.primary,
++            fontWeight: 600,
++            fontSize: '0.65rem',
++            padding: '2px 8px',
++            borderRadius: 'var(--radius-full)',
++          }}
++        >
++          {recommendationLabel}
++        </Badge>
++      </Flex>
++    </Box>
++  )
++}
+diff --git a/components/dashboard/tender-detail-content.tsx b/components/dashboard/tender-detail-content.tsx
+new file mode 100644
+index 0000000..ffec76c
+--- /dev/null
++++ b/components/dashboard/tender-detail-content.tsx
+@@ -0,0 +1,83 @@
++import { translateArabicToEnglishBatch, translateEnglishToArabicBatch } from '@/lib/ai/translate'
++import { getDisplayText } from '@/lib/translate-display'
++import type { TenderWithEvaluation } from '@/lib/queries/tender'
++import type { Tables } from '@/types/database'
++import { TenderDetailView } from './tender-detail-view'
++
++export type TenderDetailContentProps = {
++  tender: TenderWithEvaluation
++  locale: string
++  ev: Tables<'evaluations'> | null
++  hasEvaluation: boolean
++  effectiveValue: { value: number | null; isEstimated: boolean }
++  daysUntilDeadline: number | null
++  breakdownItems: Array<{ key: string; label: string; value: number }>
++}
++
++/**
++ * Async Server Component: translates content by locale then renders the detail view.
++ * - English: translate entity/title (Arabic ΓåÆ English). Summary/risks etc. shown as stored.
++ * - Arabic: entity/title shown as-is; translate summary/risks/strengths/missing_requirements/action_items (English ΓåÆ Arabic).
++ * Used inside Suspense so the page streams a skeleton first, then this when translation is ready.
++ */
++export async function TenderDetailContent({
++  tender,
++  locale,
++  ev,
++  hasEvaluation,
++  effectiveValue,
++  daysUntilDeadline,
++  breakdownItems,
++}: TenderDetailContentProps) {
++  let entityDisplay: string
++  let titleDisplay: string
++  let summaryDisplay: string | null | undefined
++  let risksDisplay: string[] | null | undefined
++  let strengthsDisplay: string[] | null | undefined
++  let missingRequirementsDisplay: string[] | null | undefined
++  let actionItemsDisplay: string[] | null | undefined
++
++  if (locale === 'en') {
++    const phrases = [tender.entity, tender.title].filter(Boolean) as string[]
++    const translationMap = phrases.length > 0 ? await translateArabicToEnglishBatch(phrases) : null
++    entityDisplay = getDisplayText(tender.entity, locale, translationMap) || 'ΓÇö'
++    titleDisplay = getDisplayText(tender.title, locale, translationMap) || 'ΓÇö'
++  } else {
++    entityDisplay = tender.entity ?? 'ΓÇö'
++    titleDisplay = tender.title ?? 'ΓÇö'
++    if (hasEvaluation && ev) {
++      const evaluationPhrases: string[] = []
++      if (ev.summary != null && String(ev.summary).trim() !== '') evaluationPhrases.push(String(ev.summary).trim())
++      if (ev.risks?.length) evaluationPhrases.push(...ev.risks.map(String).filter(Boolean))
++      if (ev.strengths?.length) evaluationPhrases.push(...ev.strengths.map(String).filter(Boolean))
++      if (ev.missing_requirements?.length) evaluationPhrases.push(...ev.missing_requirements.map(String).filter(Boolean))
++      if (ev.action_items?.length) evaluationPhrases.push(...ev.action_items.map(String).filter(Boolean))
++      const evalMap = evaluationPhrases.length > 0 ? await translateEnglishToArabicBatch(evaluationPhrases) : null
++      const map = (s: string) => (evalMap ? evalMap[s] ?? s : s)
++      summaryDisplay = ev.summary != null ? map(String(ev.summary).trim()) : null
++      risksDisplay = ev.risks?.length ? ev.risks.map((r) => map(String(r))) : null
++      strengthsDisplay = ev.strengths?.length ? ev.strengths.map((s) => map(String(s))) : null
++      missingRequirementsDisplay = ev.missing_requirements?.length ? ev.missing_requirements.map((m) => map(String(m))) : null
++      actionItemsDisplay = ev.action_items?.length ? ev.action_items.map((a) => map(String(a))) : null
++    }
++  }
++
++  return (
++    <TenderDetailView
++      locale={locale}
++      tender={tender}
++      entityDisplay={entityDisplay}
++      titleDisplay={titleDisplay}
++      ev={ev}
++      hasEvaluation={hasEvaluation}
++      effectiveValue={effectiveValue}
++      daysUntilDeadline={daysUntilDeadline}
++      breakdownItems={breakdownItems}
++      summaryDisplay={summaryDisplay}
++      risksDisplay={risksDisplay}
++      strengthsDisplay={strengthsDisplay}
++      missingRequirementsDisplay={missingRequirementsDisplay}
++      actionItemsDisplay={actionItemsDisplay}
++    />
++  )
++}
+diff --git a/components/dashboard/tender-detail-skeleton.tsx b/components/dashboard/tender-detail-skeleton.tsx
+new file mode 100644
+index 0000000..4704228
+--- /dev/null
++++ b/components/dashboard/tender-detail-skeleton.tsx
+@@ -0,0 +1,37 @@
++'use client'
++
++import { Box, Container, Flex, Card } from '@radix-ui/themes'
++
++/**
++ * Skeleton for tender detail page. Used as Suspense fallback while translation streams in.
++ */
++export function TenderDetailSkeleton() {
++  return (
++    <Container size="4" py="6">
++      <Flex direction="column" gap="6">
++        <Box style={{ height: 28, width: '80%', maxWidth: 200, borderRadius: 'var(--radius-2)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++        <Box style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
++          <Box style={{ height: 28, width: '100%', maxWidth: 480, borderRadius: 'var(--radius-2)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++          <Box style={{ height: 20, width: 200, borderRadius: 'var(--radius-1)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++          <Box style={{ height: 20, width: 140, borderRadius: 'var(--radius-1)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++        </Box>
++        <Card size="2" style={{ background: 'var(--surface-card)' }}>
++          <Flex gap="4" align="center" wrap="wrap">
++            <Box style={{ height: 32, width: 64, borderRadius: 'var(--radius-2)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++            <Box style={{ height: 24, width: 100, borderRadius: 'var(--radius-2)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++          </Flex>
++          <Box style={{ height: 48, width: '100%', marginTop: 12, borderRadius: 'var(--radius-2)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++        </Card>
++        {[1, 2, 3].map((i) => (
++          <Card key={i} size="2" style={{ background: 'var(--surface-card)' }}>
++            <Box style={{ height: 20, width: 120, marginBottom: 8, borderRadius: 'var(--radius-1)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++            <Flex direction="column" gap="2">
++              <Box style={{ height: 16, width: '100%', borderRadius: 'var(--radius-1)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++              <Box style={{ height: 16, width: '90%', borderRadius: 'var(--radius-1)', background: 'var(--gray-a3)' }} className="animate-pulse" />
++            </Flex>
++          </Card>
++        ))}
++      </Flex>
++    </Container>
++  )
++}
+diff --git a/components/dashboard/tender-detail-view.tsx b/components/dashboard/tender-detail-view.tsx
+new file mode 100644
+index 0000000..8397f68
+--- /dev/null
++++ b/components/dashboard/tender-detail-view.tsx
+@@ -0,0 +1,306 @@
++import NextLink from 'next/link'
++import { getServerT } from '@/lib/i18n'
++import type { Locale } from '@/lib/i18n'
++import { PushToCRMButton } from '@/components/dashboard/push-to-crm-button'
++import { RunAnalysisButton } from '@/components/dashboard/run-analysis-button'
++import { TenderHero } from '@/components/dashboard/tender-hero'
++import { ScoreGauge } from '@/components/dashboard/score-gauge'
++import { ScoreBreakdownList } from '@/components/dashboard/score-breakdown'
++import { EvaluationListCard } from '@/components/dashboard/evaluation-list-card'
++import { Container, Flex, Box, Text, Card, Link } from '@radix-ui/themes'
++import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, ListChecks, Sparkles, ArrowRight } from 'lucide-react'
++import { format } from 'date-fns'
++import { ar, enUS } from 'date-fns/locale'
++import type { TenderWithEvaluation } from '@/lib/queries/tender'
++import type { Tables } from '@/types/database'
++
++const localeMap = { ar, en: enUS } as const
++
++function formatDeadline(deadline: string | null, locale: string) {
++  if (!deadline) return 'ΓÇö'
++  try {
++    const d = new Date(deadline)
++    const loc = locale === 'ar' ? localeMap.ar : localeMap.en
++    return format(d, 'PP', { locale: loc })
++  } catch {
++    return deadline
++  }
++}
++
++function formatValue(value: number | null, locale: string): string {
++  if (value == null) return 'ΓÇö'
++  const numberLocale = locale === 'ar' ? 'ar-SA' : 'en'
++  return (
++    new Intl.NumberFormat(numberLocale, {
++      style: 'decimal',
++      minimumFractionDigits: 0,
++      maximumFractionDigits: 0,
++    }).format(value) + ' SAR'
++  )
++}
++
++export type TenderDetailViewProps = {
++  locale: string
++  tender: TenderWithEvaluation
++  entityDisplay: string
++  titleDisplay: string
++  ev: Tables<'evaluations'> | null
++  hasEvaluation: boolean
++  effectiveValue: { value: number | null; isEstimated: boolean }
++  daysUntilDeadline: number | null
++  breakdownItems: Array<{ key: string; label: string; value: number }>
++  /** When locale is Arabic, evaluation text (rule-based) may be translated from English */
++  summaryDisplay?: string | null
++  risksDisplay?: string[] | null
++  strengthsDisplay?: string[] | null
++  missingRequirementsDisplay?: string[] | null
++  actionItemsDisplay?: string[] | null
++}
++
++export function TenderDetailView({
++  locale,
++  tender,
++  entityDisplay,
++  titleDisplay,
++  ev,
++  hasEvaluation,
++  effectiveValue,
++  daysUntilDeadline,
++  breakdownItems,
++  summaryDisplay,
++  risksDisplay,
++  strengthsDisplay,
++  missingRequirementsDisplay,
++  actionItemsDisplay,
++}: TenderDetailViewProps) {
++  const summaryText = summaryDisplay ?? ev?.summary ?? null
++  const risksList = risksDisplay ?? ev?.risks ?? null
++  const strengthsList = strengthsDisplay ?? ev?.strengths ?? null
++  const missingList = missingRequirementsDisplay ?? ev?.missing_requirements ?? null
++  const actionList = actionItemsDisplay ?? ev?.action_items ?? null
++  const t = getServerT(locale as Locale, 'dashboard')
++  const tEval = getServerT(locale as Locale, 'evaluation')
++  const tTender = getServerT(locale as Locale, 'tender')
++  const tList = getServerT(locale as Locale, 'tendersList')
++
++  return (
++    <Container size="4" py="6">
++      <Flex direction="column" gap="6">
++        {/* Back link */}
++        <Link asChild size="2" color="gray" underline="hover">
++          <NextLink href={`/${locale}/dashboard`}>
++            <Flex align="center" gap="2">
++              <ArrowLeft size={16} className="flip-rtl" />
++              {t('backToList')}
++            </Flex>
++          </NextLink>
++        </Link>
++
++        {/* Hero section */}
++        <TenderHero
++          title={titleDisplay}
++          entity={entityDisplay}
++          referenceNo={tender.reference_no ?? 'ΓÇö'}
++          deadlineFormatted={formatDeadline(tender.deadline ?? null, locale)}
++          daysUntilDeadline={daysUntilDeadline}
++          valueFormatted={formatValue(effectiveValue.value, locale)}
++          isEstimated={effectiveValue.isEstimated}
++          locale={locale}
++          actions={
++            <Flex direction="column" gap="3" align="end">
++              <RunAnalysisButton tenderId={tender.id} hasEvaluation={hasEvaluation} />
++              <PushToCRMButton
++                tenderId={tender.id}
++                tenderTitle={tender.title ?? ''}
++                hasEvaluation={hasEvaluation}
++                currentStatus={tender.status ?? 'pending'}
++              />
++            </Flex>
++          }
++          labels={{
++            entity: tTender('entity'),
++            title: tList('tenderTitle'),
++            ref: tTender('ref'),
++            deadline: tTender('deadline'),
++            estimated: tTender('estimated'),
++            provided: tTender('provided'),
++            closingSoon: tList('deadlineClosingSoon'),
++            past: tList('deadlinePast'),
++          }}
++        />
++
++        {/* Main content grid */}
++        <Box className="tender-detail-grid">
++          {/* Left column - Evaluation score */}
++          <Flex direction="column" gap="4" className="tender-detail-left">
++            <Card size="3" className="tender-detail-evaluation-card">
++              {/* Section header */}
++              <Flex align="center" gap="2" style={{ marginBottom: 'var(--space-4)' }}>
++                <Box
++                  style={{
++                    width: 28,
++                    height: 28,
++                    borderRadius: 6,
++                    background: 'var(--color-primary-100)',
++                    display: 'flex',
++                    alignItems: 'center',
++                    justifyContent: 'center',
++                  }}
++                >
++                  <Sparkles size={14} style={{ color: 'var(--color-primary-600)' }} />
++                </Box>
++                <Text size="3" weight="bold" style={{ color: 'var(--text-primary)' }}>
++                  {tEval('title')}
++                </Text>
++              </Flex>
++
++              {hasEvaluation && ev && (
++                <>
++                  {/* Score gauge - centered */}
++                  <Flex justify="center" style={{ marginBottom: 'var(--space-4)' }}>
++                    <ScoreGauge
++                      score={ev.score ?? 0}
++                      recommendation={
++                        ev.recommendation === 'qualified' ? 'INVEST'
++                          : ev.recommendation === 'conditional' ? 'REVIEW'
++                          : ev.recommendation === 'excluded' ? 'SKIP'
++                          : (ev.recommendation as 'INVEST' | 'REVIEW' | 'SKIP')
++                      }
++                      recommendationLabel={
++                        ev.recommendation === 'qualified' ? tEval('invest')
++                          : ev.recommendation === 'conditional' ? tEval('review')
++                          : ev.recommendation === 'excluded' ? tEval('skip')
++                          : ev.recommendation === 'INVEST' ? tEval('invest')
++                          : ev.recommendation === 'REVIEW' ? tEval('review')
++                          : ev.recommendation === 'SKIP' ? tEval('skip')
++                          : tEval('excluded')
++                      }
++                      size={140}
++                    />
++                  </Flex>
++
++                  {/* Score breakdown */}
++                  {breakdownItems.length > 0 && (
++                    <Box style={{ marginTop: 'var(--space-2)' }}>
++                      <Text
++                        size="1"
++                        weight="medium"
++                        style={{
++                          color: 'var(--text-tertiary)',
++                          textTransform: 'uppercase',
++                          letterSpacing: '0.05em',
++                          marginBottom: 'var(--space-3)',
++                          display: 'block',
++                        }}
++                      >
++                        {tEval('breakdown') || 'Score Breakdown'}
++                      </Text>
++                      <ScoreBreakdownList items={breakdownItems} />
++                    </Box>
++                  )}
++                </>
++              )}
++
++              {!hasEvaluation && (
++                <Flex
++                  direction="column"
++                  align="center"
++                  justify="center"
++                  gap="3"
++                  style={{ padding: 'var(--space-8) var(--space-4)', textAlign: 'center' }}
++                >
++                  <Box
++                    style={{
++                      width: 64,
++                      height: 64,
++                      borderRadius: '50%',
++                      background: 'var(--surface-muted)',
++                      display: 'flex',
++                      alignItems: 'center',
++                      justifyContent: 'center',
++                    }}
++                  >
++                    <Sparkles size={28} style={{ color: 'var(--text-tertiary)' }} />
++                  </Box>
++                  <Text size="2" style={{ color: 'var(--text-secondary)' }}>
++                    {t('runEvaluationHint')}
++                  </Text>
++                </Flex>
++              )}
++            </Card>
++          </Flex>
++
++          {/* Right column - Summary and details */}
++          <Flex direction="column" gap="4" className="tender-detail-right">
++            {/* Summary card */}
++            {hasEvaluation && summaryText != null && String(summaryText).trim() !== '' && (
++              <Card size="3" className="summary-card">
++                <Flex direction="column" gap="3">
++                  <Text size="2" weight="bold" style={{ color: 'var(--text-primary)' }}>
++                    {tEval('summary')}
++                  </Text>
++                  <Text size="2" className="summary-card-text">
++                    {summaryText}
++                  </Text>
++                </Flex>
++              </Card>
++            )}
++
++            {/* Evaluation list cards */}
++            {hasEvaluation && (
++              <>
++                {strengthsList && Array.isArray(strengthsList) && strengthsList.length > 0 && (
++                  <EvaluationListCard
++                    title={tEval('strengths')}
++                    items={strengthsList.map(String)}
++                    icon={CheckCircle}
++                    variant="success"
++                  />
++                )}
++                {risksList && Array.isArray(risksList) && risksList.length > 0 && (
++                  <EvaluationListCard
++                    title={tEval('risks')}
++                    items={risksList.map(String)}
++                    icon={AlertTriangle}
++                    variant="warning"
++                  />
++                )}
++                {missingList && Array.isArray(missingList) && missingList.length > 0 && (
++                  <EvaluationListCard
++                    title={tEval('missingRequirements')}
++                    items={missingList.map(String)}
++                    icon={XCircle}
++                    variant="danger"
++                  />
++                )}
++                {actionList && Array.isArray(actionList) && actionList.length > 0 && (
++                  <EvaluationListCard
++                    title={tEval('actionItems')}
++                    items={actionList.map(String)}
++                    icon={ListChecks}
++                    variant="info"
++                  />
++                )}
++              </>
++            )}
++
++            {/* Next steps card */}
++            <Card size="2" className="next-steps-card">
++              <Flex direction="column" gap="2">
++                <Flex align="center" gap="2">
++                  <ArrowRight size={16} style={{ color: 'var(--color-primary-500)' }} className="flip-rtl" />
++                  <Text size="2" weight="bold" style={{ color: 'var(--text-primary)' }}>
++                    {t('nextStepsTitle')}
++                  </Text>
++                </Flex>
++                <Text size="2" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
++                  {hasEvaluation ? t('exportToOdooHint') : t('runEvaluationHint')}
++                </Text>
++              </Flex>
++            </Card>
++          </Flex>
++        </Box>
++      </Flex>
++    </Container>
++  )
++}
+diff --git a/components/dashboard/tender-hero.tsx b/components/dashboard/tender-hero.tsx
+new file mode 100644
+index 0000000..a16c1eb
+--- /dev/null
++++ b/components/dashboard/tender-hero.tsx
+@@ -0,0 +1,196 @@
++'use client'
++
++import { Flex, Box, Text, Badge } from '@radix-ui/themes'
++import { Building2, Hash, Calendar, Banknote } from 'lucide-react'
++
++export interface TenderHeroProps {
++  title: string
++  entity: string
++  referenceNo: string
++  deadlineFormatted: string
++  daysUntilDeadline: number | null
++  valueFormatted: string
++  isEstimated: boolean
++  locale: string
++  /** Actions (e.g. Run analysis, Push to CRM) shown on the right side of the hero card */
++  actions?: React.ReactNode
++  labels: {
++    entity: string
++    title: string
++    ref: string
++    deadline: string
++    estimated: string
++    provided: string
++    closingSoon: string
++    past: string
++  }
++}
++
++export function TenderHero({
++  title,
++  entity,
++  referenceNo,
++  deadlineFormatted,
++  daysUntilDeadline,
++  valueFormatted,
++  isEstimated,
++  locale,
++  actions,
++  labels,
++}: TenderHeroProps) {
++  const deadlineBadge =
++    daysUntilDeadline === null
++      ? null
++      : daysUntilDeadline < 0
++        ? { label: labels.past, color: 'red' as const }
++        : daysUntilDeadline <= 7
++          ? { label: labels.closingSoon, color: 'amber' as const }
++          : null
++
++  const isUrgent = daysUntilDeadline !== null && daysUntilDeadline <= 7
++
++  return (
++    <Box
++      className="tender-hero-card"
++      dir={locale === 'ar' ? 'rtl' : 'ltr'}
++      style={{
++        background: isUrgent
++          ? 'linear-gradient(135deg, var(--surface-card) 0%, rgba(239, 68, 68, 0.05) 100%)'
++          : 'var(--surface-card)',
++        border: isUrgent ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid var(--border-default)',
++        borderRadius: 'var(--radius-card)',
++        padding: 'var(--space-6)',
++        position: 'relative',
++        overflow: 'hidden',
++      }}
++    >
++      {/* Subtle gradient overlay for depth */}
++      <Box
++        style={{
++          position: 'absolute',
++          inset: 0,
++          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.02) 100%)',
++          pointerEvents: 'none',
++        }}
++      />
++
++      <Flex justify="between" align="start" gap="6" wrap="wrap" style={{ position: 'relative', zIndex: 1 }}>
++        <Flex direction="column" gap="4" style={{ flex: 1, minWidth: 0 }}>
++          {/* Entity with icon */}
++          <Flex align="center" gap="2">
++            <Box
++              style={{
++                width: 28,
++                height: 28,
++                borderRadius: 6,
++                background: 'var(--surface-muted)',
++                display: 'flex',
++                alignItems: 'center',
++                justifyContent: 'center',
++              }}
++            >
++              <Building2 size={14} style={{ color: 'var(--text-tertiary)' }} />
++            </Box>
++            <Text size="2" style={{ color: 'var(--text-secondary)' }}>
++              {entity}
++            </Text>
++          </Flex>
++
++          {/* Title - the main focal point */}
++          <Text
++            size="6"
++            weight="bold"
++            style={{
++              color: 'var(--text-primary)',
++              lineHeight: 1.3,
++              letterSpacing: '-0.02em',
++            }}
++          >
++            {title}
++          </Text>
++
++          {/* Meta row with icons */}
++          <Flex gap="5" wrap="wrap" align="center" className="tender-hero-meta">
++            {/* Reference */}
++            <Flex gap="2" align="center">
++              <Hash size={14} style={{ color: 'var(--text-tertiary)' }} />
++              <Text size="1" style={{ color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
++                {referenceNo}
++              </Text>
++            </Flex>
++
++            {/* Deadline */}
++            <Flex gap="2" align="center">
++              <Calendar size={14} style={{ color: deadlineBadge ? 'var(--color-excluded-text)' : 'var(--text-tertiary)' }} />
++              <Text
++                size="2"
++                weight={deadlineBadge ? 'medium' : 'regular'}
++                style={{ color: deadlineBadge ? 'var(--color-excluded-text)' : 'var(--text-secondary)' }}
++              >
++                {deadlineFormatted}
++              </Text>
++              {deadlineBadge && (
++                <Badge
++                  size="1"
++                  variant="soft"
++                  color={deadlineBadge.color}
++                  style={{ fontWeight: 600 }}
++                >
++                  {deadlineBadge.label}
++                </Badge>
++              )}
++            </Flex>
++
++            {/* Value - highlighted */}
++            <Flex gap="2" align="center">
++              <Banknote size={14} style={{ color: 'var(--color-primary-500)' }} />
++              <Text
++                size="2"
++                weight="bold"
++                style={{
++                  color: 'var(--color-primary-500)',
++                  fontVariantNumeric: 'tabular-nums',
++                }}
++              >
++                {valueFormatted}
++              </Text>
++              {isEstimated && (
++                <Badge
++                  size="1"
++                  variant="soft"
++                  color="amber"
++                  style={{ fontWeight: 500, fontSize: '0.65rem' }}
++                >
++                  {labels.estimated}
++                </Badge>
++              )}
++              {!isEstimated && valueFormatted && valueFormatted !== 'ΓÇö' && (
++                <Badge
++                  size="1"
++                  variant="soft"
++                  color="green"
++                  style={{ fontWeight: 500, fontSize: '0.65rem' }}
++                >
++                  {labels.provided}
++                </Badge>
++              )}
++            </Flex>
++          </Flex>
++        </Flex>
++
++        {/* Actions */}
++        {actions != null && (
++          <Flex
++            direction="column"
++            gap="3"
++            align="end"
++            className="tender-hero-actions"
++            style={{ flexShrink: 0 }}
++          >
++            {actions}
++          </Flex>
++        )}
++      </Flex>
++    </Box>
++  )
++}
+diff --git a/components/dashboard/tenders-list-client.tsx b/components/dashboard/tenders-list-client.tsx
+index d6a2e0b..5a447f0 100644
+--- a/components/dashboard/tenders-list-client.tsx
++++ b/components/dashboard/tenders-list-client.tsx
+@@ -6,12 +6,14 @@ import NextLink from 'next/link'
+ import { useTranslations } from '@/components/providers/i18n-provider'
+ import type { TenderWithEvaluation } from '@/lib/queries/tender'
+ import { runEvaluationAction, evaluateAllPendingAction } from '@/actions/evaluation'
+-import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox } from '@radix-ui/themes'
++import { Flex, Box, Text, Badge, Table, TextField, Select, Button, Checkbox, Card } from '@radix-ui/themes'
+ import { BarChart } from '@tremor/react'
+-import { Sparkles } from 'lucide-react'
++import { Sparkles, Search, Filter, ArrowUpDown, X } from 'lucide-react'
+ import { format } from 'date-fns'
+ import { ar, enUS } from 'date-fns/locale'
+ import { DashboardKpiRow, type DashboardKpiStats } from './dashboard-kpi-row'
++import { getDisplayText } from '@/lib/translate-display'
++import { getEffectiveValueDisplay } from '@/lib/display-ev'
+ 
+ const localeMap = { ar, en: enUS } as const
+ const PAGE_SIZE = 10
+@@ -52,7 +54,15 @@ type SortKey =
+   | 'score_high_low'
+ 
+ type TenderStatus = TenderWithEvaluation['status']
+-type RecommendationFilter = '' | 'qualified' | 'conditional' | 'excluded' | 'not_evaluated'
++type RecommendationFilter = '' | 'INVEST' | 'REVIEW' | 'SKIP' | 'not_evaluated'
++/** Normalize stored recommendation to display/filter value: INVEST / REVIEW / SKIP (legacy qualified/conditional/excluded mapped). */
++function normalizeRecommendation(rec: string | null | undefined): RecommendationFilter {
++  if (rec === 'INVEST' || rec === 'REVIEW' || rec === 'SKIP' || rec === 'not_evaluated') return rec
++  if (rec === 'qualified') return 'INVEST'
++  if (rec === 'conditional') return 'REVIEW'
++  if (rec === 'excluded') return 'SKIP'
++  return 'not_evaluated'
++}
+ /** Per DASHBOARD_SPEC Section B: Deadline status filter */
+ type DeadlineFilter = '' | 'closing_soon' | 'open' | 'past'
+ 
+@@ -67,10 +77,11 @@ function formatDeadline(deadline: string | null, locale: string) {
+   }
+ }
+ 
+-function formatValue(value: number | null): string {
++function formatValue(value: number | null, locale: string): string {
+   if (value == null) return 'ΓÇö'
++  const numberLocale = locale === 'ar' ? 'ar-SA' : 'en'
+   return (
+-    new Intl.NumberFormat('ar-SA', {
++    new Intl.NumberFormat(numberLocale, {
+       style: 'decimal',
+       minimumFractionDigits: 0,
+       maximumFractionDigits: 0,
+@@ -78,20 +89,12 @@ function formatValue(value: number | null): string {
+   )
+ }
+ 
+-/** Get effective estimated value with estimation indicator */
+-function getEffectiveValue(
+-  originalValue: number | null | undefined,
+-  predictedMin: number | null | undefined,
+-  predictedMax: number | null | undefined
+-): { value: number | null; isEstimated: boolean } {
+-  if (originalValue != null) {
+-    return { value: originalValue, isEstimated: false }
+-  }
+-  if (predictedMin != null && predictedMax != null) {
+-    const midpoint = Math.round((predictedMin + predictedMax) / 2)
+-    return { value: midpoint, isEstimated: true }
+-  }
+-  return { value: null, isEstimated: false }
++/** Score color for progress indicator: qualified green, conditional amber, excluded red */
++function getScoreColor(score: number | null | undefined): string {
++  if (score == null) return 'var(--surface-muted)'
++  if (score >= 70) return 'var(--color-qualified-text)'
++  if (score >= 40) return 'var(--color-conditional-text)'
++  return 'var(--color-excluded-text)'
+ }
+ 
+ function parseSortKey(key: SortKey): { by: 'created_at' | 'deadline' | 'score'; dir: 'asc' | 'desc' } {
+@@ -114,13 +117,16 @@ function parseSortKey(key: SortKey): { by: 'created_at' | 'deadline' | 'score';
+ interface TendersListClientProps {
+   tenders: TenderWithEvaluation[]
+   locale: string
++  /** When locale is 'en', server provides AI-translated entity/title map. */
++  translationMap?: Record<string, string> | null
+ }
+ 
+-export function TendersListClient({ tenders, locale }: TendersListClientProps) {
++export function TendersListClient({ tenders, locale, translationMap = null }: TendersListClientProps) {
+   const router = useRouter()
+   const t = useTranslations('tendersList')
+   const tDashboard = useTranslations('dashboard')
+   const tStatuses = useTranslations('tender.statuses')
++  const tTender = useTranslations('tender')
+   const tEval = useTranslations('evaluation')
+ 
+   const [search, setSearch] = useState('')
+@@ -180,7 +186,7 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+     let list = tenders.filter((tender) => {
+       if (q && !(tender.entity?.toLowerCase().includes(q) || tender.title?.toLowerCase().includes(q) || tender.reference_no?.toLowerCase().includes(q))) return false
+       if (statusFilter && tender.status !== statusFilter) return false
+-      const rec = tender.evaluation?.recommendation ?? 'not_evaluated'
++      const rec = normalizeRecommendation(tender.evaluation?.recommendation ?? 'not_evaluated')
+       if (recommendationFilter && rec !== recommendationFilter) return false
+       const dStatus = getDeadlineStatus(tender.deadline)
+       if (deadlineFilter && dStatus !== deadlineFilter) return false
+@@ -221,10 +227,10 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+     let deadlinesNext7 = 0
+     let deadlinesNext30 = 0
+     for (const tender of filteredAndSorted) {
+-      const rec = tender.evaluation?.recommendation ?? 'not_evaluated'
+-      if (rec === 'qualified') qualified++
+-      else if (rec === 'conditional') conditional++
+-      else if (rec === 'excluded') excluded++
++      const rec = normalizeRecommendation(tender.evaluation?.recommendation ?? 'not_evaluated')
++      if (rec === 'INVEST') qualified++
++      else if (rec === 'REVIEW') conditional++
++      else if (rec === 'SKIP') excluded++
+       else notEvaluated++
+       const days = getDaysFromToday(tender.deadline)
+       if (days != null && days >= 0 && days <= CLOSING_SOON_DAYS) deadlinesNext7++
+@@ -270,9 +276,9 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+ 
+   const recommendationOptions: { value: RecommendationFilter; labelKey: string }[] = [
+     { value: '', labelKey: 'allRecommendations' },
+-    { value: 'qualified', labelKey: 'qualified' },
+-    { value: 'conditional', labelKey: 'conditional' },
+-    { value: 'excluded', labelKey: 'excluded' },
++    { value: 'INVEST', labelKey: 'invest' },
++    { value: 'REVIEW', labelKey: 'review' },
++    { value: 'SKIP', labelKey: 'skip' },
+     { value: 'not_evaluated', labelKey: 'notEvaluated' },
+   ]
+ 
+@@ -304,6 +310,7 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+       {/* Section A: KPI row ΓÇö derived from filtered list per DASHBOARD_DESIGN */}
+       <DashboardKpiRow
+           stats={kpiStats}
++          locale={locale}
+           labels={{
+             total: t('kpiTotal'),
+             qualified: t('kpiQualified'),
+@@ -315,10 +322,12 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+           }}
+         />
+ 
+-        {/* Section B: Filters row ΓÇö search, recommendation, deadline, sort per DASHBOARD_SPEC */}
+-        <Flex direction="column" gap="3">
+-          <Flex gap="4" wrap="wrap" align="center">
++        {/* Section B: Filters ΓÇö card with grouped controls */}
++        <Card className="filters-container">
++          <Flex direction="column" gap="4">
+             <TextField.Root
++              size="3"
++              className="search-input"
+               aria-label={t('searchPlaceholder')}
+               placeholder={t('searchPlaceholder')}
+               value={search}
+@@ -326,116 +335,149 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+                 setSearch(e.target.value)
+                 setPage(1)
+               }}
+-              style={{ minWidth: 200, maxWidth: 320 }}
+-            />
+-            <Select.Root
+-              value={recommendationFilter || 'all'}
+-              onValueChange={(v) => {
+-                setRecommendationFilter((v === 'all' ? '' : v) as RecommendationFilter)
+-                setPage(1)
+-              }}
++              style={{ minWidth: 200, maxWidth: 400 }}
+             >
+-              <Select.Trigger aria-label={t('recommendation')} placeholder={t('recommendation')} style={{ minWidth: 160 }} />
+-              <Select.Content>
+-                {recommendationOptions.map((opt) => (
+-                  <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+-                    {opt.value === '' ? t('allRecommendations') : opt.labelKey === 'notEvaluated' ? tEval('notEvaluated') : tEval(opt.labelKey as 'qualified' | 'conditional' | 'excluded')}
+-                  </Select.Item>
+-                ))}
+-              </Select.Content>
+-            </Select.Root>
+-            <Select.Root
+-              value={deadlineFilter || 'all'}
+-              onValueChange={(v) => {
+-                setDeadlineFilter((v === 'all' ? '' : v) as DeadlineFilter)
+-                setPage(1)
+-              }}
+-            >
+-              <Select.Trigger aria-label={t('deadline')} placeholder={t('deadline')} style={{ minWidth: 140 }} />
+-              <Select.Content>
+-                {deadlineOptions.map((opt) => (
+-                  <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+-                    {t(opt.labelKey)}
+-                  </Select.Item>
+-                ))}
+-              </Select.Content>
+-            </Select.Root>
+-            <Select.Root
+-              value={statusFilter || 'all'}
+-              onValueChange={(v) => {
+-                setStatusFilter((v === 'all' ? '' : v) as TenderStatus | '')
+-                setPage(1)
+-              }}
+-            >
+-              <Select.Trigger aria-label={t('status')} placeholder={t('status')} style={{ minWidth: 120 }} />
+-              <Select.Content>
+-                {statusOptions.map((opt) => (
+-                  <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
+-                    {opt.value === '' ? t('allStatuses') : tStatuses(opt.labelKey as TenderStatus)}
+-                  </Select.Item>
+-                ))}
+-              </Select.Content>
+-            </Select.Root>
+-            <Flex align="center" gap="2">
+-              <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+-                {t('sortBy')}
+-              </Text>
+-              <Select.Root value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+-                <Select.Trigger aria-label={t('sortBy')} style={{ minWidth: 180 }} />
+-                <Select.Content>
+-                  {sortOptions.map((opt) => (
+-                    <Select.Item key={opt.value} value={opt.value}>
+-                      {t(opt.labelKey)}
+-                    </Select.Item>
+-                  ))}
+-                </Select.Content>
+-              </Select.Root>
++              <TextField.Slot>
++                <Search size={18} className="filter-icon" />
++              </TextField.Slot>
++            </TextField.Root>
++            <Flex gap="3" wrap="wrap" align="center">
++              <Flex gap="2" align="center" className="filter-group">
++                <Filter size={14} className="filter-icon" />
++                <Select.Root
++                  value={recommendationFilter || 'all'}
++                  onValueChange={(v) => {
++                    setRecommendationFilter((v === 'all' ? '' : v) as RecommendationFilter)
++                    setPage(1)
++                  }}
++                >
++                  <Select.Trigger aria-label={t('recommendation')} placeholder={t('recommendation')} style={{ minWidth: 160 }} />
++                  <Select.Content>
++                    {recommendationOptions.map((opt) => (
++                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
++                        {opt.value === '' ? t('allRecommendations') : opt.labelKey === 'notEvaluated' ? tEval('notEvaluated') : tEval(opt.labelKey as 'invest' | 'review' | 'skip')}
++                      </Select.Item>
++                    ))}
++                  </Select.Content>
++                </Select.Root>
++                <Select.Root
++                  value={deadlineFilter || 'all'}
++                  onValueChange={(v) => {
++                    setDeadlineFilter((v === 'all' ? '' : v) as DeadlineFilter)
++                    setPage(1)
++                  }}
++                >
++                  <Select.Trigger aria-label={t('deadline')} placeholder={t('deadline')} style={{ minWidth: 140 }} />
++                  <Select.Content>
++                    {deadlineOptions.map((opt) => (
++                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
++                        {t(opt.labelKey)}
++                      </Select.Item>
++                    ))}
++                  </Select.Content>
++                </Select.Root>
++                <Select.Root
++                  value={statusFilter || 'all'}
++                  onValueChange={(v) => {
++                    setStatusFilter((v === 'all' ? '' : v) as TenderStatus | '')
++                    setPage(1)
++                  }}
++                >
++                  <Select.Trigger aria-label={t('status')} placeholder={t('status')} style={{ minWidth: 120 }} />
++                  <Select.Content>
++                    {statusOptions.map((opt) => (
++                      <Select.Item key={opt.value || 'all'} value={opt.value || 'all'}>
++                        {opt.value === '' ? t('allStatuses') : tStatuses(opt.labelKey as TenderStatus)}
++                      </Select.Item>
++                    ))}
++                  </Select.Content>
++                </Select.Root>
++              </Flex>
++              <Box className="filter-divider" />
++              <Flex gap="2" align="center" className="filter-group">
++                <ArrowUpDown size={14} className="filter-icon" />
++                <Select.Root value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
++                  <Select.Trigger aria-label={t('sortBy')} style={{ minWidth: 180 }} />
++                  <Select.Content>
++                    {sortOptions.map((opt) => (
++                      <Select.Item key={opt.value} value={opt.value}>
++                        {t(opt.labelKey)}
++                      </Select.Item>
++                    ))}
++                  </Select.Content>
++                </Select.Root>
++              </Flex>
++              {hasActiveFilters && (
++                <Button variant="ghost" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
++                  <X size={14} style={{ marginInlineEnd: 4 }} />
++                  {t('clearFilters')}
++                </Button>
++              )}
+             </Flex>
+-            {hasActiveFilters && (
+-              <Button variant="soft" color="gray" size="2" onClick={clearAllFilters} aria-label={t('clearFilters')}>
+-                {t('clearFilters')}
+-              </Button>
+-            )}
+           </Flex>
+-        </Flex>
++        </Card>
+ 
+-        {/* Evaluation actions: select tenders and run analysis */}
+-        <Flex gap="3" align="center" wrap="wrap">
+-          <Button
+-            size="2"
+-            variant="soft"
+-            disabled={evaluating || pageItems.length === 0}
+-            onClick={selectAllOnPage}
+-            aria-label={t('selectAllOnPage')}
+-          >
+-            {t('selectAllOnPage')}
+-          </Button>
+-          {selectedIds.size > 0 && (
+-            <Button size="2" variant="soft" color="gray" onClick={clearSelection} aria-label={t('clearSelection')}>
+-              {t('clearSelection')} ({selectedIds.size})
++        {/* Bulk actions bar ΓÇö sticky when items selected */}
++        {selectedIds.size > 0 && (
++          <Card className="bulk-actions-bar">
++            <Flex justify="between" align="center">
++              <Flex gap="3" align="center">
++                <Checkbox
++                  checked={pageItems.length > 0 && pageItems.every((t) => selectedIds.has(t.id))}
++                  onCheckedChange={(checked) => {
++                    if (checked) selectAllOnPage()
++                    else clearSelection()
++                  }}
++                  aria-label={t('selectAllOnPage')}
++                />
++                <Text size="2" weight="medium">
++                  {t('selectedCount', { count: selectedIds.size })}
++                </Text>
++                <Button variant="ghost" size="1" onClick={clearSelection} aria-label={t('clearSelection')}>
++                  {t('clearSelection')}
++                </Button>
++              </Flex>
++              <Flex gap="2">
++                <Button
++                  size="2"
++                  disabled={evaluating}
++                  onClick={handleEvaluateSelected}
++                  className="evaluate-btn"
++                  aria-label={tDashboard('evaluateSelected')}
++                >
++                  <Sparkles size={16} style={{ marginInlineEnd: 6 }} />
++                  {evaluateProgress
++                    ? tDashboard('evaluatingCount', { current: evaluateProgress.current, total: evaluateProgress.total })
++                    : tDashboard('evaluateSelected')}
++                </Button>
++              </Flex>
++            </Flex>
++          </Card>
++        )}
++
++        {/* Evaluation actions: select all, evaluate all (when no selection) */}
++        {selectedIds.size === 0 && (
++          <Flex gap="3" align="center" wrap="wrap">
++            <Button
++              size="2"
++              variant="soft"
++              disabled={evaluating || pageItems.length === 0}
++              onClick={selectAllOnPage}
++              aria-label={t('selectAllOnPage')}
++            >
++              {t('selectAllOnPage')}
+             </Button>
+-          )}
+-          <Button
+-            size="2"
+-            disabled={evaluating || selectedIds.size === 0}
+-            onClick={handleEvaluateSelected}
+-            aria-label={tDashboard('evaluateSelected')}
+-          >
+-            <Sparkles size={16} style={{ marginInlineEnd: 6 }} />
+-            {evaluateProgress
+-              ? tDashboard('evaluatingCount', { current: evaluateProgress.current, total: evaluateProgress.total })
+-              : tDashboard('evaluateSelected')}
+-          </Button>
+-          <Button
+-            size="2"
+-            variant="soft"
+-            disabled={evaluating}
+-            onClick={handleEvaluateAllPending}
+-            aria-label={tDashboard('evaluateAll')}
+-          >
+-            {evaluating && !evaluateProgress ? tDashboard('evaluating') : tDashboard('evaluateAll')}
+-          </Button>
+-        </Flex>
++            <Button
++              size="2"
++              variant="soft"
++              disabled={evaluating}
++              onClick={handleEvaluateAllPending}
++              aria-label={tDashboard('evaluateAll')}
++            >
++              {evaluating ? tDashboard('evaluating') : tDashboard('evaluateAll')}
++            </Button>
++          </Flex>
++        )}
+ 
+         {/* Section C: Tenders table ΓÇö sticky header, numeric right-align per DASHBOARD_DESIGN */}
+         <Box
+@@ -493,7 +535,7 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+                 return (
+                 <Table.Row
+                   key={tender.id}
+-                  className="dashboard-tender-row"
++                  className="dashboard-tender-row tender-row"
+                   style={{ cursor: 'pointer' }}
+                   onClick={() => router.push(detailHref)}
+                 >
+@@ -506,13 +548,13 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+                   </Table.Cell>
+                   <Table.Cell style={{ minWidth: 0, maxWidth: 160 }}>
+                     <Text size="2" style={{ color: 'var(--gray-11)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+-                      {tender.entity ?? 'ΓÇö'}
++                      {getDisplayText(tender.entity, locale, translationMap) || 'ΓÇö'}
+                     </Text>
+                   </Table.Cell>
+                   <Table.Cell style={{ minWidth: 0, maxWidth: 240 }}>
+                     <NextLink href={detailHref} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none' }}>
+                       <Text size="2" weight="medium" style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+-                        {tender.title ?? 'ΓÇö'}
++                        {getDisplayText(tender.title, locale, translationMap) || 'ΓÇö'}
+                       </Text>
+                     </NextLink>
+                   </Table.Cell>
+@@ -539,55 +581,81 @@ export function TendersListClient({ tenders, locale }: TendersListClientProps) {
+                   </Table.Cell>
+                   <Table.Cell className="dashboard-table-numeric">
+                     {(() => {
+-                      const effectiveValue = getEffectiveValue(
++                      const effectiveValue = getEffectiveValueDisplay(
+                         tender.estimated_value,
+                         tender.evaluation?.predicted_budget_min,
+                         tender.evaluation?.predicted_budget_max
+                       )
+-                      return effectiveValue.isEstimated ? (
+-                        <Text size="2" style={{ color: 'var(--amber-11)' }}>
+-                          ~{formatValue(effectiveValue.value)}
+-                        </Text>
+-                      ) : (
+-                        <Text size="2" style={{ color: 'var(--text-secondary)' }}>
+-                          {formatValue(effectiveValue.value)}
+-                        </Text>
++                      const hasValue = effectiveValue.value != null && formatValue(effectiveValue.value, locale) !== 'ΓÇö'
++                      return (
++                        <Flex gap="2" align="center" wrap="wrap">
++                          {effectiveValue.isEstimated ? (
++                            <Text size="2" style={{ color: 'var(--amber-11)' }}>
++                              ~{formatValue(effectiveValue.value, locale)}
++                            </Text>
++                          ) : (
++                            <Text size="2" style={{ color: 'var(--text-secondary)' }}>
++                              {formatValue(effectiveValue.value, locale)}
++                            </Text>
++                          )}
++                          {effectiveValue.isEstimated && (
++                            <Badge size="1" variant="soft" color="amber" style={{ fontWeight: 500, fontSize: '0.65rem' }}>
++                              {tTender('estimated')}
++                            </Badge>
++                          )}
++                          {!effectiveValue.isEstimated && hasValue && (
++                            <Badge size="1" variant="soft" color="green" style={{ fontWeight: 500, fontSize: '0.65rem' }}>
++                              {tTender('provided')}
++                            </Badge>
++                          )}
++                        </Flex>
+                       )
+                     })()}
+                   </Table.Cell>
+-                  <Table.Cell className="dashboard-table-numeric">
+-                    <Text size="2" weight="medium">
+-                      {tender.evaluation != null ? String(Math.round(Math.min(100, Math.max(0, Number(tender.evaluation.score))))) : 'ΓÇö'}
+-                    </Text>
++                  <Table.Cell className="dashboard-table-numeric score-cell">
++                    {tender.evaluation != null ? (
++                      <Flex direction="column" gap="1" align="end">
++                        <Flex gap="2" align="center" style={{ width: '100%', minWidth: 64 }}>
++                          <Box className="score-indicator" style={{ flex: 1 }}>
++                            <Box
++                              className="score-indicator-fill"
++                              style={{
++                                width: `${Math.min(100, Math.max(0, Number(tender.evaluation.score)))}%`,
++                                backgroundColor: getScoreColor(tender.evaluation?.score ?? null),
++                              }}
++                            />
++                          </Box>
++                          <Text size="2" className="score-value" style={{ color: getScoreColor(tender.evaluation?.score ?? null), minWidth: 24 }}>
++                            {Math.round(Math.min(100, Math.max(0, Number(tender.evaluation.score))))}
++                          </Text>
++                        </Flex>
++                      </Flex>
++                    ) : (
++                      <Text size="2" style={{ color: 'var(--text-tertiary)' }}>ΓÇö</Text>
++                    )}
+                   </Table.Cell>
+                     <Table.Cell>
+-                      <Badge
+-                        size="1"
+-                        style={{
+-                          backgroundColor: tender.evaluation
+-                            ? tender.evaluation.recommendation === 'qualified'
+-                              ? 'var(--color-qualified-bg)'
+-                              : tender.evaluation.recommendation === 'conditional'
+-                                ? 'var(--color-conditional-bg)'
+-                                : 'var(--color-excluded-bg)'
+-                            : 'var(--gray-a3)',
+-                          color: tender.evaluation
+-                            ? tender.evaluation.recommendation === 'qualified'
+-                              ? 'var(--color-qualified-text)'
+-                              : tender.evaluation.recommendation === 'conditional'
+-                                ? 'var(--color-conditional-text)'
+-                                : 'var(--color-excluded-text)'
+-                            : 'var(--gray-11)',
+-                        }}
+-                      >
+-                        {tender.evaluation
+-                          ? tender.evaluation.recommendation === 'qualified'
+-                            ? tEval('qualified')
+-                            : tender.evaluation.recommendation === 'conditional'
+-                              ? tEval('conditional')
+-                              : tEval('excluded')
+-                          : tEval('notEvaluated')}
+-                      </Badge>
++                      {(() => {
++                        const recNorm = normalizeRecommendation(tender.evaluation?.recommendation)
++                        const isInvest = recNorm === 'INVEST'
++                        const isReview = recNorm === 'REVIEW'
++                        const isSkip = recNorm === 'SKIP'
++                        return (
++                          <Badge
++                            size="1"
++                            style={{
++                              backgroundColor: tender.evaluation
++                                ? isInvest ? 'var(--color-qualified-bg)' : isReview ? 'var(--color-conditional-bg)' : isSkip ? 'var(--color-excluded-bg)' : 'var(--gray-a3)'
++                                : 'var(--gray-a3)',
++                              color: tender.evaluation
++                                ? isInvest ? 'var(--color-qualified-text)' : isReview ? 'var(--color-conditional-text)' : isSkip ? 'var(--color-excluded-text)' : 'var(--gray-11)'
++                                : 'var(--gray-11)',
++                            }}
++                          >
++                            {tender.evaluation ? tEval(recNorm === 'INVEST' ? 'invest' : recNorm === 'REVIEW' ? 'review' : recNorm === 'SKIP' ? 'skip' : 'notEvaluated') : tEval('notEvaluated')}
++                          </Badge>
++                        )
++                      })()}
+                     </Table.Cell>
+                     <Table.Cell>
+                       <Badge size="1" color="gray" variant="soft">
+diff --git a/components/dashboard/tenders-list-skeleton.tsx b/components/dashboard/tenders-list-skeleton.tsx
+new file mode 100644
+index 0000000..204653e
+--- /dev/null
++++ b/components/dashboard/tenders-list-skeleton.tsx
+@@ -0,0 +1,50 @@
++'use client'
++
++import { Box, Flex, Card } from '@radix-ui/themes'
++
++const SKELETON_BG = 'var(--surface-muted)'
++
++/**
++ * Skeleton for the tenders list section (KPI row + filters + table).
++ * Used as Suspense fallback while translation streams in.
++ */
++export function TendersListSkeleton() {
++  return (
++    <Flex direction="column" gap="6">
++      <Flex gap="4" wrap="wrap" className="dashboard-kpi-grid" style={{ display: 'grid' }}>
++        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
++          <Card key={i} size="2" style={{ background: 'var(--surface-card)', minWidth: 140 }}>
++            <Flex gap="3" align="center">
++              <Box style={{ width: 42, height: 42, borderRadius: 12, background: SKELETON_BG }} className="animate-pulse" />
++              <Flex direction="column" gap="1">
++                <Box style={{ height: 20, width: 40, borderRadius: 4, background: SKELETON_BG }} className="animate-pulse" />
++                <Box style={{ height: 12, width: 64, borderRadius: 4, background: SKELETON_BG }} className="animate-pulse" />
++              </Flex>
++            </Flex>
++          </Card>
++        ))}
++      </Flex>
++      <Card className="filters-container">
++        <Flex gap="4" wrap="wrap" align="center">
++          <Box style={{ height: 36, width: 240, borderRadius: 8, background: SKELETON_BG }} className="animate-pulse" />
++          <Box style={{ height: 36, width: 140, borderRadius: 8, background: SKELETON_BG }} className="animate-pulse" />
++          <Box style={{ height: 36, width: 160, borderRadius: 8, background: SKELETON_BG }} className="animate-pulse" />
++        </Flex>
++      </Card>
++      <Box style={{ background: 'var(--surface-card)', borderRadius: 'var(--radius-card)', border: '1px solid var(--border-default)', overflow: 'hidden' }}>
++        <Flex gap="4" wrap="wrap" style={{ padding: 16, borderBottom: '1px solid var(--border-default)' }}>
++          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
++            <Box key={i} style={{ height: 14, flex: '1 1 80px', minWidth: 60, borderRadius: 4, background: SKELETON_BG }} className="animate-pulse" />
++          ))}
++        </Flex>
++        {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
++          <Flex key={row} gap="4" wrap="wrap" align="center" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-muted)' }}>
++            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
++              <Box key={i} style={{ height: 16, flex: '1 1 80px', minWidth: 60, borderRadius: 4, background: SKELETON_BG }} className="animate-pulse" />
++            ))}
++          </Flex>
++        ))}
++      </Box>
++    </Flex>
++  )
++}
+diff --git a/components/dashboard/tenders-list-translated.tsx b/components/dashboard/tenders-list-translated.tsx
+new file mode 100644
+index 0000000..c306d27
+--- /dev/null
++++ b/components/dashboard/tenders-list-translated.tsx
+@@ -0,0 +1,18 @@
++import { translateArabicToEnglishBatch } from '@/lib/ai/translate'
++import type { TenderWithEvaluation } from '@/lib/queries/tender'
++import { TendersListClient } from './tenders-list-client'
++
++type Props = {
++  tenders: TenderWithEvaluation[]
++  locale: string
++}
++
++/**
++ * Async Server Component: fetches translation then renders the list in English.
++ * Used inside Suspense so the page shell streams immediately and this streams in when ready.
++ */
++export async function TendersListTranslated({ tenders, locale }: Props) {
++  const phrases = [...new Set(tenders.flatMap((t) => [t.entity, t.title].filter(Boolean)) as string[])]
++  const translationMap = phrases.length > 0 ? await translateArabicToEnglishBatch(phrases) : null
++  return <TendersListClient tenders={tenders} locale={locale} translationMap={translationMap} />
++}
+diff --git a/lib/ai/translate.ts b/lib/ai/translate.ts
+new file mode 100644
+index 0000000..70e2897
+--- /dev/null
++++ b/lib/ai/translate.ts
+@@ -0,0 +1,231 @@
++/**
++ * Automatic Arabic ΓåÆ English translation for scraper-sourced content (entity, title).
++ * Uses the same AI provider as evaluation (DeepSeek/OpenAI).
++ *
++ * RULE: When UI locale is English, all Arabic content from the scraper is translated
++ * automatically via AI. No manual glossary ΓÇö one system for all Arabic text.
++ */
++
++import { generateText } from 'ai'
++import { getAIModel, isAIConfigured } from './client'
++
++const TRANSLATION_SYSTEM = `You are a professional translator. Translate Arabic text to clear, natural English.
++- Output ONLY the translation(s). No explanations, numbering, or extra text.
++- For government/entity names use standard English (e.g. "Ministry of Education", "Capital Market Authority").
++- Preserve meaning and tone. One line per input line when multiple lines are given.`
++
++/** In-memory cache: normalized Arabic key ΓåÆ English. Survives per-request; reduces duplicate AI calls. */
++const translationCache = new Map<string, string>()
++
++function normalizeKey(s: string): string {
++  return s.trim().replace(/\s+/g, ' ').normalize('NFC')
++}
++
++/** True if text contains meaningful Arabic (e.g. ΓëÑ25% Arabic Unicode). */
++export function isArabicContent(text: string | null | undefined): boolean {
++  if (!text || typeof text !== 'string') return false
++  const trimmed = text.trim()
++  if (trimmed.length === 0) return false
++  const arabicCount = (trimmed.match(/[\u0600-\u06FF]/g) || []).length
++  return arabicCount / trimmed.length >= 0.25
++}
++
++/**
++ * Translate a batch of Arabic phrases to English using one AI call.
++ * Uses cache; only phrases not in cache are sent to the model.
++ * Returns a map: original input phrase ΓåÆ English translation (or original if non-Arabic / AI off).
++ */
++export async function translateArabicToEnglishBatch(
++  phrases: (string | null | undefined)[]
++): Promise<Record<string, string>> {
++  const result: Record<string, string> = {}
++  const unique = new Map<string, string>() // normalized ΓåÆ original (first occurrence for key in result)
++  const toTranslate: string[] = []
++
++  for (const p of phrases) {
++    if (p == null || p === '') continue
++    const s = p.trim()
++    if (s === '') continue
++    const key = normalizeKey(s)
++    if (unique.has(key)) {
++      result[s] = result[unique.get(key)!]
++      continue
++    }
++    unique.set(key, s)
++    if (!isArabicContent(s)) {
++      result[s] = s
++      continue
++    }
++    const cached = translationCache.get(key)
++    if (cached !== undefined) {
++      result[s] = cached
++      continue
++    }
++    toTranslate.push(s)
++  }
++
++  if (toTranslate.length === 0) return result
++
++  if (!isAIConfigured()) {
++    for (const s of toTranslate) result[s] = s
++    return result
++  }
++
++  const prompt =
++    toTranslate.length === 1
++      ? `Translate this Arabic phrase to English. Output only the English translation.\n\n${toTranslate[0]}`
++      : `Translate each of the following Arabic phrases to English. Output exactly one English line per phrase, in the same order. No numbering or labels.\n\n${toTranslate.join('\n')}`
++
++  try {
++    const model = getAIModel()
++    const { text } = await generateText({
++      model,
++      system: TRANSLATION_SYSTEM,
++      prompt,
++      temperature: 0.2,
++      maxTokens: 2048,
++    })
++
++    const lines = text
++      .split(/\n/)
++      .map((l) => l.trim())
++      .filter((l) => l.length > 0)
++
++    if (lines.length >= toTranslate.length) {
++      for (let i = 0; i < toTranslate.length; i++) {
++        const orig = toTranslate[i]
++        const translated = lines[i] ?? orig
++        result[orig] = translated
++        translationCache.set(normalizeKey(orig), translated)
++      }
++    } else {
++      for (const orig of toTranslate) {
++        result[orig] = orig
++      }
++    }
++  } catch (err) {
++    console.warn('[translate] AI translation failed:', err)
++    for (const orig of toTranslate) result[orig] = orig
++  }
++
++  return result
++}
++
++/**
++ * English ΓåÆ Arabic translation for rule-based evaluation text (summary, risks, etc.).
++ * When UI locale is Arabic, evaluation reasons/summary from the rule engine are in English;
++ * translate them so Summary and Risks sections show in Arabic (same pattern as title/entity for English).
++ */
++const TRANSLATION_SYSTEM_EN_AR = `You are a professional translator. Translate English text to clear, natural Arabic (Modern Standard Arabic).
++- Output ONLY the translation(s). No explanations, numbering, or extra text.
++- Preserve meaning and tone. One line per input line when multiple lines are given.
++- For technical terms (e.g. "confidence", "booklet_price") use common Arabic equivalents or transliterate where appropriate.`
++
++/** Cache: normalized English key ΓåÆ Arabic. Per-request; reduces duplicate AI calls. */
++const translationCacheEnAr = new Map<string, string>()
++
++/** True if text is predominantly English (e.g. <25% Arabic Unicode). */
++function isEnglishContent(text: string | null | undefined): boolean {
++  if (!text || typeof text !== 'string') return false
++  const trimmed = text.trim()
++  if (trimmed.length === 0) return false
++  const arabicCount = (trimmed.match(/[\u0600-\u06FF]/g) || []).length
++  return arabicCount / trimmed.length < 0.25
++}
++
++/**
++ * Translate a batch of English phrases to Arabic using one AI call.
++ * Skips phrases that are already predominantly Arabic. Returns map: original ΓåÆ Arabic (or original if skip).
++ */
++export async function translateEnglishToArabicBatch(
++  phrases: (string | null | undefined)[]
++): Promise<Record<string, string>> {
++  const result: Record<string, string> = {}
++  const unique = new Map<string, string>()
++  const toTranslate: string[] = []
++
++  for (const p of phrases) {
++    if (p == null || p === '') continue
++    const s = p.trim()
++    if (s === '') continue
++    const key = normalizeKey(s)
++    if (unique.has(key)) {
++      result[s] = result[unique.get(key)!]
++      continue
++    }
++    unique.set(key, s)
++    if (!isEnglishContent(s)) {
++      result[s] = s
++      continue
++    }
++    const cached = translationCacheEnAr.get(key)
++    if (cached !== undefined) {
++      result[s] = cached
++      continue
++    }
++    toTranslate.push(s)
++  }
++
++  if (toTranslate.length === 0) return result
++
++  if (!isAIConfigured()) {
++    for (const s of toTranslate) result[s] = s
++    return result
++  }
++
++  const prompt =
++    toTranslate.length === 1
++      ? `Translate this English phrase to Arabic. Output only the Arabic translation.\n\n${toTranslate[0]}`
++      : `Translate each of the following English phrases to Arabic. Output exactly one Arabic line per phrase, in the same order. No numbering or labels.\n\n${toTranslate.join('\n')}`
++
++  try {
++    const model = getAIModel()
++    const { text } = await generateText({
++      model,
++      system: TRANSLATION_SYSTEM_EN_AR,
++      prompt,
++      temperature: 0.2,
++      maxTokens: 2048,
++    })
++
++    const lines = text
++      .split(/\n/)
++      .map((l) => l.trim())
++      .filter((l) => l.length > 0)
++
++    if (lines.length >= toTranslate.length) {
++      for (let i = 0; i < toTranslate.length; i++) {
++        const orig = toTranslate[i]
++        const translated = lines[i] ?? orig
++        result[orig] = translated
++        translationCacheEnAr.set(normalizeKey(orig), translated)
++      }
++    } else {
++      for (const orig of toTranslate) result[orig] = orig
++    }
++  } catch (err) {
++    console.warn('[translate] EnglishΓåÆArabic failed:', err)
++    for (const orig of toTranslate) result[orig] = orig
++  }
++
++  return result
++}
++
++const TRANSLATION_TIMEOUT_MS = 3000
++
++/**
++ * Translate with a timeout so page load is never blocked indefinitely.
++ * If the AI call exceeds `timeoutMs`, returns {} so UI falls back to original text.
++ */
++export async function translateArabicToEnglishBatchWithTimeout(
++  phrases: (string | null | undefined)[],
++  timeoutMs: number = TRANSLATION_TIMEOUT_MS
++): Promise<Record<string, string>> {
++  const delay = () => new Promise<Record<string, string>>((resolve) => setTimeout(() => resolve({}), timeoutMs))
++  try {
++    return await Promise.race([translateArabicToEnglishBatch(phrases), delay()])
++  } catch {
++    return {}
++  }
++}
++
+diff --git a/lib/currency.ts b/lib/currency.ts
+new file mode 100644
+index 0000000..6895fde
+--- /dev/null
++++ b/lib/currency.ts
+@@ -0,0 +1,92 @@
++/**
++ * Currency normalization for Etimad tender data.
++ *
++ * KNOWN BUG (validated): Money integers in scraped JSON are in halala
++ * (1 SAR = 100 halala). Example: award_amount_sar === 6054750 while
++ * "┘é┘è┘à╪⌐ ╪º┘ä╪¬╪▒╪│┘è╪⌐" in tab_sections is "60547.50"; booklet_price === 20000
++ * while "┘é┘è┘à╪⌐ ┘ê╪½╪º╪ª┘é ╪º┘ä┘à┘å╪º┘ü╪│╪⌐" is "200.00". Using these integers as SAR
++ * causes a 100x EV error.
++ *
++ * This module provides a single conversion at the boundary so the rest
++ * of the app always works in SAR.
++ */
++
++/** Provenance: scraped integer money fields from Etimad JSON are halala; computed EV and decimal strings are SAR. */
++export type MoneySource = 'award_amount_sar' | 'booklet_price' | 'estimated_value'
++
++export type NormalizedSarResult = {
++  /** Value in SAR (float) */
++  sar: number
++  /** Detected unit of the input */
++  unit: 'sar' | 'halala' | 'unknown'
++}
++
++const HALALA_PER_SAR = 100
++
++/**
++ * Normalize a money value into SAR by provenance (no magnitude heuristic).
++ *
++ * - award_amount_sar, booklet_price: Known scraped integer money fields from
++ *   Etimad JSON are halala (integer === 100 * decimal SAR string). Always /100.
++ * - estimated_value: From scraper may be decimal string (SAR) or integer;
++ *   we do not guess by magnitude. Treat as SAR (pass-through). If the scraper
++ *   ever provides an explicit unit flag, use it here.
++ *
++ * @param value - Raw number
++ * @param source - Field name (provenance) for conversion rule
++ * @returns SAR amount and detected unit; sar is 0 when value is null/NaN/negative
++ */
++export function normalizeToSar(
++  value: number | null | undefined,
++  source: MoneySource
++): NormalizedSarResult {
++  if (value == null || typeof value !== 'number' || Number.isNaN(value) || value < 0) {
++    return { sar: 0, unit: 'unknown' }
++  }
++
++  switch (source) {
++    case 'award_amount_sar':
++    case 'booklet_price':
++      // Provenance: scraped integer money fields from Etimad are halala
++      return {
++        sar: value / HALALA_PER_SAR,
++        unit: 'halala',
++      }
++    case 'estimated_value':
++      // Provenance: estimated_value from scraper is decimal string (SAR) or we pass through; no magnitude heuristic
++      return { sar: value, unit: 'sar' }
++    default:
++      return { sar: value, unit: 'unknown' }
++  }
++}
++
++/**
++ * Normalize and return only the SAR number (for call sites that don't need the unit).
++ */
++export function toSar(value: number | null | undefined, source: MoneySource): number {
++  return normalizeToSar(value, source).sar
++}
++
++/** Shape with money fields we normalize when loading from scraper JSON */
++export interface TenderMoneyFields {
++  estimated_value?: number | null
++  booklet_price?: number | null
++  award_amount_sar?: number | null
++}
++
++/**
++ * Normalize money fields on a tender (for use when loading from scraper JSON files).
++ * Returns a new object with estimated_value, booklet_price, award_amount_sar in SAR.
++ * Use when reading run-*.json or similar so calibration and estimators see SAR.
++ */
++export function normalizeTenderMoneyFields<T extends TenderMoneyFields>(tender: T): T {
++  return {
++    ...tender,
++    // estimated_value: pass-through (SAR); no halala conversion by magnitude
++    estimated_value: tender.estimated_value ?? null,
++    booklet_price:
++      tender.booklet_price != null ? toSar(tender.booklet_price, 'booklet_price') : null,
++    award_amount_sar:
++      tender.award_amount_sar != null ? toSar(tender.award_amount_sar, 'award_amount_sar') : null,
++  }
++}
+diff --git a/lib/display-ev.ts b/lib/display-ev.ts
+new file mode 100644
+index 0000000..82c8497
+--- /dev/null
++++ b/lib/display-ev.ts
+@@ -0,0 +1,30 @@
++/**
++ * Single shared helper for EV display used by both list and detail.
++ * When evaluation exists: use predicted_budget_min/max only.
++ * If min == max: value and "Provided"; else midpoint and "Estimated".
++ * When no evaluation: fallback to originalValue for display.
++ */
++
++export interface EffectiveValueDisplay {
++  value: number | null
++  isEstimated: boolean
++}
++
++/**
++ * Compute display value and badge from evaluation's predicted_budget_min/max or fallback.
++ * Do not use tender.estimated_value when evaluation exists ΓÇö use predicted min/max only.
++ */
++export function getEffectiveValueDisplay(
++  originalValue: number | null | undefined,
++  predictedMin: number | null | undefined,
++  predictedMax: number | null | undefined
++): EffectiveValueDisplay {
++  if (predictedMin != null && predictedMax != null) {
++    const value = predictedMin === predictedMax ? predictedMin : Math.round((predictedMin + predictedMax) / 2)
++    return { value, isEstimated: predictedMin !== predictedMax }
++  }
++  if (originalValue != null && originalValue > 0) {
++    return { value: originalValue, isEstimated: false }
++  }
++  return { value: null, isEstimated: false }
++}
+diff --git a/lib/evaluation/effective-value.ts b/lib/evaluation/effective-value.ts
+new file mode 100644
+index 0000000..9b7bbf7
+--- /dev/null
++++ b/lib/evaluation/effective-value.ts
+@@ -0,0 +1,123 @@
++/**
++ * Single canonical Estimated Value (EV) pipeline in SAR ΓÇö MVP deterministic only.
++ *
++ * Priority (implement exactly):
++ * 1) award_amount_sar > 0 ΓåÆ EV = award_amount_sar (SAR)
++ * 2) estimated_value > 0 ΓåÆ EV = estimated_value (SAR)
++ * 3) EV estimated from historical awarded tenders by title similarity
++ * 4) Fallback constant
++ *
++ * Range rules:
++ * - Provided (award or etimad): predicted_budget_min = predicted_budget_max = evSar.
++ * - Estimated (title similarity or fallback): use p25/p75 when available; clamp
++ *   max <= 1.5*mid, min >= 0.5*mid; if sample < 8 tighten to 0.8*mid..1.2*mid.
++ */
++
++import type { Tables } from '@/types/database'
++import { estimateEvFromTitleSimilarity } from './title-similarity-ev'
++
++export type EffectiveValueSource = 'etimad' | 'award' | 'title_similarity' | 'fallback'
++
++export interface EffectiveEstimatedValueResult {
++  evSar: number
++  source: EffectiveValueSource
++  predictedMin: number | null
++  predictedMax: number | null
++  method?: string
++  confidence?: number
++  matched_examples_count?: number
++}
++
++const FALLBACK_MIDPOINT_SAR = 1_500_000
++const FALLBACK_CONFIDENCE = 35
++
++/** Clamp min/max around mid: max <= 1.5*mid, min >= 0.5*mid; always return min <= max */
++function clampSpread(mid: number, min: number, max: number): { min: number; max: number } {
++  const capMax = Math.round(Math.min(max, 1.5 * mid))
++  const capMin = Math.round(Math.max(min, 0.5 * mid))
++  const lo = Math.min(capMin, capMax)
++  const hi = Math.max(capMin, capMax)
++  return { min: lo, max: hi }
++}
++
++/** Small sample: tighten to 0.8*mid..1.2*mid */
++function tightenSpread(mid: number): { min: number; max: number } {
++  return {
++    min: Math.round(0.8 * mid),
++    max: Math.round(1.2 * mid),
++  }
++}
++
++/**
++ * Get the single canonical estimated value in SAR for a tender.
++ * Deterministic: same tender always yields same EV.
++ */
++export function getEffectiveEstimatedValueSar(
++  tender: Tables<'tenders'>
++): EffectiveEstimatedValueResult {
++  // 1) award_amount_sar > 0 ΓåÆ EV = award_amount_sar (SAR)
++  if (tender.award_amount_sar != null && tender.award_amount_sar > 0) {
++    const evSar = tender.award_amount_sar
++    return {
++      evSar,
++      source: 'award',
++      predictedMin: evSar,
++      predictedMax: evSar,
++    }
++  }
++
++  // 2) estimated_value > 0 ΓåÆ EV = estimated_value (SAR)
++  if (tender.estimated_value != null && tender.estimated_value > 0) {
++    const evSar = tender.estimated_value
++    return {
++      evSar,
++      source: 'etimad',
++      predictedMin: evSar,
++      predictedMax: evSar,
++    }
++  }
++
++  // 3) Title similarity from historical awarded tenders
++  const similarity = estimateEvFromTitleSimilarity(tender.title ?? '')
++  if (similarity) {
++    const mid = similarity.evSar
++    const smallSample = (similarity.matched_examples_count ?? 0) < 8
++    let min: number
++    let max: number
++    if (smallSample) {
++      const t = tightenSpread(mid)
++      min = t.min
++      max = t.max
++    } else if (similarity.p25Sar != null && similarity.p75Sar != null && similarity.p25Sar > 0) {
++      const { min: capMin, max: capMax } = clampSpread(mid, similarity.p25Sar, similarity.p75Sar)
++      min = capMin
++      max = capMax
++    } else {
++      const spread = mid * 0.3 / 2
++      const { min: capMin, max: capMax } = clampSpread(mid, Math.max(0, mid - spread), mid + spread)
++      min = capMin
++      max = capMax
++    }
++    return {
++      evSar: mid,
++      source: 'title_similarity',
++      predictedMin: min,
++      predictedMax: max,
++      method: similarity.method,
++      confidence: similarity.confidence,
++      matched_examples_count: similarity.matched_examples_count,
++    }
++  }
++
++  // 4) Fallback constant ΓÇö use tightened spread (no sample)
++  const mid = FALLBACK_MIDPOINT_SAR
++  const { min, max } = tightenSpread(mid)
++  return {
++    evSar: mid,
++    source: 'fallback',
++    predictedMin: min,
++    predictedMax: max,
++    method: 'fallback',
++    confidence: FALLBACK_CONFIDENCE,
++  }
++}
+diff --git a/lib/evaluation/index.ts b/lib/evaluation/index.ts
+index 64182ca..6d0cbae 100644
+--- a/lib/evaluation/index.ts
++++ b/lib/evaluation/index.ts
+@@ -1,6 +1,19 @@
+-export { scoreTender, type ScoringConfig, type ScoredTender } from './rules'
++export {
++  scoreTender,
++  scoreTenderV2,
++  scoreTenderMVP,
++  type ScoringConfig,
++  type ScoredTender,
++  type ScoredTenderV2,
++  type ScoredTenderMVP,
++} from './rules'
+ export { loadScoringConfig } from './config-loader'
+ export { tenderRowToScraped } from './db-adapter'
++export {
++  getEffectiveEstimatedValueSar,
++  type EffectiveEstimatedValueResult,
++  type EffectiveValueSource,
++} from './effective-value'
+ export {
+   estimateValue,
+   needsValueEstimation,
+diff --git a/lib/evaluation/rules.ts b/lib/evaluation/rules.ts
+index 83e1ef9..f716c98 100644
+--- a/lib/evaluation/rules.ts
++++ b/lib/evaluation/rules.ts
+@@ -9,12 +9,20 @@
+ 
+ import type { ScrapedTender } from '@/types/scraper'
+ import type { Recommendation } from '@/types/evaluation'
++import { getMVPRecommendationFromScore, type MVPRecommendation } from '@/types/evaluation'
+ import {
+   estimateValue,
++  estimateValueV2,
+   needsValueEstimation,
+   type ValueEstimate,
++  type ValueEstimateV2,
+   type ScoringConfigWithEstimation,
+ } from './value-estimator'
++import {
++  classifyTender,
++  calculateCompanyFit,
++  type TenderClassification,
++} from './classifier'
+ 
+ /** Editable config shape (matches config/scoring.config.json). */
+ export interface ScoringConfig {
+@@ -27,6 +35,15 @@ export interface ScoringConfig {
+     scope_clarity: number
+     risk_penalty: number
+   }
++  /** V2 weights for 6-dimension scoring */
++  weights_v2?: {
++    service_fit: number    // Does tender match company capabilities?
++    budget_fit: number     // Is value in target range?
++    timeline_fit: number   // Enough prep time?
++    complexity_fit: number // Right complexity for team?
++    strategic_fit: number  // Entity relationship + geography
++    risk_score: number     // Missing fields, short timeline
++  }
+   rules: {
+     budget_fit: {
+       has_value_score: number
+@@ -64,6 +81,14 @@ export interface ScoredTender {
+   score: number
+   recommendation: Recommendation
+   reasons: string[]
++  /** Score breakdown (0-100 for each dimension) */
++  breakdown: {
++    budget_fit: number
++    technical_fit: number
++    timeline_fit: number
++    strategic_fit: number
++    risk_score: number
++  }
+   /** Predicted budget min (from value estimation, null if original value exists) */
+   predicted_budget_min: number | null
+   /** Predicted budget max (from value estimation, null if original value exists) */
+@@ -74,6 +99,23 @@ export interface ScoredTender {
+   budget_estimation_confidence: number | null
+ }
+ 
++/** V2 Scored tender with 6-dimension breakdown */
++export interface ScoredTenderV2 extends Omit<ScoredTender, 'breakdown' | 'budget_estimation_method'> {
++  /** V2 Score breakdown (0-100 for each dimension) */
++  breakdown: {
++    service_fit: number    // Company capability match
++    budget_fit: number     // Value in target range
++    timeline_fit: number   // Prep time adequacy
++    complexity_fit: number // Complexity match for team
++    strategic_fit: number  // Entity + geography fit
++    risk_score: number     // Risk assessment
++  }
++  /** Tender classification details */
++  classification: TenderClassification
++  /** Method used for value estimation (V2 methods) */
++  budget_estimation_method: ValueEstimateV2['method'] | null
++}
++
+ function recommendationFromScore(
+   score: number,
+   thresholds: { qualified: number; conditional: number }
+@@ -92,6 +134,14 @@ const DEFAULT_CONFIG: ScoringConfig = {
+     scope_clarity: 0.15,
+     risk_penalty: 0.15,
+   },
++  weights_v2: {
++    service_fit: 0.25,    // Does tender match company capabilities?
++    budget_fit: 0.20,     // Is value in target range?
++    timeline_fit: 0.20,   // Enough prep time?
++    complexity_fit: 0.15, // Right complexity for team?
++    strategic_fit: 0.10,  // Entity relationship + geography
++    risk_score: 0.10,     // Missing fields, short timeline
++  },
+   rules: {
+     budget_fit: {
+       has_value_score: 50,
+@@ -280,6 +330,14 @@ export function scoreTender(
+     score,
+     recommendation,
+     reasons,
++    // Score breakdown mapped to standard schema
++    breakdown: {
++      budget_fit: Math.round(budgetScore),
++      technical_fit: Math.round(scopeScore), // scope clarity = technical requirements clarity
++      timeline_fit: Math.round(timelineScore),
++      strategic_fit: Math.round(costScore), // cost of entry = strategic barrier
++      risk_score: Math.round(riskScore),
++    },
+     // Value estimation results (null if original value exists)
+     predicted_budget_min: valueEstimate?.min ?? null,
+     predicted_budget_max: valueEstimate?.max ?? null,
+@@ -287,3 +345,352 @@ export function scoreTender(
+     budget_estimation_confidence: valueEstimate?.confidence ?? null,
+   }
+ }
++
++// ============================================================================
++// V2 SCORING: 6-DIMENSION WITH SERVICE FIT + HISTORICAL CALIBRATION
++// ============================================================================
++
++const DEFAULT_WEIGHTS_V2 = {
++  service_fit: 0.25,    // Does tender match company capabilities?
++  budget_fit: 0.20,     // Is value in target range?
++  timeline_fit: 0.20,   // Enough prep time?
++  complexity_fit: 0.15, // Right complexity for team?
++  strategic_fit: 0.10,  // Entity relationship + geography
++  risk_score: 0.10,     // Missing fields, short timeline
++}
++
++/**
++ * V2 Scoring: 6-dimension scoring with service fit + historical calibration
++ *
++ * Dimensions:
++ * 1. SERVICE_FIT (25%) - Does tender match company capabilities?
++ * 2. BUDGET_FIT (20%) - Is estimated value in your target range?
++ * 3. TIMELINE_FIT (20%) - Enough prep time?
++ * 4. COMPLEXITY_FIT (15%) - Right complexity for your team?
++ * 5. STRATEGIC_FIT (10%) - Entity relationship + geography
++ * 6. RISK_SCORE (10%) - Missing fields, short timeline
++ */
++export function scoreTenderV2(
++  tender: ScrapedTender,
++  config: ScoringConfigWithEstimation = DEFAULT_CONFIG
++): ScoredTenderV2 {
++  const w = config.weights_v2 ?? DEFAULT_WEIGHTS_V2
++
++  // Validate weights sum to ~1.0
++  const weightsSum = w.service_fit + w.budget_fit + w.timeline_fit +
++                     w.complexity_fit + w.strategic_fit + w.risk_score
++  if (Math.abs(weightsSum - 1.0) > 0.01) {
++    throw new Error(`V2 weights must sum to 1.0 (got ${weightsSum.toFixed(3)})`)
++  }
++
++  const reasons: string[] = []
++  const r = config.rules
++
++  // Get tender classification and V2 value estimate
++  const classification = classifyTender(tender)
++  const valueEstimate = needsValueEstimation(tender)
++    ? estimateValueV2(tender, config)
++    : null
++  const effectiveValue = valueEstimate?.midpoint ?? tender.estimated_value ?? 0
++
++  // -------------------------------------------------------------------------
++  // 1. SERVICE FIT (0-100): Does tender match company capabilities?
++  // -------------------------------------------------------------------------
++  const companyFit = calculateCompanyFit(tender.title, tender.description)
++  const serviceFitScore = companyFit.score
++
++  if (companyFit.category === 'core') {
++    reasons.push(`Core service match: ${classification.serviceTypeLabel}`)
++  } else if (companyFit.category === 'adjacent') {
++    reasons.push(`Adjacent service: ${classification.serviceTypeLabel}`)
++  } else if (companyFit.category === 'avoid') {
++    reasons.push(`Outside expertise: ${classification.serviceTypeLabel}`)
++  }
++
++  // -------------------------------------------------------------------------
++  // 2. BUDGET FIT (0-100): Is value in target range?
++  // -------------------------------------------------------------------------
++  let budgetScore = 0
++  if (effectiveValue > 0) {
++    // Base score for having a value
++    budgetScore = 50
++
++    // Apply confidence penalty for estimated values
++    if (valueEstimate) {
++      budgetScore = Math.round(budgetScore * (valueEstimate.confidence / 100))
++    }
++
++    // Check if value is in preferred range
++    if (effectiveValue >= r.budget_fit.min_value_sar &&
++        effectiveValue <= r.budget_fit.max_value_sar) {
++      let rangeBonus = 50
++      if (valueEstimate) {
++        rangeBonus = Math.round(rangeBonus * (valueEstimate.confidence / 100))
++      }
++      budgetScore += rangeBonus
++
++      const formatted = effectiveValue >= 1000000
++        ? `${(effectiveValue / 1000000).toFixed(1)}M SAR`
++        : `${Math.round(effectiveValue / 1000)}K SAR`
++
++      if (valueEstimate) {
++        reasons.push(`Est. value ~${formatted} (${valueEstimate.method}, ${valueEstimate.confidence}% conf)`)
++      } else {
++        reasons.push(`Value ${formatted} in range`)
++      }
++    } else {
++      reasons.push(`Value out of target range`)
++    }
++  } else {
++    reasons.push('No value estimate available')
++  }
++  budgetScore = Math.min(100, Math.max(0, budgetScore))
++
++  // -------------------------------------------------------------------------
++  // 3. TIMELINE FIT (0-100): Enough prep time?
++  // -------------------------------------------------------------------------
++  let timelineScore = 0
++  const days = daysUntilDeadline(tender.deadline)
++  if (days !== null) {
++    if (days < 0) {
++      timelineScore = 0
++      reasons.push('Deadline passed')
++    } else if (days < 7) {
++      timelineScore = 20
++      reasons.push(`Only ${days} days - very tight`)
++    } else if (days < 14) {
++      timelineScore = 50
++      reasons.push(`${days} days - tight timeline`)
++    } else if (days < 30) {
++      timelineScore = 75
++      reasons.push(`${days} days - adequate time`)
++    } else {
++      timelineScore = 100
++      reasons.push(`${days} days - good prep time`)
++    }
++  } else {
++    timelineScore = 30 // Unknown deadline is risky
++    reasons.push('Deadline unknown')
++  }
++
++  // -------------------------------------------------------------------------
++  // 4. COMPLEXITY FIT (0-100): Right complexity for team?
++  // -------------------------------------------------------------------------
++  // Assuming team can handle medium-high complexity best
++  let complexityScore = 50
++  const complexityLevel = classification.complexity
++  const complexityValue = classification.complexityScore
++
++  if (complexityLevel === 'low') {
++    complexityScore = 70 // Easy but maybe not interesting
++  } else if (complexityLevel === 'medium') {
++    complexityScore = 100 // Sweet spot
++  } else if (complexityLevel === 'high') {
++    complexityScore = 80 // Challenging but doable
++  } else if (complexityLevel === 'very_high') {
++    complexityScore = 50 // May be too complex
++    reasons.push('High complexity project')
++  }
++
++  // -------------------------------------------------------------------------
++  // 5. STRATEGIC FIT (0-100): Entity relationship + geography
++  // -------------------------------------------------------------------------
++  let strategicScore = 50 // Base neutral score
++
++  // Entity category adjustments
++  const entityCategory = classification.entityCategory
++  if (entityCategory === 'authority' || entityCategory === 'royal_authority') {
++    strategicScore = 80 // High-value relationships
++    reasons.push(`Strategic entity: ${classification.entityCategoryLabel}`)
++  } else if (entityCategory === 'ministry') {
++    strategicScore = 70 // Good steady clients
++  } else if (entityCategory === 'municipality') {
++    strategicScore = 60 // Regional presence
++  } else if (entityCategory === 'healthcare' || entityCategory === 'education') {
++    strategicScore = 55 // Sector expertise building
++  }
++
++  // -------------------------------------------------------------------------
++  // 6. RISK SCORE (0-100): Missing fields, short timeline, red flags
++  // -------------------------------------------------------------------------
++  let riskScore = 100
++
++  // Missing critical fields
++  if (!tender.deadline || tender.deadline.trim() === '') {
++    riskScore -= 40
++    reasons.push('Missing deadline (high risk)')
++  }
++  if (!tender.entity || tender.entity.trim() === '') {
++    riskScore -= 20
++    reasons.push('Missing entity')
++  }
++  if (!tender.reference_no || tender.reference_no.trim() === '') {
++    riskScore -= 30
++    reasons.push('Missing reference number')
++  }
++
++  // Value estimation uncertainty
++  if (valueEstimate && valueEstimate.confidence < 60) {
++    riskScore -= 15
++    reasons.push('Low confidence in value estimate')
++  }
++
++  // Very short timeline is risky
++  if (days !== null && days < 7 && days >= 0) {
++    riskScore -= 20
++  }
++
++  riskScore = Math.max(0, riskScore)
++
++  // -------------------------------------------------------------------------
++  // WEIGHTED TOTAL
++  // -------------------------------------------------------------------------
++  const total =
++    serviceFitScore * w.service_fit +
++    budgetScore * w.budget_fit +
++    timelineScore * w.timeline_fit +
++    complexityScore * w.complexity_fit +
++    strategicScore * w.strategic_fit +
++    riskScore * w.risk_score
++
++  const score = Math.round(Math.max(0, Math.min(100, total)))
++  const recommendation = recommendationFromScore(score, config.thresholds)
++
++  return {
++    reference_no: tender.reference_no,
++    title: tender.title,
++    score,
++    recommendation,
++    reasons,
++    breakdown: {
++      service_fit: Math.round(serviceFitScore),
++      budget_fit: Math.round(budgetScore),
++      timeline_fit: Math.round(timelineScore),
++      complexity_fit: Math.round(complexityScore),
++      strategic_fit: Math.round(strategicScore),
++      risk_score: Math.round(riskScore),
++    },
++    classification,
++    predicted_budget_min: valueEstimate?.min ?? null,
++    predicted_budget_max: valueEstimate?.max ?? null,
++    budget_estimation_method: valueEstimate?.method ?? null,
++    budget_estimation_confidence: valueEstimate?.confidence ?? null,
++  }
++}
++
++// ============================================================================
++// MVP: SINGLE DETERMINISTIC PIPELINE ΓÇö 5 FACTORS, FIXED WEIGHTS
++// ============================================================================
++
++/** MVP weights: Value Fit 40, Scope Fit 25, Time Fit 15, Clarity 10, Risk 10 */
++const MVP_WEIGHTS = {
++  value_fit: 0.4,
++  scope_fit: 0.25,
++  time_fit: 0.15,
++  clarity: 0.1,
++  risk_score: 0.1,
++} as const
++
++/** MVP score result: score, recommendation (INVEST/REVIEW/SKIP), top_reasons (3), breakdown */
++export interface ScoredTenderMVP {
++  score: number
++  recommendation: MVPRecommendation
++  top_reasons: [string, string, string]
++  breakdown: {
++    value_fit: number
++    scope_fit: number
++    time_fit: number
++    clarity: number
++    risk_score: number
++  }
++}
++
++const MVP_VALUE_MIN_SAR = 10_000
++const MVP_VALUE_MAX_SAR = 50_000_000
++
++/**
++ * MVP scoring: one deterministic path, 5 factors, fixed weights.
++ * Recommendation: INVEST (>=70), REVIEW (40ΓÇô69), SKIP (<40). Persist and display exactly.
++ */
++export function scoreTenderMVP(
++  tender: ScrapedTender,
++  effectiveEvSar: number
++): ScoredTenderMVP {
++  const days = daysUntilDeadline(tender.deadline)
++
++  // 1. Value Fit (0ΓÇô100): has EV, in range
++  let valueFit = 0
++  if (effectiveEvSar > 0) {
++    valueFit = 50
++    if (effectiveEvSar >= MVP_VALUE_MIN_SAR && effectiveEvSar <= MVP_VALUE_MAX_SAR) {
++      valueFit += 50
++    }
++  }
++  valueFit = Math.min(100, valueFit)
++
++  // 2. Scope Fit (0ΓÇô100): company fit from title/description
++  const companyFit = calculateCompanyFit(tender.title, tender.description)
++  const scopeFit = Math.min(100, Math.max(0, companyFit.score))
++
++  // 3. Time Fit (0ΓÇô100): days until deadline
++  let timeFit = 0
++  if (days !== null) {
++    if (days < 0) timeFit = 0
++    else if (days < 7) timeFit = 25
++    else if (days < 14) timeFit = 50
++    else if (days < 30) timeFit = 75
++    else timeFit = 100
++  } else {
++    timeFit = 30
++  }
++
++  // 4. Clarity (0ΓÇô100): title + description present
++  const hasTitle = Boolean(tender.title?.trim())
++  const hasDesc = Boolean(tender.description?.trim())
++  const clarity = (hasTitle ? 50 : 0) + (hasDesc ? 50 : 0)
++
++  // 5. Risk (0ΓÇô100): missing fields, short timeline
++  let riskScore = 100
++  if (!tender.deadline?.trim()) riskScore -= 40
++  if (!tender.entity?.trim()) riskScore -= 20
++  if (!tender.reference_no?.trim()) riskScore -= 30
++  if (days !== null && days >= 0 && days < 7) riskScore -= 20
++  riskScore = Math.max(0, riskScore)
++
++  const total =
++    valueFit * MVP_WEIGHTS.value_fit +
++    scopeFit * MVP_WEIGHTS.scope_fit +
++    timeFit * MVP_WEIGHTS.time_fit +
++    clarity * MVP_WEIGHTS.clarity +
++    riskScore * MVP_WEIGHTS.risk_score
++  const score = Math.round(Math.max(0, Math.min(100, total)))
++  const recommendation = getMVPRecommendationFromScore(score)
++
++  const reasonsAll: string[] = []
++  if (valueFit >= 70) reasonsAll.push('Value in target range')
++  else if (effectiveEvSar > 0) reasonsAll.push('Value outside preferred range')
++  if (scopeFit >= 70) reasonsAll.push('Scope matches capabilities')
++  else if (scopeFit < 50) reasonsAll.push('Scope may not match')
++  if (timeFit >= 70) reasonsAll.push('Adequate timeline')
++  else if (days !== null && days >= 0) reasonsAll.push(`Only ${days} days until deadline`)
++  if (clarity >= 80) reasonsAll.push('Clear title and description')
++  if (riskScore < 70) reasonsAll.push('Missing data or tight deadline')
++  const top_reasons: [string, string, string] = [
++    reasonsAll[0] ?? 'Evaluated against MVP factors',
++    reasonsAll[1] ?? (score >= 70 ? 'Meets threshold for INVEST' : score >= 40 ? 'Meets threshold for REVIEW' : 'Below threshold'),
++    reasonsAll[2] ?? `Score ${score}/100`,
++  ]
++
++  return {
++    score,
++    recommendation,
++    top_reasons,
++    breakdown: {
++      value_fit: Math.round(valueFit),
++      scope_fit: Math.round(scopeFit),
++      time_fit: Math.round(timeFit),
++      clarity: Math.round(clarity),
++      risk_score: Math.round(riskScore),
++    },
++  }
++}
+diff --git a/lib/evaluation/title-similarity-ev.ts b/lib/evaluation/title-similarity-ev.ts
+new file mode 100644
+index 0000000..f9e12e9
+--- /dev/null
++++ b/lib/evaluation/title-similarity-ev.ts
+@@ -0,0 +1,209 @@
++/**
++ * Title-based Estimated Value from historical awarded tenders.
++ * Uses token similarity (BM25-like) over historical JSON; EV = median(award_amount_sar) of top K matches.
++ * Currency: historical award_amount_sar in JSON is halala ΓåÆ we normalize to SAR when loading.
++ */
++
++import * as fs from 'fs'
++import * as path from 'path'
++import { toSar } from '@/lib/currency'
++
++const TOP_K = 25
++const DEFAULT_HISTORICAL_PATH = path.join(
++  process.cwd(),
++  'scraper-output',
++  'run-historical-2026-02-01T12-22-15-075Z.json'
++)
++
++export interface HistoricalTenderEntry {
++  title: string
++  /** award_amount in SAR (normalized from halala in file) */
++  award_amount_sar: number
++  reference_no?: string
++}
++
++export interface TitleSimilarityEVResult {
++  evSar: number
++  confidence: number
++  matched_examples_count: number
++  method: 'title_similarity'
++  /** P25/P75 of matched amounts for range (when available) */
++  p25Sar?: number
++  p75Sar?: number
++  /** Top matches for debug/sanity (title + award_amount_sar) */
++  matched_examples?: Array<{ title: string; award_amount_sar: number; reference_no?: string }>
++}
++
++/** Normalize text for tokenization: strip extra spaces, lowercase ASCII, keep Arabic */
++function normalizeForTokens(s: string): string {
++  return (
++    s
++      .normalize('NFD')
++      .replace(/\p{Diacritic}/gu, '')
++      .replace(/\s+/g, ' ')
++      .trim()
++      .toLowerCase()
++  )
++}
++
++/** Tokenize: split on non-word (Unicode letters/numbers), filter length >= 2 */
++function tokenize(text: string): string[] {
++  const normalized = normalizeForTokens(text)
++  const tokens = normalized.split(/[\s\p{P}\p{S}]+/u).filter((t) => t.length >= 2)
++  return [...new Set(tokens)]
++}
++
++/** BM25-like score: sum over query terms of (tf in doc) * idf. Simple variant. */
++function bm25Score(queryTokens: string[], docTokens: string[], idf: Map<string, number>): number {
++  let score = 0
++  for (const qt of queryTokens) {
++    const tf = docTokens.filter((t) => t === qt).length
++    if (tf === 0) continue
++    const idfVal = idf.get(qt) ?? 1
++    score += tf * idfVal
++  }
++  return score
++}
++
++let cachedIndex: {
++  entries: HistoricalTenderEntry[]
++  tokenToDocs: Map<string, Set<number>>
++  docTokens: string[][]
++  idf: Map<string, number>
++} | null = null
++
++function getHistoricalPath(): string {
++  const envPath = process.env.HISTORICAL_TENDERS_JSON
++  if (envPath && fs.existsSync(envPath)) return envPath
++  if (fs.existsSync(DEFAULT_HISTORICAL_PATH)) return DEFAULT_HISTORICAL_PATH
++  return DEFAULT_HISTORICAL_PATH
++}
++
++/**
++ * Load historical tenders from JSON. Normalize award_amount_sar from halala to SAR.
++ */
++function loadHistoricalTenders(filePath: string): HistoricalTenderEntry[] {
++  const raw = fs.readFileSync(filePath, 'utf-8')
++  const data = JSON.parse(raw) as { tenders?: unknown[]; mode?: string }
++  const tenders = Array.isArray(data.tenders) ? data.tenders : []
++  const entries: HistoricalTenderEntry[] = []
++
++  for (const t of tenders) {
++    const row = t as {
++      title?: string
++      award_amount_sar?: number | null
++      reference_no?: string
++    }
++    const title = typeof row.title === 'string' ? row.title : ''
++    const rawAward = row.award_amount_sar
++    if (!title || rawAward == null || rawAward <= 0) continue
++    const awardSar = toSar(rawAward, 'award_amount_sar')
++    if (awardSar <= 0) continue
++    entries.push({
++      title,
++      award_amount_sar: awardSar,
++      reference_no: row.reference_no,
++    })
++  }
++
++  return entries
++}
++
++/**
++ * Build in-memory index: doc tokens, tokenΓåÆdoc set, idf.
++ */
++function buildIndex(entries: HistoricalTenderEntry[]): void {
++  const docTokens = entries.map((e) => tokenize(e.title))
++  const tokenToDocs = new Map<string, Set<number>>()
++  docTokens.forEach((tokens, docId) => {
++    tokens.forEach((t) => {
++      let set = tokenToDocs.get(t)
++      if (!set) {
++        set = new Set()
++        tokenToDocs.set(t, set)
++      }
++      set.add(docId)
++    })
++  })
++  const N = entries.length
++  const idf = new Map<string, number>()
++  tokenToDocs.forEach((docSet, term) => {
++    const df = docSet.size
++    idf.set(term, Math.log((N - df + 0.5) / (df + 0.5) + 1))
++  })
++  cachedIndex = { entries, tokenToDocs, docTokens, idf }
++}
++
++/**
++ * Estimate EV from title similarity against historical awarded tenders.
++ * Returns median(award_amount_sar) of top K matches; confidence from match count and spread.
++ */
++export function estimateEvFromTitleSimilarity(
++  queryTitle: string,
++  options?: { historicalPath?: string; topK?: number }
++): TitleSimilarityEVResult | null {
++  const historicalPath = options?.historicalPath ?? getHistoricalPath()
++  if (!fs.existsSync(historicalPath)) return null
++
++  const entries = loadHistoricalTenders(historicalPath)
++  if (entries.length === 0) return null
++
++  if (!cachedIndex || cachedIndex.entries.length !== entries.length) {
++    buildIndex(entries)
++  }
++  const index = cachedIndex!
++  const k = Math.min(options?.topK ?? TOP_K, index.entries.length)
++  const queryTokens = tokenize(queryTitle)
++  if (queryTokens.length === 0) return null
++
++  const scores: { docId: number; score: number }[] = []
++  index.docTokens.forEach((docTokens, docId) => {
++    const score = bm25Score(queryTokens, docTokens, index.idf)
++    if (score > 0) scores.push({ docId, score })
++  })
++
++  scores.sort((a, b) => b.score - a.score)
++  const topDocIds = scores.slice(0, k).map((s) => s.docId)
++  const amounts = topDocIds
++    .map((id) => index.entries[id].award_amount_sar)
++    .filter((a) => a > 0)
++
++  if (amounts.length === 0) return null
++
++  amounts.sort((a, b) => a - b)
++  const median =
++    amounts.length % 2 === 1
++      ? amounts[Math.floor(amounts.length / 2)]
++      : (amounts[amounts.length / 2 - 1] + amounts[amounts.length / 2]) / 2
++
++  const p25 = amounts[Math.floor(amounts.length * 0.25)] ?? median
++  const p75 = amounts[Math.floor(amounts.length * 0.75)] ?? median
++  const spread = p25 > 0 ? p75 / p25 : 0
++  const confidenceFromSpread = spread <= 2 ? 85 : spread <= 4 ? 70 : 55
++  const confidenceFromCount =
++    amounts.length >= 10 ? 90 : amounts.length >= 5 ? 75 : amounts.length >= 1 ? 60 : 50
++  const confidence = Math.round((confidenceFromCount + confidenceFromSpread) / 2)
++
++  const matched_examples = topDocIds.slice(0, 3).map((id) => ({
++    title: index.entries[id].title,
++    award_amount_sar: index.entries[id].award_amount_sar,
++    reference_no: index.entries[id].reference_no,
++  }))
++
++  return {
++    evSar: Math.round(median),
++    confidence: Math.min(100, Math.max(0, confidence)),
++    matched_examples_count: amounts.length,
++    method: 'title_similarity',
++    p25Sar: Math.round(p25),
++    p75Sar: Math.round(p75),
++    matched_examples,
++  }
++}
++
++/**
++ * Clear cached index (e.g. for tests or when historical file changes).
++ */
++export function clearTitleSimilarityCache(): void {
++  cachedIndex = null
++}
+diff --git a/lib/translate-display.ts b/lib/translate-display.ts
+new file mode 100644
+index 0000000..d5b8450
+--- /dev/null
++++ b/lib/translate-display.ts
+@@ -0,0 +1,23 @@
++/**
++ * Display helper for translated content. No AI dependency ΓÇö safe to use in client components.
++ * Server builds translation map via lib/ai/translate and passes it as props.
++ */
++
++function normalizeKey(s: string): string {
++  return s.trim().replace(/\s+/g, ' ').normalize('NFC')
++}
++
++/**
++ * Resolve display text for locale: when locale is 'en', use translation map; otherwise return original.
++ */
++export function getDisplayText(
++  text: string | null | undefined,
++  locale: string,
++  translationMap: Record<string, string> | null
++): string {
++  if (text == null || text === '') return text ?? ''
++  if (locale !== 'en') return text
++  if (!translationMap) return text
++  const t = text.trim()
++  return translationMap[text] ?? translationMap[t] ?? translationMap[normalizeKey(text)] ?? text
++}
+diff --git a/messages/ar.json b/messages/ar.json
+index 2a9fc01..1240829 100644
+--- a/messages/ar.json
++++ b/messages/ar.json
+@@ -43,8 +43,11 @@
+     "uploadFile": "╪▒┘ü╪╣ ┘à┘ä┘ü",
+     "entity": "╪º┘ä╪¼┘ç╪⌐",
+     "referenceNo": "╪▒┘é┘à ╪º┘ä┘à┘å╪º┘ü╪│╪⌐",
++    "ref": "╪º┘ä┘à╪▒╪¼╪╣",
+     "deadline": "╪º┘ä┘à┘ê╪╣╪» ╪º┘ä┘å┘ç╪º╪ª┘è",
+     "estimatedValue": "╪º┘ä┘é┘è┘à╪⌐ ╪º┘ä╪¬┘é╪»┘è╪▒┘è╪⌐",
++    "estimated": "┘à╪¡╪│┘ê╪¿╪⌐",
++    "provided": "┘à┘å ╪º┘ä╪¼┘ç╪⌐",
+     "status": "╪º┘ä╪¡╪º┘ä╪⌐",
+     "description": "╪º┘ä┘ê╪╡┘ü",
+     "source": "╪º┘ä┘à╪╡╪»╪▒",
+@@ -74,6 +77,9 @@
+     "qualified": "┘à╪ñ┘ç┘ä",
+     "conditional": "┘à╪ñ┘ç┘ä ╪¿╪┤╪▒┘ê╪╖",
+     "excluded": "┘à╪│╪¬╪¿╪╣╪»",
++    "invest": "INVEST",
++    "review": "REVIEW",
++    "skip": "SKIP",
+     "strengths": "┘å┘é╪º╪╖ ╪º┘ä┘é┘ê╪⌐",
+     "risks": "╪º┘ä┘à╪«╪º╪╖╪▒",
+     "summary": "╪º┘ä┘à┘ä╪«╪╡",
+@@ -179,6 +185,7 @@
+   },
+   "scrape": {
+     "title": "╪º┘ä╪¼┘ä╪¿ ┘ê╪º┘ä╪¿┘è╪º┘å╪º╪¬",
++    "commandCenter": "┘à╪▒┘â╪▓ ╪º┘ä╪¬╪¡┘â┘à",
+     "clearAll": "┘à╪│╪¡ ┘â┘ä ╪º┘ä┘à┘å╪º┘ü╪│╪º╪¬",
+     "confirmClear": "╪º┘å┘é╪▒ ┘à╪▒╪⌐ ╪ú╪«╪▒┘ë ┘ä┘ä╪¬╪ú┘â┘è╪»",
+     "runScrape": "╪¬╪┤╪║┘è┘ä ╪º┘ä╪¼┘ä╪¿ (┘å╪┤╪╖)",
+@@ -194,16 +201,21 @@
+     "savedTo": "╪¬┘à ╪º┘ä╪¡┘ü╪╕ ┘ü┘è {path}",
+     "syncFromLastFile": "┘à╪▓╪º┘à┘å╪⌐ ┘à┘å ╪ó╪«╪▒ ┘à┘ä┘ü",
+     "syncing": "╪¼╪º╪▒┘è ╪º┘ä┘à╪▓╪º┘à┘å╪⌐ΓÇª",
+-    "failed": "┘ü╪┤┘ä ╪º┘ä╪¼┘ä╪¿"
++    "failed": "┘ü╪┤┘ä ╪º┘ä╪¼┘ä╪¿",
++    "errorDetails": "╪¬┘ü╪º╪╡┘è┘ä ╪º┘ä╪«╪╖╪ú",
++    "copyError": "┘å╪│╪«",
++    "copied": "╪¬┘à ╪º┘ä┘å╪│╪«!",
++    "close": "╪Ñ╪║┘ä╪º┘é"
+   },
+   "dashboard": {
+     "pageTitle": "┘ä┘ê╪¡╪⌐ ╪º┘ä╪¬╪¡┘â┘à",
++    "pageSubtitle": "┘à╪▒╪º╪¼╪╣╪⌐ ┘ê╪¬┘é┘è┘è┘à ╪º┘ä┘à┘å╪º┘ü╪│╪º╪¬ ┘à┘å ┘à┘â╪º┘å ┘ê╪º╪¡╪»",
+     "noTendersFound": "┘ä┘à ┘è╪¬┘à ╪º┘ä╪╣╪½┘ê╪▒ ╪╣┘ä┘ë ┘à┘å╪º┘ü╪│╪º╪¬.",
+     "toolsLabel": "╪ú╪»┘ê╪º╪¬",
+     "nextAction": "╪º┘ä╪Ñ╪¼╪▒╪º╪í ╪º┘ä╪¬╪º┘ä┘è",
+     "nextStepsTitle": "┘à╪º ╪º┘ä╪«╪╖┘ê╪⌐ ╪º┘ä╪¬╪º┘ä┘è╪⌐",
+     "backToList": "╪º┘ä╪╣┘ê╪»╪⌐ ┘ä┘ä┘é╪º╪ª┘à╪⌐",
+-    "exportToOdooHint": "╪╡╪»┘æ╪▒ ┘ç╪░┘ç ╪º┘ä┘à┘å╪º┘ü╪│╪⌐ ╪Ñ┘ä┘ë Excel ┘ä┘Ç Odoo ┘à┘å ┘ä┘ê╪¡╪⌐ ╪º┘ä╪¬╪¡┘â┘à.",
++    "exportToOdooHint": "╪º╪│╪¬╪«╪»┘à ╪▓╪▒ '╪Ñ╪▒╪│╪º┘ä ╪Ñ┘ä┘ë CRM' ╪ú╪╣┘ä╪º┘ç ┘ä╪Ñ┘å╪┤╪º╪í ┘ü╪▒╪╡╪⌐ ┘ü┘è ┘å╪╕╪º┘à CRM.",
+     "runEvaluationHint": "╪┤╪║┘æ┘ä ╪º┘ä╪¬┘é┘è┘è┘à ┘à┘å ╪º┘ä┘à╪│╪º╪▒ ┘ä┘ä╪¡╪╡┘ê┘ä ╪╣┘ä┘ë ╪»╪▒╪¼╪⌐ ┘ê╪¬┘ê╪╡┘è╪⌐.",
+     "runAnalysis": "╪¬╪┤╪║┘è┘ä ╪º┘ä╪¬╪¡┘ä┘è┘ä",
+     "rerunAnalysis": "╪Ñ╪╣╪º╪»╪⌐ ╪¬╪┤╪║┘è┘ä ╪º┘ä╪¬╪¡┘ä┘è┘ä",
+@@ -272,6 +284,8 @@
+     "clearFilters": "┘à╪│╪¡ ╪º┘ä┘ü┘ä╪º╪¬╪▒",
+     "selectAllOnPage": "╪¬╪¡╪»┘è╪» ┘â┘ä ╪º┘ä╪╡┘ü╪¡╪⌐",
+     "clearSelection": "╪Ñ┘ä╪║╪º╪í ╪º┘ä╪¬╪¡╪»┘è╪»",
++    "selectedCount": "{count} ┘à╪¡╪»╪»╪⌐",
++    "selectTender": "╪¬╪¡╪»┘è╪» ┘à┘å╪º┘ü╪│╪⌐ {ref}",
+     "selectRow": "╪¬╪¡╪»┘è╪» ╪º┘ä╪╡┘ü",
+     "sortBy": "╪¬╪▒╪¬┘è╪¿ ╪¡╪│╪¿",
+     "sortNewestFirst": "╪º┘ä╪ú╪¡╪»╪½ ╪ú┘ê┘ä╪º┘ï",
+diff --git a/messages/en.json b/messages/en.json
+index f387910..d10f461 100644
+--- a/messages/en.json
++++ b/messages/en.json
+@@ -43,8 +43,11 @@
+     "uploadFile": "Upload File",
+     "entity": "Entity",
+     "referenceNo": "Reference No.",
++    "ref": "Ref",
+     "deadline": "Deadline",
+     "estimatedValue": "Estimated Value",
++    "estimated": "Estimated",
++    "provided": "Provided",
+     "status": "Status",
+     "description": "Description",
+     "source": "Source",
+@@ -74,6 +77,9 @@
+     "qualified": "Qualified",
+     "conditional": "Conditional",
+     "excluded": "Excluded",
++    "invest": "INVEST",
++    "review": "REVIEW",
++    "skip": "SKIP",
+     "strengths": "Strengths",
+     "risks": "Risks",
+     "summary": "Summary",
+@@ -179,6 +185,7 @@
+   },
+   "scrape": {
+     "title": "Scrape & data",
++    "commandCenter": "Command center",
+     "clearAll": "Clear all tenders",
+     "confirmClear": "Click again to confirm",
+     "runScrape": "Run scrape (active)",
+@@ -194,16 +201,21 @@
+     "savedTo": "Saved to {path}",
+     "syncFromLastFile": "Sync from last file",
+     "syncing": "SyncingΓÇª",
+-    "failed": "Scrape failed"
++    "failed": "Scrape failed",
++    "errorDetails": "Error details",
++    "copyError": "Copy",
++    "copied": "Copied!",
++    "close": "Close"
+   },
+   "dashboard": {
+     "pageTitle": "Dashboard",
++    "pageSubtitle": "Review and evaluate tenders at a glance",
+     "noTendersFound": "No tenders found.",
+     "toolsLabel": "Tools",
+     "nextAction": "Next Action",
+     "nextStepsTitle": "What to do next",
+     "backToList": "Back to list",
+-    "exportToOdooHint": "Export this tender to Odoo Excel from the dashboard.",
++    "exportToOdooHint": "Use the Push to CRM button above to create an opportunity in your CRM.",
+     "runEvaluationHint": "Run evaluation from the pipeline to get a score and recommendation.",
+     "runAnalysis": "Run analysis",
+     "rerunAnalysis": "Re-run analysis",
+@@ -272,6 +284,8 @@
+     "clearFilters": "Clear Filters",
+     "selectAllOnPage": "Select all on page",
+     "clearSelection": "Clear selection",
++    "selectedCount": "{count} selected",
++    "selectTender": "Select tender {ref}",
+     "selectRow": "Select row",
+     "sortBy": "Sort by",
+     "sortNewestFirst": "Newest first",
+diff --git a/types/database.ts b/types/database.ts
+index d5ab290..da85fbf 100644
+--- a/types/database.ts
++++ b/types/database.ts
+@@ -82,7 +82,7 @@ export interface Database {
+           updated_at: string
+           tender_id: string
+           score: number
+-          recommendation: 'qualified' | 'conditional' | 'excluded'
++          recommendation: 'qualified' | 'conditional' | 'excluded' | 'INVEST' | 'REVIEW' | 'SKIP'
+           summary: string
+           strengths: string[] | null
+           risks: string[] | null
+@@ -101,7 +101,7 @@ export interface Database {
+           updated_at?: string
+           tender_id: string
+           score: number
+-          recommendation: 'qualified' | 'conditional' | 'excluded'
++          recommendation: 'qualified' | 'conditional' | 'excluded' | 'INVEST' | 'REVIEW' | 'SKIP'
+           summary: string
+           strengths?: string[] | null
+           risks?: string[] | null
+@@ -120,7 +120,7 @@ export interface Database {
+           updated_at?: string
+           tender_id?: string
+           score?: number
+-          recommendation?: 'qualified' | 'conditional' | 'excluded'
++          recommendation?: 'qualified' | 'conditional' | 'excluded' | 'INVEST' | 'REVIEW' | 'SKIP'
+           summary?: string
+           strengths?: string[] | null
+           risks?: string[] | null
+diff --git a/types/evaluation.ts b/types/evaluation.ts
+index 48eabca..39c8292 100644
+--- a/types/evaluation.ts
++++ b/types/evaluation.ts
+@@ -1,9 +1,18 @@
+ import { z } from 'zod'
+ 
+-// Recommendation type
++// Recommendation type (legacy / config-based scoring)
+ export const recommendationSchema = z.enum(['qualified', 'conditional', 'excluded'])
+ export type Recommendation = z.infer<typeof recommendationSchema>
+ 
++// MVP recommendation: persisted and displayed exactly
++export type MVPRecommendation = 'INVEST' | 'REVIEW' | 'SKIP'
++
++export function getMVPRecommendationFromScore(score: number): MVPRecommendation {
++  if (score >= 70) return 'INVEST'
++  if (score >= 40) return 'REVIEW'
++  return 'SKIP'
++}
++
+ // Score breakdown schema
+ export const scoreBreakdownSchema = z.object({
+   budget_fit: z.number().min(0).max(100),

@@ -207,14 +207,17 @@ export async function pushToCRMDryRun(
   const evaluation = Array.isArray(evals) ? evals[0] : evals
   const evaluationRecord = evaluation as Record<string, unknown> | undefined
 
-  // Use estimated value from evaluation if original is missing
+  // When evaluation exists use predicted_budget_min/max (canonical); else fallback to tender.estimated_value
   let effectiveEstimatedValue: number | null = null
-  if (tenderData.estimated_value != null) {
+  if (
+    evaluationRecord?.predicted_budget_min != null &&
+    evaluationRecord?.predicted_budget_max != null
+  ) {
+    const pmin = Number(evaluationRecord.predicted_budget_min)
+    const pmax = Number(evaluationRecord.predicted_budget_max)
+    effectiveEstimatedValue = pmin === pmax ? pmin : Math.round((pmin + pmax) / 2)
+  } else if (tenderData.estimated_value != null) {
     effectiveEstimatedValue = Number(tenderData.estimated_value)
-  } else if (evaluationRecord?.predicted_budget_min && evaluationRecord?.predicted_budget_max) {
-    effectiveEstimatedValue = Math.round(
-      (Number(evaluationRecord.predicted_budget_min) + Number(evaluationRecord.predicted_budget_max)) / 2
-    )
   }
 
   const opportunityData: OpportunityData = {
@@ -321,15 +324,17 @@ export async function pushToCRM(
     : tenderData.evaluations
   
   // 3. Prepare opportunity data
-  // Use estimated value from evaluation if original is missing
+  // When evaluation exists use predicted_budget_min/max (canonical); else fallback to tender.estimated_value
   let effectiveEstimatedValue: number | null = null
-  if (tenderData.estimated_value) {
+  if (
+    evaluation?.predicted_budget_min != null &&
+    evaluation?.predicted_budget_max != null
+  ) {
+    const pmin = Number(evaluation.predicted_budget_min)
+    const pmax = Number(evaluation.predicted_budget_max)
+    effectiveEstimatedValue = pmin === pmax ? pmin : Math.round((pmin + pmax) / 2)
+  } else if (tenderData.estimated_value != null) {
     effectiveEstimatedValue = Number(tenderData.estimated_value)
-  } else if (evaluation?.predicted_budget_min && evaluation?.predicted_budget_max) {
-    // Use midpoint of predicted budget range
-    effectiveEstimatedValue = Math.round(
-      (Number(evaluation.predicted_budget_min) + Number(evaluation.predicted_budget_max)) / 2
-    )
   }
 
   const opportunityData: OpportunityData = {
@@ -389,6 +394,7 @@ export async function pushToCRM(
   
   revalidatePath('/[locale]/dashboard', 'page')
   revalidatePath(`/[locale]/dashboard/${tenderId}`, 'page')
-  
+  revalidatePath('/[locale]/dashboard/opportunities', 'page')
+
   return { success: true, data: { crmUrl: undefined } } // URL support depends on provider return
 }

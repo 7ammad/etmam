@@ -130,7 +130,7 @@ Both modes share the same technical path: **Scraper → Sync API → Supabase**.
 
 After scraping, the pipeline runs:
 
-1. **run-scraper.ts** writes scraped tenders to `scraper-output/run-<timestamp>.json` so the next step has input.
+1. **run-scraper.ts** writes scraped tenders to `scraper-output/run-<mode>-<timestamp>.json` (mode: active or historical) so the next step has input.
 2. **evaluate-tenders** (`pnpm evaluate-tenders`) reads the latest `scraper-output/*.json`, scores each tender, and writes `data/tenders.scored.json`.
 3. **sync:evaluations** (`pnpm sync:evaluations`) POSTs `data/tenders.scored.json` to `POST /api/sync/evaluations` (Bearer `CRON_SECRET`), which upserts into the `evaluations` table for CRM push.
 
@@ -162,7 +162,7 @@ Secrets: `SCRAPER_API_URL`, `CRON_SECRET`, `APP_BASE_URL` (deployed app origin f
 ```
 [Etimad] → [Playwright] → [Zod] → [ScrapeResult]
                 ↓
-         run-scraper.ts → scraper-output/run-<ts>.json
+         run-scraper.ts → scraper-output/run-<mode>-<ts>.json (active | historical)
                 ↓
          POST /api/cron/sync (Bearer CRON_SECRET) → tenders table
                 ↓

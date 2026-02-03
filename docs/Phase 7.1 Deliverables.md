@@ -64,7 +64,7 @@ Layout
   - Section C: Tenders table
 
 Section A: KPI cards row
-- KPI 1: Total tenders
+- KPI 1: Total Tenders
 - KPI 2: Qualified
 - KPI 3: Conditional
 - KPI 4: Excluded
@@ -79,7 +79,7 @@ Section B: Filters row
 - Search input
   - Searches across: title, entity, reference number
 - Recommendation filter
-  - All, Qualified, Conditional, Excluded, Not evaluated
+  - All, Qualified, Conditional, Excluded, Not Evaluated
 - Deadline status filter
   - All, Closing soon, Open, Past deadline
 - Sort control
@@ -106,7 +106,7 @@ Section C: Tenders table
   - Score: integer 0–100, display as a small bar or ring with text
   - Recommendation: badge
     - qualified, conditional, excluded
-    - if missing evaluation: show "Not evaluated"
+    - if missing evaluation: show "Not Evaluated"
 
 Required states for Dashboard page
 - Loading
@@ -119,7 +119,7 @@ Required states for Dashboard page
   - Message: "Failed to load tenders."
   - Action: "Retry"
 - Partial data state
-  - If evaluation is missing for a tender: show Score = "—" and Recommendation = "Not evaluated"
+  - If evaluation is missing for a tender: show Score = "—" and Recommendation = "Not Evaluated"
 
 Acceptance criteria: Dashboard page
 - Logged-out users cannot view `/[locale]/dashboard`. :contentReference[oaicite:7]{index=7}
@@ -154,7 +154,7 @@ Required states for Tender detail
   - Message: "Tender not found."
 - Error state
 - Partial data
-  - If evaluation missing: show "Not evaluated" and hide evaluation detail lists
+  - If evaluation missing: show "Not Evaluated" and hide evaluation detail lists
 
 Acceptance criteria: Tender detail
 - User can open a tender from the dashboard table.
@@ -273,7 +273,7 @@ The Arabic request lists the core CRM fields. :contentReference[oaicite:18]{inde
 - Recommendation
   - UI field: Recommendation
   - Source: evaluations.recommendation
-  - Fallback: "Not evaluated" if evaluation missing
+  - Fallback: "Not Evaluated" if evaluation missing
 
 Mapping: rule-based scoring output to evaluation storage
 - Rule-based scoring config exists and sets thresholds and weights. :contentReference[oaicite:19]{index=19}

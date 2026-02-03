@@ -63,15 +63,24 @@ async function main(): Promise<void> {
       if (!fs.existsSync(SCRAPER_OUTPUT_DIR)) {
         fs.mkdirSync(SCRAPER_OUTPUT_DIR, { recursive: true })
       }
+      const mode = isHistorical ? 'historical' : 'active'
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
       savedTo = path.join(
         SCRAPER_OUTPUT_DIR,
-        `run-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+        `run-${mode}-${timestamp}.json`
       )
-      fs.writeFileSync(
-        savedTo,
-        JSON.stringify({ tenders: result.tenders, metadata: result.metadata }, null, 2),
-        'utf-8'
-      )
+      const payload = {
+        mode,
+        tenders: result.tenders,
+        metadata: result.metadata,
+      }
+      try {
+        fs.writeFileSync(savedTo, JSON.stringify(payload, null, 2), 'utf-8')
+      } catch (writeErr) {
+        const msg = writeErr instanceof Error ? writeErr.message : String(writeErr)
+        console.error(`[Output] Failed to write ${savedTo}: ${msg}`)
+        throw writeErr
+      }
     }
 
     const response = await fetch(apiUrl, {

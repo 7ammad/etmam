@@ -1,12 +1,12 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import type { Tables, TablesInsert, TablesUpdate, Json } from '@/types/database'
 
 export type Tender = Tables<'tenders'>
 export type TenderInsert = TablesInsert<'tenders'>
 export type TenderUpdate = TablesUpdate<'tenders'>
 
-// Diagnostic function to test database connectivity
-async function testDatabaseConnection(supabase: ReturnType<typeof createServiceClient>) {
+// Diagnostic function to test database connectivity (uses RLS-scoped client)
+async function testDatabaseConnection(supabase: Awaited<ReturnType<typeof createClient>>) {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/b22f8891-a0d3-4eaa-a284-fd7127c7ef55',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/queries/tender.ts:testDatabaseConnection',message:'Testing raw RPC call',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-H5'})}).catch(()=>{});
   // #endregion
@@ -34,7 +34,7 @@ export type TenderWithEvaluation = Tender & {
  * not displayed as actionable items in the dashboard.
  */
 export async function getTenders(): Promise<TenderWithEvaluation[]> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('tenders')
@@ -58,12 +58,27 @@ export async function getTenders(): Promise<TenderWithEvaluation[]> {
   }))
 }
 
+/** Recommendation values that qualify a tender as "opportunity-ready" for the Opportunities list. */
+const OPPORTUNITY_READY_RECOMMENDATIONS = ['INVEST', 'REVIEW', 'qualified'] as const
+
+/**
+ * Get tenders that are opportunity-ready: have an evaluation with recommendation INVEST, REVIEW, or qualified.
+ * Used for the Opportunities list page. Push status is derived from tender.status === 'pushed'.
+ */
+export async function getOpportunityReadyTenders(): Promise<TenderWithEvaluation[]> {
+  const all = await getTenders()
+  return all.filter((t) => {
+    const rec = t.evaluation?.recommendation
+    return rec != null && OPPORTUNITY_READY_RECOMMENDATIONS.includes(rec as (typeof OPPORTUNITY_READY_RECOMMENDATIONS)[number])
+  })
+}
+
 /**
  * Get historical tenders (awarded, with award_amount_sar).
  * Used for value estimation calibration only.
  */
 export async function getHistoricalTenders(): Promise<TenderWithEvaluation[]> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('tenders')
@@ -89,7 +104,7 @@ export async function getHistoricalTenders(): Promise<TenderWithEvaluation[]> {
 
 // Get single tender by ID (any logged-in user can view).
 export async function getTenderById(id: string): Promise<TenderWithEvaluation | null> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('tenders')
@@ -115,7 +130,7 @@ export async function getTenderById(id: string): Promise<TenderWithEvaluation | 
   }
 }
 
-// Create tender
+// Create tender (user-scoped; RLS applies)
 export async function createTender(tender: {
   entity: string
   title: string
@@ -127,17 +142,18 @@ export async function createTender(tender: {
   status?: 'pending' | 'evaluating' | 'evaluated' | 'approved' | 'pushed' | 'rejected'
   raw_data?: Json | null
 }): Promise<Tender> {
-  const supabase = createServiceClient()
-  
-  // TODO: When auth is implemented, get user from session
-  // For now, use a dummy user_id for development
-  const dummyUserId = '00000000-0000-0000-0000-000000000000'
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    throw new Error('Unauthorized')
+  }
 
   const { data, error } = await supabase
     .from('tenders')
     .insert({
       ...tender,
-      user_id: dummyUserId,
+      user_id: user.id,
     } as any)
     .select()
     .single()
@@ -163,15 +179,16 @@ export async function createTenders(
     raw_data?: Json | null
   }[]
 ): Promise<{ created: number; errors: string[] }> {
-  const supabase = createServiceClient()
-  
-  // TODO: When auth is implemented, get user from session
-  // For now, use a dummy user_id for development
-  const dummyUserId = '00000000-0000-0000-0000-000000000000'
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    throw new Error('Unauthorized')
+  }
 
   const tendersWithUser = tenders.map((t) => ({
     ...t,
-    user_id: dummyUserId,
+    user_id: user.id,
   }))
 
   const { data, error } = await supabase
@@ -191,9 +208,9 @@ export async function createTenders(
   return { created: data?.length || 0, errors: [] }
 }
 
-// Update tender
+// Update tender (RLS restricts to own tenders)
 export async function updateTender(id: string, update: Record<string, unknown>): Promise<Tender> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
   
   // Cast to any to bypass Supabase strict typing until DB types are generated
   const { data, error } = await (supabase
@@ -205,15 +222,20 @@ export async function updateTender(id: string, update: Record<string, unknown>):
 
   if (error) {
     console.error('Error updating tender:', error)
+    if (error.code === 'PGRST116') {
+      throw new Error(
+        'Update affected 0 rows. If this tender was created by the scraper (system user), ensure migration 00015_tenders_update_own_or_system.sql is applied so authenticated users can update system tenders.'
+      )
+    }
     throw new Error('Failed to update tender')
   }
 
   return data as Tender
 }
 
-// Delete tender
+// Delete tender (RLS restricts to own tenders)
 export async function deleteTender(id: string): Promise<void> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const { error } = await supabase
     .from('tenders')
@@ -226,12 +248,12 @@ export async function deleteTender(id: string): Promise<void> {
   }
 }
 
-// Delete all tenders (and related evaluations, crm_pushes) for a fresh start.
+// Delete all tenders (and related evaluations, crm_pushes) for a fresh start. RLS restricts to own tenders.
 export async function clearAllTenders(): Promise<{ deletedTenders: number }> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const { data: tenderRows } = await supabase.from('tenders').select('id')
-  const ids = (tenderRows ?? []).map((r) => r.id)
+  const ids = ((tenderRows ?? []) as { id: string }[]).map((r) => r.id)
   if (ids.length === 0) {
     return { deletedTenders: 0 }
   }
@@ -260,7 +282,7 @@ export async function getTenderStats(): Promise<{
   pendingEvaluation: number
   pushedToCRM: number
 }> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('tenders')
@@ -335,7 +357,7 @@ export async function getTenderStats(): Promise<{
 export async function getTendersByRouting(
   routingDecision?: 'INFRATECH' | 'EXOTECH' | 'JOINT' | 'NO_BID'
 ): Promise<TenderWithEvaluation[]> {
-  const supabase = createServiceClient()
+  const supabase = await createClient()
 
   let query = supabase
     .from('tenders')

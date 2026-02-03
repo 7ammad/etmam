@@ -1,6 +1,6 @@
 /**
  * POST /api/scrape/sync-latest — sync tenders from the latest scraper-output/run-*.json to the DB.
- * Runs on the server (same process as sync API) so we avoid child-process fetch issues.
+ * Matches run-active-* and run-historical-* (latest by mtime). Runs on the server (same process as sync API).
  */
 
 import { NextResponse } from 'next/server'

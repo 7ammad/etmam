@@ -1,4 +1,11 @@
 export {
+  BOOKLET_MULTIPLIERS,
+  BLOCKLIST_KEYWORDS,
+  INFRATECH_KEYWORDS,
+  EXOTECH_KEYWORDS,
+  STRATEGIC_ENTITIES,
+} from './constants'
+export {
   scoreTender,
   scoreTenderV2,
   scoreTenderMVP,
@@ -16,8 +23,15 @@ export {
 } from './effective-value'
 export {
   estimateValue,
+  estimateFromBooklet,
   needsValueEstimation,
   type ValueEstimate,
   type ValueEstimationConfig,
   type ScoringConfigWithEstimation,
 } from './value-estimator'
+export {
+  detectWorkType,
+  calculateDualScore,
+  type WorkTypeCommodityOrPro,
+  type DualScoreResult,
+} from './classifier'

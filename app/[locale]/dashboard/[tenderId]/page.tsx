@@ -12,6 +12,7 @@ import type { Locale } from '@/lib/i18n'
 import { ErrorState } from '@/components/dashboard/error-state'
 import { TenderDetailContent } from '@/components/dashboard/tender-detail-content'
 import { TenderDetailSkeleton } from '@/components/dashboard/tender-detail-skeleton'
+import { TenderDetailViewTracker } from '@/components/dashboard/tender-detail-view-tracker'
 import type { ScoreBreakdown } from '@/types/evaluation'
 import { Container } from '@radix-ui/themes'
 import { getEffectiveValueDisplay } from '@/lib/display-ev'
@@ -100,6 +101,7 @@ export default async function TenderDetailPage({ params }: Props) {
 
   return (
     <Suspense fallback={<TenderDetailSkeleton />}>
+      <TenderDetailViewTracker tenderId={tenderId} locale={locale} />
       <TenderDetailContent
         tender={tender}
         locale={locale}

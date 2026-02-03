@@ -124,15 +124,23 @@ async function main(): Promise<void> {
       if (!fs.existsSync(SCRAPER_OUTPUT_DIR)) {
         fs.mkdirSync(SCRAPER_OUTPUT_DIR, { recursive: true })
       }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
       const runFile = path.join(
         SCRAPER_OUTPUT_DIR,
-        `run-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+        `run-${scraperMode}-${timestamp}.json`
       )
-      fs.writeFileSync(
-        runFile,
-        JSON.stringify({ tenders: result.tenders, metadata: result.metadata }, null, 2),
-        'utf-8'
-      )
+      const payload = {
+        mode: scraperMode,
+        tenders: result.tenders,
+        metadata: result.metadata,
+      }
+      try {
+        fs.writeFileSync(runFile, JSON.stringify(payload, null, 2), 'utf-8')
+      } catch (writeErr) {
+        const msg = writeErr instanceof Error ? writeErr.message : String(writeErr)
+        console.error(`[Output] Failed to write ${runFile}: ${msg}`)
+        throw writeErr
+      }
       console.log(`[Output] Wrote ${result.tenders.length} tenders to ${runFile}`)
       console.log('')
     }
