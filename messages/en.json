@@ -597,6 +597,29 @@
       "guidance": "Load historic tenders to see market analysis."
     }
   },
+  "booklet": {
+    "title": "RFP Booklet",
+    "verified": "Verified",
+    "confidence": "Confidence",
+    "evaluationWeights": "Evaluation Weights",
+    "financial": "Financial",
+    "technical": "Technical",
+    "localContent": "Local Content",
+    "boqItems": "BoQ Items",
+    "item": "Item",
+    "qty": "Qty",
+    "unit": "Unit",
+    "moreItems": "more items",
+    "uploadNew": "Upload New",
+    "clear": "Clear",
+    "error": "Upload failed",
+    "tryAgain": "Try Again",
+    "processing": "Processing PDF",
+    "extracting": "Extracting data with AI...",
+    "dropHere": "Drop PDF here",
+    "dropzone": "Drop RFP booklet PDF or click to select",
+    "pdfOnly": "PDF files only (max 10MB)"
+  },
   "landing": {
     "tagline": "From Etimad to CRM in seconds",
     "subtitle": "Intelligent evaluation and automatic opportunity creation",

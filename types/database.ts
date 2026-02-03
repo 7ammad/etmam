@@ -34,6 +34,7 @@ export interface Database {
           is_protected: boolean | null
           entity_en: string | null
           title_en: string | null
+          booklet_metadata: Json | null
         }
         Insert: {
           id?: string
@@ -59,6 +60,7 @@ export interface Database {
           is_protected?: boolean | null
           entity_en?: string | null
           title_en?: string | null
+          booklet_metadata?: Json | null
         }
         Update: {
           id?: string
@@ -84,6 +86,7 @@ export interface Database {
           is_protected?: boolean | null
           entity_en?: string | null
           title_en?: string | null
+          booklet_metadata?: Json | null
         }
         Relationships: []
       }

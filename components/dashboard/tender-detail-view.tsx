@@ -8,12 +8,14 @@ import { ScoreGauge } from '@/components/dashboard/score-gauge'
 import { ScoreBreakdownList } from '@/components/dashboard/score-breakdown'
 import { EvaluationTabs } from '@/components/dashboard/evaluation-tabs'
 import { AiPriceBlock } from '@/components/dashboard/ai-price-block'
+import { BookletUploadCard } from '@/components/dashboard/booklet-upload-card'
 import { Container, Flex, Box, Text, Card, Link, Badge } from '@radix-ui/themes'
 import { ArrowLeft, Sparkles, ArrowRight, Briefcase } from 'lucide-react'
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import type { TenderWithEvaluation } from '@/lib/queries/tender'
 import type { Tables } from '@/types/database'
+import type { BookletMetadata } from '@/lib/parsing'
 
 const localeMap = { ar, en: enUS } as const
 
@@ -331,6 +333,12 @@ export function TenderDetailView({
                 />
               </Flex>
             </Card>
+
+            {/* Booklet PDF Upload Card */}
+            <BookletUploadCard
+              tenderId={tender.id}
+              existingMetadata={(tender as unknown as { booklet_metadata: BookletMetadata | null }).booklet_metadata}
+            />
 
             {/* Evaluation details: tabs (Summary, Strengths, Risks, Requirements, Actions) */}
             {hasEvaluation && (

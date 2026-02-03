@@ -1,0 +1,9 @@
+{
+  "boq_items": null,
+  "evaluation_weights": null,
+  "local_content_target": null,
+  "extraction_confidence": 25,
+  "extracted_at": "2026-02-03T14:10:40.780Z",
+  "source_text_length": 61565,
+  "extraction_notes": "This document appears to be a general RFP conditions document (كراسة الشروط) for IT services/consulting, not a specific tender with Bill of Quantities. The text contains standard RFP clauses, definitions, and general conditions but no structured BoQ table with quantities and units. There are references to evaluation criteria but no explicit weight percentages. No local content target percentage was found in the provided text. The document seems to be focused on IT strategy, governance, and service management consulting services rather than goods procurement with quantities."
+}
